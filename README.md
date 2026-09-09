@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WeddingPlanner
 
-## Getting Started
+App personal para planificar una boda: presupuesto por categoría con alertas, lista de invitados con asignación de mesa, lista de canciones, línea de tiempo del día, y un editor visual de distribución del salón (mesas, escenario, pista de baile, área de fotos) tipo "Lego".
 
-First, run the development server:
+Stack: Next.js (App Router, TypeScript, Tailwind), Prisma + MongoDB, Zustand (estado del editor de canvas), react-konva/Konva (canvas 2D), `@dnd-kit` (listas reordenables).
+
+## Requisitos
+
+- Node.js 20+
+- Docker Desktop (para levantar MongoDB localmente)
+
+## Puesta en marcha
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+docker compose up -d mongo   # levanta MongoDB como replica set de un solo nodo
+cp .env.example .env.local   # si no existe ya
+npx prisma db push           # sincroniza el esquema con la base de datos
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Por qué MongoDB corre como replica set
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Prisma requiere que MongoDB esté configurado como replica set para poder **escribir** datos (incluso un solo documento) — ver [pris.ly/d/mongodb-replica-set](https://pris.ly/d/mongodb-replica-set). El `docker-compose.yml` ya levanta el contenedor con `--replSet rs0` y lo inicializa automáticamente vía `healthcheck` la primera vez.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Conectar a MongoDB Atlas en vez de local
 
-## Learn More
+Solo cambia `MONGODB_URI` en `.env.local` por la cadena de conexión de Atlas (que ya corre como replica set) — no se necesita ningún cambio de código.
 
-To learn more about Next.js, take a look at the following resources:
+## Estructura
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `src/app/` — rutas de la app en español: `/`, `/invitados`, `/presupuesto`, `/canciones`, `/linea-tiempo`, `/distribucion`.
+- `src/lib/` — conexión a Prisma, helpers de negocio (`wedding.ts`, `budgetAlerts.ts`, `seatGeometry.ts`, `seatingLayout.ts`).
+- `src/generated/prisma/` — cliente de Prisma generado (no se edita a mano).
+- `prisma/schema.prisma` — modelos de datos.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Notas de v1
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Pensada para una sola boda, sin autenticación. El modelo de datos ya incluye `weddingId` en cada colección para poder agregar multi-boda/autenticación más adelante sin reescribir el esquema.
+- Pendiente para versiones futuras: zoom/pan en el editor de distribución, exportar el plano como imagen, deshacer/rehacer, importar/exportar invitados en CSV.

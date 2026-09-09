@@ -1,0 +1,23 @@
+services:
+  mongo:
+    image: mongo:8
+    container_name: weddingplanner-mongo
+    restart: unless-stopped
+    # Prisma requiere que MongoDB corra como replica set para poder escribir
+    # (incluso con un solo nodo) — ver https://pris.ly/d/mongodb-replica-set
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: weddingplanner
+    healthcheck:
+      test: |
+        mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongo-data:

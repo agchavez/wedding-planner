@@ -1,69 +1,133 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, CalendarClock, LayoutGrid, ListMusic, Users, Wallet } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { getActiveWeddingId } from "@/lib/wedding";
+import { getBudgetAlerts } from "@/lib/budgetAlerts";
+import { WeddingForm } from "@/app/WeddingForm";
+import { AlertBanner } from "@/components/AlertBanner";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+function daysUntil(date: Date | null) {
+  if (!date) return null;
+  return Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function formatMoney(amount: number, currency: string) {
+  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+}
+
+export default async function DashboardPage() {
+  const weddingId = await getActiveWeddingId();
+
+  const [wedding, guests, expenses, songsCount, eventsCount, alerts] = await Promise.all([
+    prisma.wedding.findUnique({ where: { id: weddingId } }),
+    prisma.guest.findMany({ where: { weddingId } }),
+    prisma.expense.findMany({ where: { weddingId } }),
+    prisma.song.count({ where: { weddingId } }),
+    prisma.timelineEvent.count({ where: { weddingId } }),
+    getBudgetAlerts(),
+  ]);
+
+  const currency = wedding?.currency ?? "HNL";
+  const confirmed = guests.filter((g) => g.rsvpStatus === "confirmed");
+  const pending = guests.filter((g) => g.rsvpStatus === "pending");
+  const declined = guests.filter((g) => g.rsvpStatus === "declined");
+  const totalAttending = confirmed.reduce((sum, g) => sum + 1 + g.plusOnes, 0);
+  const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
+  const days = daysUntil(wedding?.weddingDate ?? null);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-8">
+      <section className="overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-secondary/60 to-card px-6 py-10 sm:px-10 sm:py-14">
+        <WeddingForm wedding={wedding!} />
+        {days !== null && (
+          <div className="mt-5 flex justify-center">
+            <Badge className="px-3 py-1 text-sm" variant="secondary">
+              {days > 0 ? `Faltan ${days} días para la boda` : days === 0 ? "¡Es hoy! 🎉" : "La boda ya pasó"}
+            </Badge>
+          </div>
+        )}
+      </section>
+
+      <AlertBanner alerts={alerts} />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <DashboardCard
+          href="/invitados"
+          icon={Users}
+          title="Invitados"
+          value={`${totalAttending} asistentes`}
+          detail={`${confirmed.length} confirmados · ${pending.length} pendientes · ${declined.length} rechazados`}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <DashboardCard
+          href="/presupuesto"
+          icon={Wallet}
+          title="Presupuesto"
+          value={formatMoney(totalActual, currency)}
+          detail={`de ${formatMoney(wedding?.totalBudget ?? 0, currency)} estimado`}
+        />
+        <DashboardCard
+          href="/canciones"
+          icon={ListMusic}
+          title="Canciones"
+          value={`${songsCount}`}
+          detail="canciones en la lista"
+        />
+        <DashboardCard
+          href="/linea-tiempo"
+          icon={CalendarClock}
+          title="Línea de tiempo"
+          value={`${eventsCount}`}
+          detail="momentos planificados"
+        />
+      </div>
+
+      <Link href="/distribucion">
+        <Card className="transition-shadow hover:shadow-md">
+          <CardContent className="flex items-center gap-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+              <LayoutGrid className="size-5" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">Editor de distribución del salón</p>
+              <p className="text-sm text-muted-foreground">Mesas, escenario, pista de baile y área de fotos</p>
+            </div>
+            <ArrowRight className="size-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
     </div>
+  );
+}
+
+function DashboardCard({
+  href,
+  icon: Icon,
+  title,
+  value,
+  detail,
+}: {
+  href: string;
+  icon: typeof Users;
+  title: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="h-full transition-shadow hover:shadow-md">
+        <CardContent className="space-y-1">
+          <div className="mb-1 flex size-9 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Icon className="size-4" />
+          </div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="text-xl font-semibold text-foreground">{value}</p>
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+// Documento singleton: datos generales de la boda.
+model Wedding {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  partner1     String    @default("")
+  partner2     String    @default("")
+  weddingDate  DateTime?
+  venueName    String    @default("")
+  venueAddress String    @default("")
+  totalBudget  Float     @default(0)
+  currency     String    @default("HNL")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Guest {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId           String?  @db.ObjectId
+  fullName            String
+  group               String   @default("")
+  rsvpStatus          String   @default("pending") // pending | confirmed | declined
+  plusOnes            Int      @default(0)
+  plusOneNames        String[] @default([])
+  dietaryRestrictions String   @default("")
+  notes               String   @default("")
+  // Referencia suelta al id de un LayoutElement embebido en SeatingLayout.elements.
+  tableElementId      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model ExpenseCategory {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId       String?  @db.ObjectId
+  name            String
+  estimatedBudget Float    @default(0)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Expense {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId       String?   @db.ObjectId
+  categoryId      String    @db.ObjectId
+  description     String
+  vendor          String    @default("")
+  estimatedAmount Float     @default(0)
+  actualAmount    Float     @default(0)
+  amountPaid      Float     @default(0)
+  paymentStatus   String    @default("pending") // pending | partially_paid | paid
+  dueDate         DateTime?
+  paidDate        DateTime?
+  notes           String    @default("")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Song {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId   String?  @db.ObjectId
+  title       String
+  artist      String   @default("")
+  // ceremony | cocktail | entrance | dinner | party | last_dance | do_not_play | other
+  category    String   @default("other")
+  mustPlay    Boolean  @default(false)
+  requestedBy String   @default("")
+  notes       String   @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Un "evento" dentro de la boda (ej. "Boda Jardín", "Boda Fiesta") — permite tener
+// varias líneas de tiempo independientes cuando la boda tiene más de una celebración.
+model WeddingEvent {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId String?  @db.ObjectId
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TimelineEvent {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId       String?   @db.ObjectId
+  // Referencia suelta a WeddingEvent.id. Null = "General" (boda sin sub-eventos separados).
+  eventId         String?   @db.ObjectId
+  title           String
+  description     String    @default("")
+  startTime       DateTime?
+  durationMinutes Int       @default(0)
+  // preparation | ceremony | reception | party
+  category        String?
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Elemento embebido dentro de SeatingLayout.elements (mesa, silla, escenario, altar, entrada, etc.).
+// El campo `id` es un string generado en la app (no un ObjectId de Mongo), y es lo que
+// Guest.tableElementId referencia para asignar invitados a una mesa.
+type LayoutElement {
+  id          String
+  // table-round | table-rectangular | table-sweetheart | table-cake | chair-row |
+  // stage | dance-floor | photo-area | altar | aisle | entrance | restroom | hallway
+  type        String
+  label       String  @default("")
+  tableNumber Int?
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  rotation    Float   @default(0)
+  capacity    Int?
+  // Solo para type "chair-row": filas y columnas del bloque de sillas.
+  rows        Int?
+  columns     Int?
+  fill        String?
+  zIndex      Int     @default(0)
+}
+
+// Distribución visual de un evento de la boda (una por WeddingEvent — comparten el mismo id
+// que su WeddingEvent, ver getOrCreateSeatingLayout en lib/seatingLayout.ts).
+model SeatingLayout {
+  id           String          @id @map("_id") @db.ObjectId
+  weddingId    String?         @db.ObjectId
+  eventId      String?         @db.ObjectId
+  canvasWidth  Int             @default(2000)
+  canvasHeight Int             @default(1400)
+  // indoor | garden — estilo visual del salón (interior o ceremonia al aire libre).
+  background   String          @default("indoor")
+  elements     LayoutElement[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
