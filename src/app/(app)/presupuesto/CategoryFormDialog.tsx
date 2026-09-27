@@ -2,7 +2,9 @@
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { createCategory, updateCategory } from "@/app/(app)/presupuesto/actions";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +22,11 @@ export function CategoryFormDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const { canEdit } = useWeddingAccess();
   const isEdit = Boolean(category);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -34,13 +40,18 @@ export function CategoryFormDialog({
           id="category-form"
           action={(formData) => {
             startTransition(async () => {
-              if (category) {
-                await updateCategory(category.id, formData);
-              } else {
-                await createCategory(formData);
+              try {
+                if (category) {
+                  await updateCategory(category.id, formData);
+                } else {
+                  await createCategory(formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(category ? "Categoría actualizada" : "Categoría creada");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="space-y-3"

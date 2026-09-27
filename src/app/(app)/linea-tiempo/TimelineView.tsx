@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { TimelineEvent } from "@/generated/prisma";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 
 function formatTime(date: Date | null) {
   if (!date) return "Hora por definir";
@@ -34,7 +35,6 @@ function formatTime(date: Date | null) {
 
 /** Fila usada tanto en pantalla como en la lista que se imprime/exporta. */
 function TimelineRow({ item, dragHandle }: { item: TimelineEvent; dragHandle?: React.ReactNode }) {
-  const [, startTransition] = useTransition();
 
   return (
     <Card className="print:border-none print:shadow-none">
@@ -77,7 +77,8 @@ function TimelineRow({ item, dragHandle }: { item: TimelineEvent; dragHandle?: R
             }
             title={`¿Eliminar "${item.title}"?`}
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteTimelineEvent(item.id))}
+            onConfirm={() => deleteTimelineEvent(item.id)}
+            successMessage="Momento eliminado"
           />
         </div>
       </CardContent>
@@ -86,7 +87,11 @@ function TimelineRow({ item, dragHandle }: { item: TimelineEvent; dragHandle?: R
 }
 
 function SortableTimelineRow({ item }: { item: TimelineEvent }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const { canEdit } = useWeddingAccess();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !canEdit,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
@@ -94,6 +99,7 @@ function SortableTimelineRow({ item }: { item: TimelineEvent }) {
       <TimelineRow
         item={item}
         dragHandle={
+          canEdit && (
           <button
             {...attributes}
             {...listeners}
@@ -102,6 +108,7 @@ function SortableTimelineRow({ item }: { item: TimelineEvent }) {
           >
             <GripVertical className="size-4" />
           </button>
+          )
         }
       />
     </div>

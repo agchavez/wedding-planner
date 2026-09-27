@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { deleteWeddingEvent } from "@/app/(app)/linea-tiempo/events-actions";
 import { EventFormDialog } from "@/app/(app)/linea-tiempo/EventFormDialog";
@@ -21,7 +21,6 @@ export function DistribucionEventTabsClient({
   layoutByEvent: Record<string, LayoutData>;
 }) {
   const [activeId, setActiveId] = useState(events[0]?.id ?? "");
-  const [, startTransition] = useTransition();
 
   if (events.length === 0) {
     return (
@@ -82,13 +81,12 @@ export function DistribucionEventTabsClient({
             }
             title={`¿Eliminar el evento "${activeEvent.name}"?`}
             description="Se eliminarán también su línea de tiempo y su distribución del salón. Esta acción no se puede deshacer."
-            onConfirm={() =>
-              startTransition(async () => {
-                await deleteWeddingEvent(activeEvent.id);
-                const remaining = events.filter((e) => e.id !== activeEvent.id);
-                setActiveId(remaining[0]?.id ?? "");
-              })
-            }
+            onConfirm={async () => {
+              await deleteWeddingEvent(activeEvent.id);
+              const remaining = events.filter((e) => e.id !== activeEvent.id);
+              setActiveId(remaining[0]?.id ?? "");
+            }}
+            successMessage="Evento eliminado"
           />
         </div>
       </div>

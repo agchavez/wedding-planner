@@ -11,6 +11,7 @@ import { Toolbar } from "@/app/(app)/distribucion/Toolbar";
 import { PropertiesPanel } from "@/app/(app)/distribucion/PropertiesPanel";
 import { saveLayout } from "@/app/(app)/distribucion/actions";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { cn } from "@/lib/utils";
 import type { LayoutElement } from "@/generated/prisma";
 
@@ -46,6 +47,9 @@ export function SeatingEditor({
   const selectElement = useCanvasStore((s) => s.selectElement);
   const setSaveStatus = useCanvasStore((s) => s.setSaveStatus);
   const markClean = useCanvasStore((s) => s.markClean);
+  const setViewCenter = useCanvasStore((s) => s.setViewCenter);
+  const { canEdit } = useWeddingAccess();
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   const nodeRefs = useRef(new Map<string, Konva.Group>());
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -56,6 +60,30 @@ export function SeatingEditor({
     didInit.current = true;
     setElements(initialElements, initialCanvasWidth, initialCanvasHeight, initialBackground);
     // Solo se usa el valor inicial cargado del servidor; después el store es la fuente de verdad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateViewCenter = useCallback(() => {
+    const box = viewportRef.current;
+    if (!box) return;
+    setViewCenter({ x: box.scrollLeft + box.clientWidth / 2, y: box.scrollTop + box.clientHeight / 2 });
+  }, [setViewCenter]);
+
+  // Al abrir, centra la vista en lo que ya hay en el salón (o en el centro del lienzo).
+  useEffect(() => {
+    const box = viewportRef.current;
+    if (!box) return;
+    let cx = initialCanvasWidth / 2;
+    let cy = initialCanvasHeight / 2;
+    if (initialElements.length > 0) {
+      const xs = initialElements.map((el) => el.x);
+      const ys = initialElements.map((el) => el.y);
+      cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    }
+    box.scrollTo({ left: Math.max(0, cx - box.clientWidth / 2), top: Math.max(0, cy - box.clientHeight / 2) });
+    updateViewCenter();
+    // Solo al montar: después el usuario controla el desplazamiento.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -91,21 +119,25 @@ export function SeatingEditor({
   const isRoundSelected = selected?.type === "table-round";
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className={cn("grid min-w-0 grid-cols-1 gap-4", canEdit && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Toolbar />
-            <CanvasSizeControl />
-            <AmbienteControl />
+        {canEdit && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              <Toolbar />
+              <CanvasSizeControl />
+              <AmbienteControl />
+            </div>
+            <div className="flex items-center gap-3">
+              <SaveIndicator status={saveStatus} dirty={dirty} />
+              <Button onClick={performSave}>Guardar ahora</Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <SaveIndicator status={saveStatus} dirty={dirty} />
-            <Button onClick={performSave}>Guardar ahora</Button>
-          </div>
-        </div>
+        )}
 
         <div
+          ref={viewportRef}
+          onScroll={updateViewCenter}
           className={cn("overflow-auto rounded-lg border border-border", BACKGROUND_CLASSES[background])}
           style={{ maxHeight: "min(70vh, 560px)" }}
         >
@@ -121,7 +153,8 @@ export function SeatingEditor({
                 <CanvasElement
                   key={el.id}
                   element={el}
-                  isSelected={el.id === selectedId}
+                  isSelected={canEdit && el.id === selectedId}
+                  editable={canEdit}
                   onSelect={selectElement}
                   onChange={updateElement}
                   registerRef={registerRef}
@@ -129,6 +162,7 @@ export function SeatingEditor({
               ))}
               <Transformer
                 ref={transformerRef}
+                visible={canEdit}
                 rotateEnabled
                 keepRatio={isRoundSelected}
                 boundBoxFunc={(oldBox, newBox) => {
@@ -141,7 +175,7 @@ export function SeatingEditor({
         </div>
       </div>
 
-      <PropertiesPanel />
+      {canEdit && <PropertiesPanel />}
     </div>
   );
 }

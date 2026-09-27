@@ -14,6 +14,9 @@ type CanvasState = {
   dirty: boolean;
   saveStatus: SaveStatus;
   setElements: (elements: LayoutElement[], canvasWidth?: number, canvasHeight?: number, background?: Background) => void;
+  /** Centro de la zona visible del lienzo: ahí aparecen los elementos nuevos. */
+  viewCenter: { x: number; y: number } | null;
+  setViewCenter: (center: { x: number; y: number }) => void;
   addElement: (type: ElementType) => void;
   updateElement: (id: string, patch: Partial<LayoutElement>) => void;
   removeElement: (id: string) => void;
@@ -34,6 +37,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   background: "indoor",
   dirty: false,
   saveStatus: "idle",
+  viewCenter: null,
+
+  setViewCenter: (center) => set({ viewCenter: center }),
 
   setElements: (elements, canvasWidth, canvasHeight, background) => {
     nextTableNumberCounter = elements.reduce(
@@ -61,8 +67,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       type,
       label: isTable ? `Mesa ${nextTableNumberCounter}` : ELEMENT_LABELS[type],
       tableNumber: isTable ? nextTableNumberCounter : null,
-      x: get().canvasWidth / 2,
-      y: get().canvasHeight / 2,
+      x: get().viewCenter?.x ?? get().canvasWidth / 2,
+      y: get().viewCenter?.y ?? get().canvasHeight / 2,
       width: shape.width,
       height: shape.height,
       rotation: 0,

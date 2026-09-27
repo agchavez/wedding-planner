@@ -2,7 +2,9 @@
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { createGuest, updateGuest } from "@/app/(app)/invitados/actions";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
@@ -33,7 +35,11 @@ export function GuestFormDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const { canEdit } = useWeddingAccess();
   const isEdit = Boolean(guest);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -47,13 +53,18 @@ export function GuestFormDialog({
           id="guest-form"
           action={(formData) => {
             startTransition(async () => {
-              if (guest) {
-                await updateGuest(guest.id, formData);
-              } else {
-                await createGuest(formData);
+              try {
+                if (guest) {
+                  await updateGuest(guest.id, formData);
+                } else {
+                  await createGuest(formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(guest ? "Invitado actualizado" : "Invitado agregado");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="grid grid-cols-1 gap-3 sm:grid-cols-2"

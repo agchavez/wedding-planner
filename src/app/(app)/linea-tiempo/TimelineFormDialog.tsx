@@ -4,7 +4,9 @@ import { useRef, useState, useTransition, type ReactElement, type ReactNode } fr
 import { format } from "date-fns";
 import { createTimelineEvent, updateTimelineEvent } from "@/app/(app)/linea-tiempo/actions";
 import { TIMELINE_CATEGORY_LABEL, TIMELINE_CATEGORY_OPTIONS } from "@/app/(app)/linea-tiempo/categories";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { TimePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -27,7 +29,11 @@ export function TimelineFormDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const { canEdit } = useWeddingAccess();
   const isEdit = Boolean(item);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -41,13 +47,18 @@ export function TimelineFormDialog({
           id="timeline-form"
           action={(formData) => {
             startTransition(async () => {
-              if (item) {
-                await updateTimelineEvent(item.id, formData);
-              } else {
-                await createTimelineEvent(eventId, formData);
+              try {
+                if (item) {
+                  await updateTimelineEvent(item.id, formData);
+                } else {
+                  await createTimelineEvent(eventId, formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(item ? "Momento actualizado" : "Momento agregado");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="grid grid-cols-1 gap-3 sm:grid-cols-2"

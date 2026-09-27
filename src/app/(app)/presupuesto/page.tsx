@@ -6,6 +6,7 @@ import { CategoryFormDialog } from "@/app/(app)/presupuesto/CategoryFormDialog";
 import { CategoryCard } from "@/app/(app)/presupuesto/CategoryCard";
 import { BudgetSummary } from "@/app/(app)/presupuesto/BudgetSummary";
 import { Button } from "@/components/ui/button";
+import { effectiveBudget } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ export default async function PresupuestoPage() {
   const currency = wedding?.currency ?? "HNL";
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
   const totalPaid = expenses.reduce((sum, e) => sum + e.amountPaid, 0);
+  const budget = effectiveBudget(
+    wedding?.totalBudget ?? 0,
+    categories.map((c) => c.estimatedBudget)
+  );
 
   return (
     <div className="space-y-6">
@@ -44,7 +49,8 @@ export default async function PresupuestoPage() {
       </div>
 
       <BudgetSummary
-        totalBudget={wedding?.totalBudget ?? 0}
+        totalBudget={budget.amount}
+        budgetSource={budget.source}
         totalActual={totalActual}
         totalPaid={totalPaid}
         currency={currency}

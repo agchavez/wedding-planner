@@ -23,8 +23,24 @@ export function formatDate(iso: string) {
   return dateOnly.format(new Date(iso));
 }
 
-export function formatMoney(amount: number, currency = "HNL") {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
+/** Único formato de dinero de la app: "L 42,000.00". */
+export function formatMoney(amount: number, currency?: string | null) {
+  return new Intl.NumberFormat("es-HN", {
+    style: "currency",
+    currency: currency || "HNL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
+ * Presupuesto de referencia: el total que definió la pareja o, si no lo hizo, la suma de
+ * lo estimado en sus categorías.
+ */
+export function effectiveBudget(totalBudget: number, categoryEstimates: number[]) {
+  if (totalBudget > 0) return { amount: totalBudget, source: "total" as const };
+  const sum = categoryEstimates.reduce((a, b) => a + b, 0);
+  return sum > 0 ? { amount: sum, source: "categories" as const } : { amount: 0, source: "none" as const };
 }
 
 export function initials(name: string) {

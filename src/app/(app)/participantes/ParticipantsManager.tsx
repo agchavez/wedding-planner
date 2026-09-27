@@ -158,6 +158,7 @@ export function ParticipantsManager({
                           title={`¿Quitar a ${p.name}?`}
                           description="Dejará de ver y editar esta boda. Podrás invitarle de nuevo cuando quieras."
                           onConfirm={() => perform(() => removeParticipantAction(p.id, p.name), `${p.name} ya no participa en la boda.`)}
+                          confirmLabel="Quitar"
                         />
                       </div>
                     ) : (
@@ -218,6 +219,8 @@ export function ParticipantsManager({
             title="¿Salir de esta boda?"
             description="Dejarás de verla. Para volver necesitarás una nueva invitación."
             onConfirm={() => perform(() => leaveWeddingAction(), "Saliste de la boda.")}
+            confirmLabel="Salir de la boda"
+            requiresEdit={false}
           />
         )}
       </div>
