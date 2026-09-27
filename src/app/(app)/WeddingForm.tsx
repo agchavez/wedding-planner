@@ -4,14 +4,11 @@ import { useState, useTransition } from "react";
 import { Pencil } from "lucide-react";
 import { updateWeddingDetails } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
+import { formatCalendarDate, toDateOnlyValue } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import type { Wedding } from "@/generated/prisma";
-
-function toDateInputValue(date: Date | null) {
-  if (!date) return "";
-  return new Date(date).toISOString().slice(0, 10);
-}
 
 export function WeddingForm({ wedding }: { wedding: Wedding }) {
   const [editing, setEditing] = useState(false);
@@ -28,7 +25,7 @@ export function WeddingForm({ wedding }: { wedding: Wedding }) {
         <div className="mx-auto my-4 h-px w-24 bg-decorative" />
         <p className="text-base text-muted-foreground">
           {wedding.weddingDate
-            ? new Intl.DateTimeFormat("es-HN", { dateStyle: "full" }).format(new Date(wedding.weddingDate))
+            ? formatCalendarDate(wedding.weddingDate, "full")
             : "Fecha por definir"}
         </p>
         <p className="text-sm text-muted-foreground">{wedding.venueName || "Lugar por definir"}</p>
@@ -60,11 +57,11 @@ export function WeddingForm({ wedding }: { wedding: Wedding }) {
       </div>
       <div>
         <Label htmlFor="weddingDate">Fecha de la boda</Label>
-        <Input
+        <DatePicker
           id="weddingDate"
           name="weddingDate"
-          type="date"
-          defaultValue={toDateInputValue(wedding.weddingDate)}
+          defaultValue={toDateOnlyValue(wedding.weddingDate)}
+          placeholder="Fecha por definir"
           className="mt-1"
         />
       </div>

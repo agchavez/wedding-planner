@@ -12,11 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { STATUS_LABEL } from "@/app/(app)/gastos/constants";
 import type { Expense, ExpenseCategory } from "@/generated/prisma";
-
-function toDateOnlyString(date: Date | null) {
-  if (!date) return "";
-  return new Date(date).toISOString().slice(0, 10);
-}
+import { toDateOnlyValue } from "@/lib/format";
 
 export function ExpenseFormDialog({
   expense,
@@ -107,7 +103,7 @@ export function ExpenseFormDialog({
           </div>
           <div>
             <Label htmlFor="dueDate">Fecha de vencimiento</Label>
-            <DatePicker name="dueDate" defaultValue={toDateOnlyString(expense?.dueDate ?? null)} className="mt-1" />
+            <DatePicker name="dueDate" defaultValue={toDateOnlyValue(expense?.dueDate)} className="mt-1" />
           </div>
           <div>
             <Label htmlFor="estimatedAmount">Monto estimado</Label>

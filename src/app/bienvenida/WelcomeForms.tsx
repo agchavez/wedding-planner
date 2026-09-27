@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Heart, LoaderCircle } from "lucide-react";
 import { acceptInvitationAction, createWeddingAction } from "@/app/bienvenida/actions";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { roleLabel } from "@/lib/permissions";
@@ -76,7 +77,7 @@ export function CreateWeddingForm({ showHeading, cancelHref }: { showHeading: bo
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="weddingDate">Fecha de la boda</Label>
-        <Input id="weddingDate" name="weddingDate" type="date" className="h-11 px-3.5 text-base md:text-sm" />
+        <DatePicker id="weddingDate" name="weddingDate" placeholder="Elige la fecha" className="h-11 px-3.5" />
         <p className="text-xs text-muted-foreground">Si aún no la tienen, déjala vacía y agrégala después.</p>
       </div>
       {error && (

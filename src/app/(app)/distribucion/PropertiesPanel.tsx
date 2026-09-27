@@ -2,6 +2,7 @@
 
 import { useCanvasStore } from "@/app/(app)/distribucion/canvasStore";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,17 +149,13 @@ export function PropertiesPanel() {
         </div>
 
         <div className="flex gap-2 pt-2">
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              if (confirm(`¿Eliminar "${selected.label || ELEMENT_LABELS[selected.type as ElementType]}"?`)) {
-                removeElement(selected.id);
-              }
-            }}
-          >
-            Eliminar
-          </Button>
+          <ConfirmDeleteDialog
+            triggerRender={<Button variant="destructive" size="sm" />}
+            triggerChildren="Eliminar"
+            title={`¿Eliminar "${selected.label || ELEMENT_LABELS[selected.type as ElementType]}"?`}
+            description="Se quitará del plano de este salón."
+            onConfirm={() => removeElement(selected.id)}
+          />
           <Button variant="outline" size="sm" onClick={() => selectElement(null)}>
             Deseleccionar
           </Button>

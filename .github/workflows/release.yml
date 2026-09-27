@@ -1,40 +1,77 @@
 name: Release
 
+# Regla: todo cambio entra a main por PR. Al mergear un PR se crea el tag semver y el
+# release. El tipo de cambio se toma del título del PR (Conventional Commits):
+#   feat: …            → minor   (v1.2.0 → v1.3.0)
+#   fix: / chore: / …  → patch   (v1.2.0 → v1.2.1)
+#   tipo!: … o "BREAKING CHANGE" en la descripción → major (v1.2.0 → v2.0.0)
+# Con la etiqueta `sin-release` en el PR no se publica versión.
+
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Build & Publish Release
+    name: Tag & release
+    if: github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'sin-release')
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
+      - name: Calculate next version
+        id: version
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          last=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          if [ -z "$last" ]; then
+            # Primer release: parte de la versión de package.json.
+            next="v$(node -p "require('./package.json').version")"
+          else
+            IFS=. read -r major minor patch <<< "${last#v}"
+            if [[ "$PR_TITLE" =~ ^[a-z]+(\([^\)]*\))?!: ]] || grep -q "BREAKING CHANGE" <<< "$PR_BODY"; then
+              next="v$((major + 1)).0.0"
+            elif [[ "$PR_TITLE" =~ ^feat(\([^\)]*\))?: ]]; then
+              next="v${major}.$((minor + 1)).0"
+            else
+              next="v${major}.${minor}.$((patch + 1))"
+            fi
+          fi
+          echo "Última: ${last:-ninguna} → siguiente: $next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG: $PR_TITLE"
+          git push origin "$TAG"
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Build
-        run: npm run build
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          name: ${{ github.ref_name }}
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          previous=$(git tag --list 'v*.*.*' --sort=-v:refname | sed -n 2p)
+          args=(--title "$TAG · $PR_TITLE" --generate-notes --verify-tag --latest)
+          [ -n "$previous" ] && args+=(--notes-start-tag "$previous")
+          gh release create "$TAG" "${args[@]}"

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ActivityFeed, Avatar, PageHeader, Panel, RoleChip, StatTile } from "@/app/(admin)/admin/_components/ui";
 import { getAdminWeddings, getRecentActivity } from "@/lib/admin-data";
-import { daysUntil, formatDate, formatMoney, relativeTime } from "@/lib/format";
+import { daysUntil, formatCalendarDate, formatMoney, relativeTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function AdminWeddingDetailPage({ params }: PageProps<"/adm
       <PageHeader
         title={wedding.name}
         description={[
-          wedding.weddingDate ? formatDate(wedding.weddingDate) : "Fecha por definir",
+          wedding.weddingDate ? formatCalendarDate(wedding.weddingDate) : "Fecha por definir",
           wedding.venueName || null,
           `creada ${relativeTime(wedding.createdAt).toLowerCase()}`,
         ]
@@ -43,7 +43,7 @@ export default async function AdminWeddingDetailPage({ params }: PageProps<"/adm
         <StatTile
           label="Faltan"
           value={days === null ? "—" : days >= 0 ? `${days} días` : "Celebrada"}
-          hint={wedding.weddingDate ? formatDate(wedding.weddingDate) : "Sin fecha"}
+          hint={wedding.weddingDate ? formatCalendarDate(wedding.weddingDate) : "Sin fecha"}
         />
         <StatTile label="Invitados confirmados" value={`${wedding.confirmedGuests}/${wedding.guests}`} />
         <StatTile

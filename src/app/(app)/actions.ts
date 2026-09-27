@@ -6,6 +6,7 @@ import { getEditableWeddingId, weddingDisplayName } from "@/lib/wedding";
 import { mongoDb } from "@/lib/mongo";
 import { toObjectId } from "@/lib/ids";
 import { audit } from "@/lib/audit";
+import { parseDateOnly } from "@/lib/format";
 
 export async function updateWeddingDetails(formData: FormData) {
   const id = await getEditableWeddingId();
@@ -21,7 +22,7 @@ export async function updateWeddingDetails(formData: FormData) {
       venueAddress: String(formData.get("venueAddress") ?? ""),
       totalBudget: Number(formData.get("totalBudget") ?? 0),
       currency: String(formData.get("currency") ?? "HNL"),
-      weddingDate: weddingDateRaw ? new Date(weddingDateRaw) : null,
+      weddingDate: parseDateOnly(weddingDateRaw),
     },
   });
 

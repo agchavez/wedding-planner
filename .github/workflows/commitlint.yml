@@ -3,8 +3,24 @@ name: Commit lint
 on:
   pull_request:
     branches: [main]
+    types: [opened, edited, synchronize, reopened]
 
 jobs:
+  pr-title:
+    name: Validate PR title
+    runs-on: ubuntu-24.04
+    steps:
+      # El título define la versión del release (ver release.yml).
+      - name: Check Conventional Commits format
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|perf|refactor|docs|style|test|build|ci|chore|revert)(\([a-z0-9._-]+\))?!?: .+'
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "::error::El título del PR debe seguir Conventional Commits, p. ej. 'feat(admin): agrega auditoría'. Recibido: '$TITLE'"
+            exit 1
+          fi
+
   commitlint:
     name: Validate PR commits
     runs-on: ubuntu-24.04

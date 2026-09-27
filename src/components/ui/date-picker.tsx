@@ -98,15 +98,22 @@ function toDateOnlyString(date: Date) {
 }
 
 export function DatePicker({
+  id,
   name,
   defaultValue,
   placeholder = "Selecciona una fecha",
   className,
+  fromYear = new Date().getFullYear() - 1,
+  toYear = new Date().getFullYear() + 5,
 }: {
+  id?: string;
   name: string;
   defaultValue?: string | null;
   placeholder?: string;
   className?: string;
+  /** Rango de años del selector de mes/año. */
+  fromYear?: number;
+  toYear?: number;
 }) {
   const [date, setDate] = useState<Date | undefined>(() => parseDateOnly(defaultValue));
   const [open, setOpen] = useState(false);
@@ -117,6 +124,7 @@ export function DatePicker({
       <PopoverTrigger
         render={
           <Button
+            id={id}
             type="button"
             variant="outline"
             className={cn("w-full justify-start font-normal", !date && "text-muted-foreground", className)}
@@ -130,6 +138,10 @@ export function DatePicker({
         <Calendar
           mode="single"
           selected={date}
+          defaultMonth={date}
+          captionLayout="dropdown"
+          startMonth={new Date(fromYear, 0)}
+          endMonth={new Date(toYear, 11)}
           onSelect={(d) => {
             setDate(d);
             setOpen(false);
@@ -137,6 +149,22 @@ export function DatePicker({
           locale={es}
           autoFocus
         />
+        {date && (
+          <div className="border-t border-border p-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              onClick={() => {
+                setDate(undefined);
+                setOpen(false);
+              }}
+            >
+              Quitar fecha
+            </Button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

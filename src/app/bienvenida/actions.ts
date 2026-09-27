@@ -9,6 +9,7 @@ import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { weddingDisplayName } from "@/lib/wedding";
+import { parseDateOnly } from "@/lib/format";
 
 function slugify(text: string) {
   return (
@@ -44,7 +45,7 @@ export async function createWeddingAction(formData: FormData): Promise<{ error?:
   await prisma.wedding.upsert({
     where: { id: weddingId },
     update: {},
-    create: { id: weddingId, partner1, partner2, weddingDate: dateRaw ? new Date(dateRaw) : null },
+    create: { id: weddingId, partner1, partner2, weddingDate: parseDateOnly(dateRaw) },
   });
   await audit("wedding.create", `Creó la boda ${name}`, { weddingId, targetId: weddingId });
   redirect("/");

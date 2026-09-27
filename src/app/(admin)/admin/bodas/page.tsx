@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CalendarDays, MailPlus, Users } from "lucide-react";
 import { Avatar, PageHeader, RoleChip } from "@/app/(admin)/admin/_components/ui";
 import { getAdminWeddings } from "@/lib/admin-data";
-import { daysUntil, formatDate, formatMoney, relativeTime } from "@/lib/format";
+import { daysUntil, formatCalendarDate, formatMoney, relativeTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export default async function AdminWeddingsPage() {
                       <h2 className="truncate font-heading text-xl font-semibold text-foreground">{w.name}</h2>
                       <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
                         <CalendarDays className="size-3.5" />
-                        {w.weddingDate ? formatDate(w.weddingDate) : "Fecha por definir"}
+                        {w.weddingDate ? formatCalendarDate(w.weddingDate) : "Fecha por definir"}
                       </p>
                     </div>
                     {days !== null && (

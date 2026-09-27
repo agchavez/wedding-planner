@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
+import { formatCalendarDate } from "@/lib/format";
 
 export type BudgetAlert = {
   type: "category_exceeded" | "total_exceeded" | "payment_overdue" | "payment_upcoming";
@@ -68,5 +69,5 @@ function formatMoney(amount: number, currency?: string) {
 }
 
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("es-HN", { dateStyle: "medium" }).format(date);
+  return formatCalendarDate(date);
 }
