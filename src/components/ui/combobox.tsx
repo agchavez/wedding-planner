@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { FIELD_TRIGGER_CLASS } from "@/components/ui/field-trigger";
 
 /**
  * Campo de texto con autocompletar (Popover + Command): sugiere valores ya usados
@@ -35,19 +36,21 @@ export function Combobox({
           <Button
             type="button"
             variant="outline"
-            className={cn("w-full justify-between font-normal", !value && "text-muted-foreground", className)}
+            className={cn(FIELD_TRIGGER_CLASS, !value && "text-muted-foreground", className)}
           />
         }
       >
         <span className="truncate">{value || placeholder}</span>
-        <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="start">
         <Command>
           <CommandInput value={value} onValueChange={setValue} placeholder="Buscar o escribir…" />
           <CommandList>
             <CommandEmpty>
-              <span className="text-xs">Sin coincidencias — se usará &quot;{value}&quot;.</span>
+              <span className="text-xs">
+                {value ? <>Se creará &quot;{value}&quot; como opción nueva.</> : "Escribe para buscar o crear uno nuevo."}
+              </span>
             </CommandEmpty>
             <CommandGroup>
               {suggestions.map((s) => (
