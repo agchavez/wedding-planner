@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AuditRow, HealthLevel } from "@/lib/admin-data";
-import { formatDateTime, initials, relativeTime } from "@/lib/format";
+import { formatDateTime, initials, relativeTime, formatIp } from "@/lib/format";
 import { roleLabel, type WeddingRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +132,7 @@ export function ActivityFeed({ rows, showWedding = true }: { rows: AuditRow[]; s
                     </Link>
                   </>
                 )}
-                {row.ip && ` · ${row.ip}`}
+                {row.ip && <span className="break-all">{` · ${formatIp(row.ip)}`}</span>}
               </p>
             </div>
           </li>
@@ -160,7 +160,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-card", className)}>
+    <section className={cn("min-w-0 rounded-2xl border border-border bg-card", className)}>
       <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div>
           <h2 className="font-medium text-foreground">{title}</h2>

@@ -85,3 +85,16 @@ const calendarFormats = {
 export function formatCalendarDate(date: Date | string, style: "medium" | "full" = "medium") {
   return calendarFormats[style].format(new Date(date));
 }
+
+/** IP legible: loopback → "Local", vacía → "Desconocida", IPv4 mapeada → IPv4. */
+export function formatIp(ip: string | null | undefined) {
+  const value = (ip ?? "").trim();
+  if (!value) return "Desconocida";
+  if (value === "::1" || value === "127.0.0.1" || /^[0:]+$/.test(value) || /^(0{4}:){7}0{3}1$/.test(value)) return "Local";
+  return value.replace(/^::ffff:/i, "");
+}
+
+/** "1 persona" / "3 personas". */
+export function plural(count: number, singular: string, pluralForm = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}

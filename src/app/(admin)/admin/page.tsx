@@ -3,7 +3,7 @@ import { ShieldAlert } from "lucide-react";
 import { ActivityChart } from "@/app/(admin)/admin/_components/ActivityChart";
 import { ActivityFeed, HealthPill, PageHeader, Panel, StatTile } from "@/app/(admin)/admin/_components/ui";
 import { getOverview, getRecentActivity, getSystemHealth } from "@/lib/admin-data";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, formatIp } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -98,8 +98,8 @@ export default async function AdminOverviewPage() {
                   <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
                   <div className="min-w-0">
                     <p className="text-sm text-foreground">
-                      <Link href={`/admin/actividad?q=${encodeURIComponent(f.ip)}`} className="font-mono hover:underline">
-                        {f.ip}
+                      <Link href={`/admin/actividad?q=${encodeURIComponent(f.ip)}`} className="break-all font-mono hover:underline">
+                        {formatIp(f.ip)}
                       </Link>{" "}
                       <span className="text-muted-foreground">· {f.count} intentos</span>
                     </p>

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ActivityFeed, Avatar, PageHeader, Panel, RoleChip, StatTile } from "@/app/(admin)/admin/_components/ui";
 import { getAdminWeddings, getRecentActivity } from "@/lib/admin-data";
-import { daysUntil, formatCalendarDate, formatMoney, relativeTime } from "@/lib/format";
+import { daysUntil, formatCalendarDate, formatMoney, relativeTime, plural } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export default async function AdminWeddingDetailPage({ params }: PageProps<"/adm
           hint={wedding.totalBudget ? `de ${formatMoney(wedding.totalBudget, wedding.currency)}` : "Sin presupuesto total"}
           tone={wedding.totalBudget > 0 && wedding.spent > wedding.totalBudget ? "warning" : "default"}
         />
-        <StatTile label="Planificación" value={timelineCount} hint={`momentos en ${eventCount || 1} evento(s) · ${wedding.songs} canciones`} />
+        <StatTile label="Planificación" value={timelineCount} hint={`momentos en ${plural(Math.max(eventCount, 1), "evento")} · ${plural(wedding.songs, "canción", "canciones")}`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -65,7 +65,7 @@ export default async function AdminWeddingDetailPage({ params }: PageProps<"/adm
           )}
         </Panel>
 
-        <Panel title="Participantes" description={`${wedding.members.length} personas${wedding.pendingInvites ? ` · ${wedding.pendingInvites} invitaciones pendientes` : ""}`}>
+        <Panel title="Participantes" description={`${plural(wedding.members.length, "persona")}${wedding.pendingInvites ? ` · ${plural(wedding.pendingInvites, "invitación pendiente", "invitaciones pendientes")}` : ""}`}>
           <ul className="divide-y divide-border">
             {wedding.members.map((m) => (
               <li key={m.userId} className="flex items-center gap-3 py-3">
