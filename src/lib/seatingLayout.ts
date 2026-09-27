@@ -11,6 +11,8 @@ import type { LayoutElement } from "@/generated/prisma";
  */
 export async function getOrCreateSeatingLayout(eventId: string) {
   const weddingId = await getActiveWeddingId();
+  // El evento debe pertenecer a la boda del usuario (evita leer/sobrescribir otra boda).
+  await prisma.weddingEvent.findFirstOrThrow({ where: { id: eventId, weddingId }, select: { id: true } });
   return prisma.seatingLayout.upsert({
     where: { id: eventId },
     update: {},

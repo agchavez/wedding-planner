@@ -68,6 +68,8 @@ npx prisma db push           # sincroniza el esquema con la base de datos
 npm run dev                  # http://localhost:3000
 ```
 
+Completa `BETTER_AUTH_SECRET` (`openssl rand -base64 32`) y `ADMIN_EMAIL` / `ADMIN_PASSWORD` en `.env.local`: al arrancar se crea ese administrador si todavía no existe ninguno.
+
 <details>
 <summary>¿Por qué MongoDB corre como replica set?</summary>
 
@@ -82,13 +84,36 @@ Solo cambia `MONGODB_URI` en `.env.local` por la cadena de conexión de Atlas (q
 
 </details>
 
+## 🔐 Usuarios y bodas
+
+- Autenticación con [Better Auth](https://better-auth.com) (correo + contraseña). **No hay registro público**: las cuentas las crea un administrador en `/admin`.
+- Cada usuario pertenece a una boda (`user.weddingId`); varios usuarios pueden compartir la misma (la pareja y su wedding planner). Si un usuario no tiene boda, se le crea una al entrar.
+- Todas las consultas y mutaciones pasan por `getActiveWeddingId()` (`src/lib/wedding.ts`), que exige sesión y limita los datos a la boda del usuario.
+- El panel `/admin` permite crear usuarios, asignar bodas, cambiar rol, restablecer contraseñas, suspender y eliminar.
+- Cada usuario puede cambiar su nombre y contraseña en `/cuenta`.
+
+## 🚢 Despliegue
+
+Cada push a `main` ejecuta `.github/workflows/deploy.yml`: construye la imagen Docker en GitHub Actions, la copia por SSH al servidor y levanta `deploy/docker-compose.yml` (app + Caddy con HTTPS automático) en `/opt/wedding-planner`.
+
+| Tipo | Nombre | Uso |
+| --- | --- | --- |
+| Secret | `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | Acceso SSH al servidor |
+| Secret | `MONGODB_URI` | MongoDB Atlas (base `weddingplanner`) |
+| Secret | `BETTER_AUTH_SECRET` | Firma de sesiones |
+| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador inicial (solo se usa si no existe ningún admin) |
+| Variable | `DOMAIN` | Dominio público (Caddy obtiene el certificado) |
+
 ## 📁 Estructura del proyecto
 
 ```
 src/
-├─ app/                 # rutas en español: /, /invitados, /presupuesto, /canciones, /linea-tiempo, /distribucion
+├─ app/(app)/           # rutas protegidas: /, /invitados, /presupuesto, /canciones, /linea-tiempo, /distribucion, /cuenta, /admin
+├─ app/(auth)/login/    # inicio de sesión
+├─ app/api/             # /api/auth (Better Auth) y /api/health
 ├─ components/          # componentes de UI compartidos
-├─ lib/                 # conexión a Prisma y helpers de negocio (wedding.ts, budgetAlerts.ts, seatGeometry.ts, seatingLayout.ts)
+├─ proxy.ts             # redirige al login si no hay cookie de sesión
+├─ lib/                 # auth.ts, session.ts, conexión a Prisma/Mongo y helpers de negocio (wedding.ts, budgetAlerts.ts, seatGeometry.ts, seatingLayout.ts)
 └─ generated/prisma/    # cliente de Prisma generado (no se edita a mano)
 prisma/
 └─ schema.prisma        # modelos de datos

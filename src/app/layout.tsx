@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Playfair_Display, Geist } from "next/font/google";
-import { AppSidebar } from "@/components/AppSidebar";
-import { SiteHeader } from "@/components/SiteHeader";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { DEFAULT_THEME, THEME_STORAGE_KEY } from "@/lib/theme";
 import "./globals.css";
 
@@ -43,15 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-full bg-background">
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <SiteHeader />
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
-          </SidebarInset>
-        </SidebarProvider>
-      </body>
+      <body className="min-h-full bg-background">{children}</body>
     </html>
   );
 }

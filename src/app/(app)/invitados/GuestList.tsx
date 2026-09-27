@@ -1,0 +1,82 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { GuestCard } from "@/app/(app)/invitados/GuestCard";
+import { GuestFormDialog } from "@/app/(app)/invitados/GuestFormDialog";
+import type { Guest } from "@/generated/prisma";
+import type { TableOption } from "@/lib/seatingLayout";
+
+const FILTERS = [
+  { value: "all", label: "Todos" },
+  { value: "pending", label: "Pendientes" },
+  { value: "confirmed", label: "Confirmados" },
+  { value: "declined", label: "Rechazados" },
+] as const;
+
+export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOptions: TableOption[] }) {
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]["value"]>("all");
+
+  const filtered = useMemo(
+    () => (filter === "all" ? guests : guests.filter((g) => g.rsvpStatus === filter)),
+    [guests, filter]
+  );
+
+  const totalAttending = useMemo(
+    () =>
+      guests
+        .filter((g) => g.rsvpStatus === "confirmed")
+        .reduce((sum, g) => sum + 1 + g.plusOnes, 0),
+    [guests]
+  );
+
+  const groupSuggestions = useMemo(
+    () => Array.from(new Set(guests.map((g) => g.group).filter(Boolean))).sort(),
+    [guests]
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1">
+          {FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              size="sm"
+              variant={filter === f.value ? "default" : "outline"}
+              onClick={() => setFilter(f.value)}
+            >
+              {f.label} ({f.value === "all" ? guests.length : guests.filter((g) => g.rsvpStatus === f.value).length})
+            </Button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            Confirmados (con acompañantes): <strong className="text-foreground">{totalAttending}</strong>
+          </p>
+          <GuestFormDialog
+            groupSuggestions={groupSuggestions}
+            triggerRender={<Button size="sm" />}
+            triggerChildren={
+              <>
+                <Plus className="size-3.5" />
+                Agregar invitado
+              </>
+            }
+          />
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">No hay invitados en esta categoría todavía.</p>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((guest) => (
+            <GuestCard key={guest.id} guest={guest} tableOptions={tableOptions} groupSuggestions={groupSuggestions} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
