@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getActiveWeddingId } from "@/lib/wedding";
+import { getEditableWeddingId } from "@/lib/wedding";
+import { audit } from "@/lib/audit";
 
 function parsePlusOneNames(raw: string): string[] {
   return raw
@@ -12,9 +13,9 @@ function parsePlusOneNames(raw: string): string[] {
 }
 
 export async function createGuest(formData: FormData) {
-  const weddingId = await getActiveWeddingId();
+  const weddingId = await getEditableWeddingId();
 
-  await prisma.guest.create({
+  const guest = await prisma.guest.create({
     data: {
       weddingId,
       fullName: String(formData.get("fullName") ?? "").trim(),
@@ -26,14 +27,15 @@ export async function createGuest(formData: FormData) {
       notes: String(formData.get("notes") ?? ""),
     },
   });
+  await audit("guest.create", `Agregó al invitado "${guest.fullName}"`, { weddingId, targetId: guest.id });
 
   revalidatePath("/invitados");
   revalidatePath("/");
 }
 
 export async function updateGuest(id: string, formData: FormData) {
-  const weddingId = await getActiveWeddingId();
-  await prisma.guest.update({
+  const weddingId = await getEditableWeddingId();
+  const guest = await prisma.guest.update({
     where: { id, weddingId },
     data: {
       fullName: String(formData.get("fullName") ?? "").trim(),
@@ -45,24 +47,28 @@ export async function updateGuest(id: string, formData: FormData) {
       notes: String(formData.get("notes") ?? ""),
     },
   });
+  await audit("guest.update", `Editó al invitado "${guest.fullName}"`, { weddingId, targetId: id });
 
   revalidatePath("/invitados");
   revalidatePath("/");
 }
 
 export async function deleteGuest(id: string) {
-  const weddingId = await getActiveWeddingId();
-  await prisma.guest.delete({ where: { id, weddingId } });
+  const weddingId = await getEditableWeddingId();
+  const guest = await prisma.guest.delete({ where: { id, weddingId } });
+  await audit("guest.delete", `Eliminó al invitado "${guest.fullName}"`, { weddingId, targetId: id });
+
   revalidatePath("/invitados");
   revalidatePath("/");
 }
 
 export async function assignGuestTable(id: string, tableElementId: string | null) {
-  const weddingId = await getActiveWeddingId();
-  await prisma.guest.update({
+  const weddingId = await getEditableWeddingId();
+  const guest = await prisma.guest.update({
     where: { id, weddingId },
     data: { tableElementId },
   });
+  await audit("guest.assign_table", tableElementId ? `Asignó mesa a "${guest.fullName}"` : `Quitó la mesa de "${guest.fullName}"`, { weddingId, targetId: id });
   revalidatePath("/invitados");
   revalidatePath("/distribucion");
 }

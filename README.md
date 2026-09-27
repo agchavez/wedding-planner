@@ -1,6 +1,6 @@
 <div align="center">
 
-# 💍 WeddingPlanner
+# 💍 Wedplan
 
 App personal para planificar una boda de principio a fin: presupuesto, invitados, canciones, línea de tiempo y un editor visual de distribución del salón.
 
@@ -84,13 +84,22 @@ Solo cambia `MONGODB_URI` en `.env.local` por la cadena de conexión de Atlas (q
 
 </details>
 
-## 🔐 Usuarios y bodas
+## 🔐 Usuarios, bodas y roles
 
-- Autenticación con [Better Auth](https://better-auth.com) (correo + contraseña). **No hay registro público**: las cuentas las crea un administrador en `/admin`.
-- Cada usuario pertenece a una boda (`user.weddingId`); varios usuarios pueden compartir la misma (la pareja y su wedding planner). Si un usuario no tiene boda, se le crea una al entrar.
-- Todas las consultas y mutaciones pasan por `getActiveWeddingId()` (`src/lib/wedding.ts`), que exige sesión y limita los datos a la boda del usuario.
-- El panel `/admin` permite crear usuarios, asignar bodas, cambiar rol, restablecer contraseñas, suspender y eliminar.
-- Cada usuario puede cambiar su nombre y contraseña en `/cuenta`.
+- Autenticación con [Better Auth](https://better-auth.com): correo y contraseña (registro abierto en `/registro`) y Google (si `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` están definidos).
+- Cada boda es una **organización** de Better Auth. Quien la crea queda como *Pareja*; desde `/participantes` invita a otros con un enlace y un rol:
+
+  | Rol | Puede |
+  | --- | --- |
+  | Pareja (`owner`) | Todo, incluida la gestión de participantes |
+  | Organizador (`admin`) | Editar todo e invitar o quitar participantes |
+  | Colaborador (`member`) | Editar los datos de la boda |
+  | Solo lectura (`viewer`) | Ver, sin cambiar nada |
+
+- Una persona puede participar en varias bodas y cambiar entre ellas desde el selector del sidebar. La boda activa vive en la sesión.
+- Toda lectura pasa por `requireWeddingContext()` y toda mutación por `getEditableWeddingId()` (`src/lib/wedding.ts`): exigen sesión, limitan los datos a la boda activa y bloquean a quien tiene rol de solo lectura.
+- **Consola `/admin`** (administradores de la plataforma): resumen con salud del sistema, actividad y alertas de seguridad; bodas con sus métricas y participantes; usuarios y en qué bodas participan; auditoría filtrable; sesiones activas. El admin no crea bodas: las crean los usuarios.
+- **Auditoría** (`AuditLog`): inicios de sesión (también los fallidos, con IP), registros, cada cambio en los datos de una boda y cada acción de administración. Se conserva 180 días (índice TTL).
 
 ## 🚢 Despliegue
 
@@ -102,6 +111,7 @@ Cada push a `main` ejecuta `.github/workflows/deploy.yml`: construye la imagen D
 | Secret | `MONGODB_URI` | MongoDB Atlas (base `weddingplanner`) |
 | Secret | `BETTER_AUTH_SECRET` | Firma de sesiones |
 | Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador inicial (solo se usa si no existe ningún admin) |
+| Secret | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Inicio de sesión con Google (opcional) |
 | Variable | `DOMAIN` | Dominio público (Caddy obtiene el certificado) |
 
 ## 📁 Estructura del proyecto

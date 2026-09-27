@@ -213,3 +213,27 @@
     margin: 0 !important;
   }
 }
+
+/* Login: los anillos se dibujan una sola vez al cargar. */
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.ring-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ring-draw 1.8s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.ring-draw-late {
+  animation-delay: 0.45s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

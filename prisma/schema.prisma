@@ -144,3 +144,24 @@ model SeatingLayout {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 }
+
+// Registro de auditoría: inicios de sesión, cambios en los datos de cada boda y acciones
+// de administración. Los índices (y el TTL de 180 días) se crean al arrancar, en
+// lib/bootstrap.ts.
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  // "<entidad>.<verbo>", ej. auth.sign_in, guest.create, admin.user_ban
+  action     String
+  // auth | data | admin
+  category   String
+  summary    String
+  success    Boolean  @default(true)
+  actorId    String?
+  actorName  String   @default("")
+  actorEmail String   @default("")
+  weddingId  String?
+  targetId   String?
+  ip         String   @default("")
+  userAgent  String   @default("")
+  createdAt  DateTime @default(now())
+}

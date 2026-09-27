@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getActiveWeddingId } from "@/lib/wedding";
+import { getEditableWeddingId } from "@/lib/wedding";
+import { audit } from "@/lib/audit";
 
 export async function createCategory(formData: FormData) {
-  const weddingId = await getActiveWeddingId();
+  const weddingId = await getEditableWeddingId();
   const count = await prisma.expenseCategory.count({ where: { weddingId } });
 
-  await prisma.expenseCategory.create({
+  const category = await prisma.expenseCategory.create({
     data: {
       weddingId,
       name: String(formData.get("name") ?? "").trim(),
@@ -16,6 +17,7 @@ export async function createCategory(formData: FormData) {
       sortOrder: count,
     },
   });
+  await audit("budget_category.create", `Creó la categoría "${category.name}"`, { weddingId, targetId: category.id });
 
   revalidatePath("/presupuesto");
   revalidatePath("/gastos");
@@ -23,14 +25,15 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function updateCategory(id: string, formData: FormData) {
-  const weddingId = await getActiveWeddingId();
-  await prisma.expenseCategory.update({
+  const weddingId = await getEditableWeddingId();
+  const category = await prisma.expenseCategory.update({
     where: { id, weddingId },
     data: {
       name: String(formData.get("name") ?? "").trim(),
       estimatedBudget: Number(formData.get("estimatedBudget") ?? 0),
     },
   });
+  await audit("budget_category.update", `Editó la categoría "${category.name}" (presupuesto ${category.estimatedBudget})`, { weddingId, targetId: id });
 
   revalidatePath("/presupuesto");
   revalidatePath("/gastos");
@@ -38,10 +41,12 @@ export async function updateCategory(id: string, formData: FormData) {
 }
 
 export async function deleteCategory(id: string) {
-  const weddingId = await getActiveWeddingId();
+  const weddingId = await getEditableWeddingId();
   await prisma.expenseCategory.findFirstOrThrow({ where: { id, weddingId }, select: { id: true } });
   await prisma.expense.deleteMany({ where: { categoryId: id, weddingId } });
-  await prisma.expenseCategory.delete({ where: { id, weddingId } });
+  const category = await prisma.expenseCategory.delete({ where: { id, weddingId } });
+  await audit("budget_category.delete", `Eliminó la categoría "${category.name}" y sus gastos`, { weddingId, targetId: id });
+
 
   revalidatePath("/presupuesto");
   revalidatePath("/gastos");

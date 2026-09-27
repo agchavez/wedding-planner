@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireSession } from "@/lib/session";
 import { AccountForms } from "@/app/(app)/cuenta/AccountForms";
 
-export const metadata: Metadata = { title: "Mi cuenta · WeddingPlanner" };
+export const metadata: Metadata = { title: "Mi cuenta · Wedplan" };
 
 export default async function CuentaPage() {
   const { user } = await requireSession();

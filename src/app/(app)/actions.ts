@@ -2,14 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getActiveWeddingId } from "@/lib/wedding";
+import { getEditableWeddingId, weddingDisplayName } from "@/lib/wedding";
+import { mongoDb } from "@/lib/mongo";
+import { toObjectId } from "@/lib/ids";
+import { audit } from "@/lib/audit";
 
 export async function updateWeddingDetails(formData: FormData) {
-  const id = await getActiveWeddingId();
+  const id = await getEditableWeddingId();
 
   const weddingDateRaw = formData.get("weddingDate") as string;
 
-  await prisma.wedding.update({
+  const wedding = await prisma.wedding.update({
     where: { id },
     data: {
       partner1: String(formData.get("partner1") ?? ""),
@@ -22,5 +25,10 @@ export async function updateWeddingDetails(formData: FormData) {
     },
   });
 
-  revalidatePath("/");
+  // El nombre de la organización (boda) sigue a los nombres de la pareja.
+  const name = weddingDisplayName(wedding);
+  await mongoDb.collection("organization").updateOne({ _id: toObjectId(id) }, { $set: { name } });
+  await audit("wedding.update", `Actualizó los datos de la boda ${name}`, { weddingId: id, targetId: id });
+
+  revalidatePath("/", "layout");
 }

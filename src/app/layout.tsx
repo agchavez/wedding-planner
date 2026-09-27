@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "WeddingPlanner",
+  title: "Wedplan",
   description: "Planificación de boda: presupuesto, invitados, canciones, línea de tiempo y distribución del salón.",
 };
 

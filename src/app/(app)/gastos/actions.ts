@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getActiveWeddingId } from "@/lib/wedding";
+import { getEditableWeddingId } from "@/lib/wedding";
+import { audit } from "@/lib/audit";
 
 /** Valida que la categoría elegida pertenezca a la boda del usuario. */
 async function ownedCategoryId(weddingId: string, formData: FormData) {
@@ -14,11 +15,11 @@ async function ownedCategoryId(weddingId: string, formData: FormData) {
 }
 
 export async function createExpense(formData: FormData) {
-  const weddingId = await getActiveWeddingId();
+  const weddingId = await getEditableWeddingId();
   const dueDateRaw = formData.get("dueDate") as string;
   const categoryId = await ownedCategoryId(weddingId, formData);
 
-  await prisma.expense.create({
+  const expense = await prisma.expense.create({
     data: {
       weddingId,
       categoryId,
@@ -32,6 +33,7 @@ export async function createExpense(formData: FormData) {
       notes: String(formData.get("notes") ?? ""),
     },
   });
+  await audit("expense.create", `Registró el gasto "${expense.description}"`, { weddingId, targetId: expense.id });
 
   revalidatePath("/gastos");
   revalidatePath("/presupuesto");
@@ -39,12 +41,12 @@ export async function createExpense(formData: FormData) {
 }
 
 export async function updateExpense(id: string, formData: FormData) {
-  const weddingId = await getActiveWeddingId();
+  const weddingId = await getEditableWeddingId();
   const categoryId = await ownedCategoryId(weddingId, formData);
   const dueDateRaw = formData.get("dueDate") as string;
   const paymentStatus = String(formData.get("paymentStatus") ?? "pending");
 
-  await prisma.expense.update({
+  const expense = await prisma.expense.update({
     where: { id, weddingId },
     data: {
       categoryId,
@@ -59,6 +61,7 @@ export async function updateExpense(id: string, formData: FormData) {
       notes: String(formData.get("notes") ?? ""),
     },
   });
+  await audit("expense.update", `Editó el gasto "${expense.description}" (${expense.paymentStatus === "paid" ? "pagado" : expense.paymentStatus === "partially_paid" ? "pago parcial" : "pendiente"})`, { weddingId, targetId: id });
 
   revalidatePath("/gastos");
   revalidatePath("/presupuesto");
@@ -66,8 +69,10 @@ export async function updateExpense(id: string, formData: FormData) {
 }
 
 export async function deleteExpense(id: string) {
-  const weddingId = await getActiveWeddingId();
-  await prisma.expense.delete({ where: { id, weddingId } });
+  const weddingId = await getEditableWeddingId();
+  const expense = await prisma.expense.delete({ where: { id, weddingId } });
+  await audit("expense.delete", `Eliminó el gasto "${expense.description}"`, { weddingId, targetId: id });
+
   revalidatePath("/gastos");
   revalidatePath("/presupuesto");
   revalidatePath("/");

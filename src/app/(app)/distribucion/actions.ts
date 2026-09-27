@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateSeatingLayout } from "@/lib/seatingLayout";
+import { getEditableWeddingId } from "@/lib/wedding";
+import { audit } from "@/lib/audit";
 import { isChairBlock, isTableType, type ElementType } from "@/lib/seatGeometry";
 import type { LayoutElement } from "@/generated/prisma";
 
@@ -61,6 +63,7 @@ export async function saveLayout(
   canvasHeight: number,
   background: string
 ) {
+  const weddingId = await getEditableWeddingId();
   const layout = await getOrCreateSeatingLayout(eventId);
   const sanitized = elements.map(sanitizeElement).filter((el): el is LayoutElement => el !== null);
 
@@ -73,6 +76,9 @@ export async function saveLayout(
       background: background === "garden" ? "garden" : "indoor",
     },
   });
+
+  // Se autoguarda en cada cambio: un evento cada 10 minutos por salón basta.
+  await audit("layout.save", "Editó la distribución del salón", { weddingId, targetId: eventId, dedupeMinutes: 10 });
 
   revalidatePath("/distribucion");
   revalidatePath("/invitados");

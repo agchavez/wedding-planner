@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { BrandMark } from "@/components/BrandMark";
 import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarClock,
+  Check,
   ChevronsUpDown,
+  Heart,
+  Plus,
+  UserRoundPlus,
   KeyRound,
   LayoutDashboard,
   LayoutGrid,
@@ -37,6 +42,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { authClient } from "@/lib/auth-client";
+import { roleLabel } from "@/lib/permissions";
+import type { WeddingSummary } from "@/lib/wedding";
 
 export type SidebarUser = { name: string; email: string; isAdmin: boolean };
 
@@ -48,20 +55,30 @@ const LINKS = [
   { href: "/canciones", label: "Canciones", icon: ListMusic },
   { href: "/linea-tiempo", label: "Línea de tiempo", icon: CalendarClock },
   { href: "/distribucion", label: "Distribución del salón", icon: LayoutGrid },
+  { href: "/participantes", label: "Participantes", icon: UserRoundPlus },
 ];
 
-export function AppSidebar({ user }: { user: SidebarUser }) {
+export function AppSidebar({
+  user,
+  weddings,
+  activeWeddingId,
+}: {
+  user: SidebarUser;
+  weddings: WeddingSummary[];
+  activeWeddingId: string | null;
+}) {
   const pathname = usePathname();
 
   return (
     <Sidebar collapsible="icon" className="print:hidden">
       <SidebarHeader>
         <Link href="/" className="flex items-center gap-2 px-2 py-1.5">
-          <span className="text-xl">💍</span>
+          <BrandMark />
           <span className="font-heading text-lg font-semibold text-primary group-data-[collapsible=icon]:hidden">
-            WeddingPlanner
+            Wedplan
           </span>
         </Link>
+        <WeddingSwitcher weddings={weddings} activeWeddingId={activeWeddingId} />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -82,12 +99,11 @@ export function AppSidebar({ user }: { user: SidebarUser }) {
               {user.isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    isActive={pathname.startsWith("/admin")}
-                    tooltip="Administración"
+                    tooltip="Consola de administración"
                     render={<Link href="/admin" />}
                   >
                     <ShieldCheck />
-                    <span>Administración</span>
+                    <span>Consola de administración</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
@@ -116,7 +132,7 @@ function initials(name: string) {
   );
 }
 
-function UserMenu({ user }: { user: SidebarUser }) {
+export function UserMenu({ user }: { user: SidebarUser }) {
   const router = useRouter();
 
   async function signOut() {
@@ -154,13 +170,64 @@ function UserMenu({ user }: { user: SidebarUser }) {
             {user.isAdmin && (
               <DropdownMenuItem onClick={() => router.push("/admin")}>
                 <ShieldCheck />
-                Administración
+                Consola de administración
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={signOut}>
               <LogOut />
               Cerrar sesión
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+function WeddingSwitcher({ weddings, activeWeddingId }: { weddings: WeddingSummary[]; activeWeddingId: string | null }) {
+  const router = useRouter();
+  const active = weddings.find((w) => w.id === activeWeddingId);
+
+  async function switchTo(id: string) {
+    if (id === activeWeddingId) return;
+    await authClient.organization.setActive({ organizationId: id });
+    router.push("/");
+    router.refresh();
+  }
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="border border-sidebar-border" />}>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Heart className="size-4" />
+            </span>
+            <span className="grid flex-1 text-left leading-tight">
+              <span className="truncate text-sm font-medium">{active?.name ?? "Sin boda"}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {active ? roleLabel(active.role) : "Crea o únete a una"}
+              </span>
+            </span>
+            <ChevronsUpDown className="ml-auto size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-64">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Tus bodas</DropdownMenuLabel>
+              {weddings.map((w) => (
+                <DropdownMenuItem key={w.id} onClick={() => switchTo(w.id)}>
+                  <Heart className="text-decorative" />
+                  <span className="flex-1 truncate">{w.name}</span>
+                  <span className="text-xs text-muted-foreground">{roleLabel(w.role)}</span>
+                  {w.id === activeWeddingId && <Check className="size-3.5" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/bienvenida?nueva=1")}>
+              <Plus />
+              Crear otra boda
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
