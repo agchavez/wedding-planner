@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+src/generated
+.env*
+!.env.example
+*.md
+deploy
+Dockerfile
+.dockerignore
+docker-compose.yml
