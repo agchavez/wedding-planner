@@ -86,7 +86,7 @@ export function SongFormDialog({
             <Label htmlFor="requestedBy">Pedida por</Label>
             <Input id="requestedBy" name="requestedBy" defaultValue={song?.requestedBy} className="mt-1" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-foreground">
+          <label className="flex items-center gap-2 self-end pb-2 text-sm text-foreground">
             <Checkbox name="mustPlay" defaultChecked={song?.mustPlay} />
             Debe tocarse sí o sí
           </label>
@@ -96,7 +96,7 @@ export function SongFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="song-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar canción"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar canción"}
           </Button>
         </DialogFooter>
       </DialogContent>

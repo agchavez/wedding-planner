@@ -61,7 +61,7 @@ function SongItem({ song }: { song: Song }) {
           <p className="flex items-center gap-2 font-medium text-foreground">
             {song.title}
             {song.mustPlay && (
-              <Badge variant="outline" className="border-transparent bg-emerald-100 text-emerald-800">
+              <Badge variant="outline" className="border-transparent bg-primary/10 text-primary">
                 Obligatoria
               </Badge>
             )}

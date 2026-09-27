@@ -78,7 +78,7 @@ export function CategoryFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="category-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar categoría"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar categoría"}
           </Button>
         </DialogFooter>
       </DialogContent>

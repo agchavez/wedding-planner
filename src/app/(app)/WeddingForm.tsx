@@ -107,7 +107,7 @@ export function WeddingForm({ wedding }: { wedding: Wedding }) {
       </div>
       <div className="flex gap-2 sm:col-span-2">
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Guardando..." : "Guardar"}
+          {isPending ? "Guardando…" : "Guardar"}
         </Button>
         <Button type="button" variant="outline" onClick={() => setEditing(false)}>
           Cancelar

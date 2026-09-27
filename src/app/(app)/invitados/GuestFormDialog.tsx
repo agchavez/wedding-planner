@@ -84,7 +84,7 @@ export function GuestFormDialog({
             />
           </div>
           <div>
-            <Label htmlFor="rsvpStatus">RSVP</Label>
+            <Label htmlFor="rsvpStatus">Confirmación</Label>
             <Select name="rsvpStatus" defaultValue={guest?.rsvpStatus ?? "pending"}>
               <SelectTrigger className="mt-1 w-full">
                 <SelectValue>{(value: string) => RSVP_LABEL[value] ?? value}</SelectValue>
@@ -117,7 +117,7 @@ export function GuestFormDialog({
               className="mt-1"
             />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <Label htmlFor="dietaryRestrictions">Restricciones alimentarias</Label>
             <Input
               id="dietaryRestrictions"
@@ -136,7 +136,7 @@ export function GuestFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="guest-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar invitado"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar invitado"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -9,6 +9,7 @@ import type { Guest } from "@/generated/prisma";
 import type { TableOption } from "@/lib/seatingLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { cn } from "@/lib/utils";
 
 const FILTERS = [
   { value: "all", label: "Todos" },
@@ -58,16 +59,23 @@ export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOpti
       />
       <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrar por confirmación">
           {FILTERS.map((f) => (
-            <Button
+            <button
               key={f.value}
-              size="sm"
-              variant={filter === f.value ? "default" : "outline"}
+              type="button"
               onClick={() => setFilter(f.value)}
+              aria-pressed={filter === f.value}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm transition-colors",
+                filter === f.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+              )}
             >
-              {f.label} ({f.value === "all" ? guests.length : guests.filter((g) => g.rsvpStatus === f.value).length})
-            </Button>
+              {f.label}{" "}
+              <span className="tabular-nums opacity-70">
+                {f.value === "all" ? guests.length : guests.filter((g) => g.rsvpStatus === f.value).length}
+              </span>
+            </button>
           ))}
         </div>
         <div className="flex items-center gap-3">

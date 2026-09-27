@@ -73,7 +73,7 @@ export function EventFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="event-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar" : "Crear evento"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar" : "Crear evento"}
           </Button>
         </DialogFooter>
       </DialogContent>

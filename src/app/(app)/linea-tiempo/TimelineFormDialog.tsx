@@ -119,7 +119,7 @@ export function TimelineFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="timeline-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar momento"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar momento"}
           </Button>
         </DialogFooter>
       </DialogContent>

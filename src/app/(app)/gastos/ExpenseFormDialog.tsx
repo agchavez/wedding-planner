@@ -116,38 +116,40 @@ export function ExpenseFormDialog({
             <Label htmlFor="dueDate">Fecha de vencimiento</Label>
             <DatePicker name="dueDate" defaultValue={toDateOnlyValue(expense?.dueDate)} className="mt-1" />
           </div>
-          <div>
-            <Label htmlFor="estimatedAmount">Monto estimado</Label>
-            <Input
-              id="estimatedAmount"
-              name="estimatedAmount"
-              type="number"
-              step="0.01"
-              defaultValue={expense?.estimatedAmount ?? 0}
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="actualAmount">Monto real</Label>
-            <Input
-              id="actualAmount"
-              name="actualAmount"
-              type="number"
-              step="0.01"
-              defaultValue={expense?.actualAmount ?? 0}
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="amountPaid">Monto pagado</Label>
-            <Input
-              id="amountPaid"
-              name="amountPaid"
-              type="number"
-              step="0.01"
-              defaultValue={expense?.amountPaid ?? 0}
-              className="mt-1"
-            />
+          <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="estimatedAmount">Monto estimado</Label>
+              <Input
+                id="estimatedAmount"
+                name="estimatedAmount"
+                type="number"
+                step="0.01"
+                defaultValue={expense?.estimatedAmount ?? 0}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="actualAmount">Monto real</Label>
+              <Input
+                id="actualAmount"
+                name="actualAmount"
+                type="number"
+                step="0.01"
+                defaultValue={expense?.actualAmount ?? 0}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="amountPaid">Monto pagado</Label>
+              <Input
+                id="amountPaid"
+                name="amountPaid"
+                type="number"
+                step="0.01"
+                defaultValue={expense?.amountPaid ?? 0}
+                className="mt-1"
+              />
+            </div>
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="notes">Notas</Label>
@@ -159,7 +161,7 @@ export function ExpenseFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="expense-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar gasto"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar gasto"}
           </Button>
         </DialogFooter>
       </DialogContent>
