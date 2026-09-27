@@ -72,8 +72,8 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="icon" className="print:hidden">
       <SidebarHeader>
-        <Link href="/" className="flex items-center gap-2 px-2 py-1.5">
-          <BrandMark />
+        <Link href="/" className="flex h-12 items-center gap-2 px-2 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:px-0">
+          <BrandMark className="size-8" />
           <span className="font-heading text-lg font-semibold text-primary group-data-[collapsible=icon]:hidden">
             Wedplan
           </span>
@@ -200,7 +200,7 @@ function WeddingSwitcher({ weddings, activeWeddingId }: { weddings: WeddingSumma
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="border border-sidebar-border" />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="border border-sidebar-border group-data-[collapsible=icon]:border-0" />}>
             <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Heart className="size-4" />
             </span>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getEditableWeddingId } from "@/lib/wedding";
 import { audit } from "@/lib/audit";
+import { parseDateOnly } from "@/lib/format";
 
 /** Valida que la categoría elegida pertenezca a la boda del usuario. */
 async function ownedCategoryId(weddingId: string, formData: FormData) {
@@ -29,7 +30,7 @@ export async function createExpense(formData: FormData) {
       actualAmount: Number(formData.get("actualAmount") ?? 0),
       amountPaid: Number(formData.get("amountPaid") ?? 0),
       paymentStatus: String(formData.get("paymentStatus") ?? "pending"),
-      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      dueDate: parseDateOnly(dueDateRaw),
       notes: String(formData.get("notes") ?? ""),
     },
   });
@@ -56,7 +57,7 @@ export async function updateExpense(id: string, formData: FormData) {
       actualAmount: Number(formData.get("actualAmount") ?? 0),
       amountPaid: Number(formData.get("amountPaid") ?? 0),
       paymentStatus,
-      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      dueDate: parseDateOnly(dueDateRaw),
       paidDate: paymentStatus === "paid" ? new Date() : null,
       notes: String(formData.get("notes") ?? ""),
     },

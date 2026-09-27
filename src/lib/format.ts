@@ -43,3 +43,29 @@ export function daysUntil(iso: string | null) {
   if (!iso) return null;
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
+
+/**
+ * Convierte "AAAA-MM-DD" (fecha sin hora) en un Date a mediodía UTC, para que el día se
+ * muestre igual en cualquier zona horaria de América (medianoche UTC en Honduras es el
+ * día anterior).
+ */
+export function parseDateOnly(value: FormDataEntryValue | null | undefined): Date | null {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  return new Date(`${raw}T12:00:00Z`);
+}
+
+/** Inversa de parseDateOnly: Date guardado → "AAAA-MM-DD" (en UTC, sin corrimiento). */
+export function toDateOnlyValue(date: Date | string | null | undefined) {
+  return date ? new Date(date).toISOString().slice(0, 10) : "";
+}
+
+const calendarFormats = {
+  medium: new Intl.DateTimeFormat("es-HN", { dateStyle: "medium", timeZone: "UTC" }),
+  full: new Intl.DateTimeFormat("es-HN", { dateStyle: "full", timeZone: "UTC" }),
+};
+
+/** Fechas sin hora (boda, vencimientos): se leen en UTC para no correrse de día. */
+export function formatCalendarDate(date: Date | string, style: "medium" | "full" = "medium") {
+  return calendarFormats[style].format(new Date(date));
+}

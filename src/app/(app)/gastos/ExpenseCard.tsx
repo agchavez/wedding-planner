@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { STATUS_LABEL } from "@/app/(app)/gastos/constants";
 import type { Expense, ExpenseCategory } from "@/generated/prisma";
+import { formatCalendarDate } from "@/lib/format";
 
 const STATUS_CLASSES: Record<string, string> = {
   pending: "",
@@ -58,7 +59,7 @@ export function ExpenseCard({
             </p>
             {expense.dueDate && (
               <p className="text-xs text-muted-foreground">
-                Vence: {new Intl.DateTimeFormat("es-HN", { dateStyle: "medium" }).format(new Date(expense.dueDate))}
+                Vence: {formatCalendarDate(expense.dueDate)}
               </p>
             )}
             {expense.notes && <p className="mt-1 text-sm text-muted-foreground">{expense.notes}</p>}

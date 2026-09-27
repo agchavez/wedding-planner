@@ -33,8 +33,8 @@ export function AdminSidebar({ user }: { user: SidebarUser }) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Link href="/admin" className="flex items-center gap-2 px-2 py-1.5">
-          <BrandMark />
+        <Link href="/admin" className="flex h-12 items-center gap-2 px-2 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:px-0">
+          <BrandMark className="size-8" />
           <span className="grid leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-heading text-lg font-semibold text-primary">Wedplan</span>
             <span className="text-xs text-muted-foreground">Consola de administración</span>
