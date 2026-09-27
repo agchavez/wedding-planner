@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { EventTabsClient } from "@/app/(app)/linea-tiempo/EventTabsClient";
 import type { TimelineEvent } from "@/generated/prisma";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +21,7 @@ export default async function LineaTiempoPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Línea de tiempo</h1>
-        <p className="text-sm text-muted-foreground">
-          Cómo va a transcurrir cada evento de la boda. Crea un evento por cada celebración (ej. Boda Jardín, Boda
-          Fiesta) y exporta su línea de tiempo en PDF.
-        </p>
-      </div>
+      <PageHeader title="Línea de tiempo" description={"Cómo va a transcurrir cada evento de la boda. Crea un evento por cada celebración (ej. Boda Jardín, Boda Fiesta) y exporta su línea de tiempo en PDF."} />
       <EventTabsClient events={events} itemsByEvent={itemsByEvent} />
     </div>
   );

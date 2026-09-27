@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Printer, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Printer, Trash2, Plus, CalendarClock } from "lucide-react";
 import { deleteTimelineEvent, reorderTimelineEvents } from "@/app/(app)/linea-tiempo/actions";
 import { TIMELINE_CATEGORY_COLOR, TIMELINE_CATEGORY_LABEL } from "@/app/(app)/linea-tiempo/categories";
 import { TimelineFormDialog } from "@/app/(app)/linea-tiempo/TimelineFormDialog";
@@ -27,6 +27,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { TimelineEvent } from "@/generated/prisma";
 import { useWeddingAccess } from "@/components/WeddingAccess";
+import { EmptyState } from "@/components/EmptyState";
 
 function formatTime(date: Date | null) {
   if (!date) return "Hora por definir";
@@ -141,19 +142,28 @@ export function TimelineView({ eventId, items }: { eventId: string; items: Timel
   return (
     <div>
       <div className="mb-4 flex justify-end gap-2 print:hidden">
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer className="size-3.5" />
-          Exportar
+        <Button variant="outline" onClick={() => window.print()}>
+          <Printer className="size-4" />
+          Imprimir
         </Button>
         <TimelineFormDialog
           eventId={eventId}
-          triggerRender={<Button size="sm" />}
-          triggerChildren={<>Agregar momento</>}
+          triggerRender={<Button />}
+          triggerChildren={
+            <>
+              <Plus className="size-4" />
+              Agregar momento
+            </>
+          }
         />
       </div>
 
       {ordered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">Todavía no hay momentos en este evento.</p>
+        <EmptyState
+          icon={CalendarClock}
+          title="Todavía no hay momentos"
+          description="Agrega cada momento del día con su hora y duración: llegada, ceremonia, brindis, primer baile…"
+        />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={ordered.map((i) => i.id)} strategy={verticalListSortingStrategy}>

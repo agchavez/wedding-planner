@@ -3,6 +3,7 @@ import { getActiveWeddingId } from "@/lib/wedding";
 import { DistribucionEventTabsClient } from "@/app/(app)/distribucion/DistribucionEventTabsClient";
 import type { Background } from "@/app/(app)/distribucion/canvasStore";
 import type { LayoutElement } from "@/generated/prisma";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,7 @@ export default async function DistribucionPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Distribución del salón</h1>
-        <p className="text-sm text-muted-foreground">
-          Un salón por evento. Arrastra, redimensiona y rota mesas, sillas de ceremonia, altar, escenario y más.
-        </p>
-      </div>
+      <PageHeader title="Distribución del salón" description={"Un salón por evento. Arrastra, redimensiona y rota mesas, sillas de ceremonia, altar, escenario y más."} />
       <DistribucionEventTabsClient events={events} layoutByEvent={layoutByEvent} />
     </div>
   );

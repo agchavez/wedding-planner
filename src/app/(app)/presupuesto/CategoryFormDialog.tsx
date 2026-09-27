@@ -33,7 +33,7 @@ export function CategoryFormDialog({
       <DialogTrigger render={triggerRender}>{triggerChildren}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar categoría" : "Nueva categoría"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Editar categoría" : "Agregar categoría"}</DialogTitle>
         </DialogHeader>
         <form
           ref={formRef}

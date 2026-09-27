@@ -57,7 +57,7 @@ export function EventTabsClient({
             triggerChildren={
               <>
                 <Plus className="size-3.5" />
-                Nuevo evento
+                Crear evento
               </>
             }
             onCreated={setActiveId}

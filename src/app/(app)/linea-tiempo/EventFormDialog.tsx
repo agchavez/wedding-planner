@@ -35,7 +35,7 @@ export function EventFormDialog({
       <DialogTrigger render={triggerRender}>{triggerChildren}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Renombrar evento" : "Nuevo evento"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Renombrar evento" : "Crear evento"}</DialogTitle>
         </DialogHeader>
         <form
           ref={formRef}

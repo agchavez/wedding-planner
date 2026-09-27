@@ -15,17 +15,7 @@ import { formatDateTime, initials, relativeTime } from "@/lib/format";
 import { roleLabel, type WeddingRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
-export function PageHeader({ title, description, actions }: { title: string; description: string; actions?: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      {actions}
-    </div>
-  );
-}
+export { PageHeader } from "@/components/PageHeader";
 
 /** Cifra principal con etiqueta; `hint` da contexto (p. ej. "+3 esta semana"). */
 export function StatTile({

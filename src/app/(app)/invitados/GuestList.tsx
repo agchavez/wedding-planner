@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GuestCard } from "@/app/(app)/invitados/GuestCard";
 import { GuestFormDialog } from "@/app/(app)/invitados/GuestFormDialog";
 import type { Guest } from "@/generated/prisma";
 import type { TableOption } from "@/lib/seatingLayout";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
 
 const FILTERS = [
   { value: "all", label: "Todos" },
@@ -37,7 +39,24 @@ export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOpti
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <PageHeader
+        title="Invitados"
+        description="Gestiona la lista de invitados, su confirmación y su mesa asignada."
+        actions={
+          <GuestFormDialog
+            groupSuggestions={groupSuggestions}
+            triggerRender={<Button />}
+            triggerChildren={
+              <>
+                <Plus className="size-4" />
+                Agregar invitado
+              </>
+            }
+          />
+        }
+      />
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1">
           {FILTERS.map((f) => (
@@ -55,21 +74,19 @@ export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOpti
           <p className="text-sm text-muted-foreground">
             Confirmados (con acompañantes): <strong className="text-foreground">{totalAttending}</strong>
           </p>
-          <GuestFormDialog
-            groupSuggestions={groupSuggestions}
-            triggerRender={<Button size="sm" />}
-            triggerChildren={
-              <>
-                <Plus className="size-3.5" />
-                Agregar invitado
-              </>
-            }
-          />
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">No hay invitados en esta categoría todavía.</p>
+        <EmptyState
+          icon={Users}
+          title={guests.length === 0 ? "Todavía no hay invitados" : "Nadie en este filtro"}
+          description={
+            guests.length === 0
+              ? "Agrega a tus invitados con su grupo y acompañantes; luego podrás asignarles mesa."
+              : "Prueba con otro estado de confirmación."
+          }
+        />
       ) : (
         <div className="space-y-2">
           {filtered.map((guest) => (
@@ -77,6 +94,7 @@ export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOpti
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
