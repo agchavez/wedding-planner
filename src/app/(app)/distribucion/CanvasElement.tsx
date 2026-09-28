@@ -19,12 +19,15 @@ const HIGHLIGHT_PADDING = 6;
 export const CanvasElement = memo(function CanvasElement({
   element,
   isSelected,
+  editable = true,
   onSelect,
   onChange,
   registerRef,
 }: {
   element: LayoutElement;
   isSelected: boolean;
+  /** Falso para roles de solo lectura: no se puede arrastrar ni seleccionar. */
+  editable?: boolean;
   onSelect: (id: string) => void;
   onChange: (id: string, patch: Partial<LayoutElement>) => void;
   registerRef: (id: string, node: Konva.Group | null) => void;
@@ -107,9 +110,9 @@ export const CanvasElement = memo(function CanvasElement({
       x={element.x}
       y={element.y}
       rotation={element.rotation}
-      draggable
-      onClick={() => onSelect(element.id)}
-      onTap={() => onSelect(element.id)}
+      draggable={editable}
+      onClick={() => editable && onSelect(element.id)}
+      onTap={() => editable && onSelect(element.id)}
       onDragEnd={(e) => onChange(element.id, { x: e.target.x(), y: e.target.y() })}
       onTransformEnd={(e) => {
         const node = e.target;

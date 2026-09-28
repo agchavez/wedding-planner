@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExpenseCard } from "@/app/(app)/gastos/ExpenseCard";
 import { ExpenseFormDialog } from "@/app/(app)/gastos/ExpenseFormDialog";
 import type { Expense, ExpenseCategory } from "@/generated/prisma";
+import { PageHeader } from "@/components/PageHeader";
+import Link from "next/link";
+import { EmptyState } from "@/components/EmptyState";
 
 const ALL_CATEGORIES = "all";
 
@@ -35,14 +38,43 @@ export function ExpenseList({
 
   if (categories.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Primero crea al menos una categoría en Presupuesto para poder registrar gastos.
-      </p>
+      <div className="space-y-6">
+        <PageHeader title="Gastos" description="Registro de todos los gastos, sin importar la categoría." />
+        <EmptyState
+          icon={Receipt}
+          title="Primero crea una categoría"
+          description="Cada gasto pertenece a una categoría del presupuesto (catering, música, flores…)."
+          action={
+            <Button nativeButton={false} render={<Link href="/presupuesto" />}>
+              Ir a Presupuesto
+            </Button>
+          }
+        />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <PageHeader
+        title="Gastos"
+        description="Registro de todos los gastos, sin importar la categoría."
+        actions={
+          <ExpenseFormDialog
+            categories={categories}
+            defaultCategoryId={categoryFilter !== ALL_CATEGORIES ? categoryFilter : undefined}
+            vendorSuggestions={vendorSuggestions}
+            triggerRender={<Button />}
+            triggerChildren={
+              <>
+                <Plus className="size-4" />
+                Agregar gasto
+              </>
+            }
+          />
+        }
+      />
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value ?? ALL_CATEGORIES)}>
           <SelectTrigger className="w-full sm:w-56">
@@ -62,22 +94,14 @@ export function ExpenseList({
           </SelectContent>
         </Select>
 
-        <ExpenseFormDialog
-          categories={categories}
-          defaultCategoryId={categoryFilter !== ALL_CATEGORIES ? categoryFilter : undefined}
-          vendorSuggestions={vendorSuggestions}
-          triggerRender={<Button size="sm" />}
-          triggerChildren={
-            <>
-              <Plus className="size-3.5" />
-              Agregar gasto
-            </>
-          }
-        />
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">No hay gastos registrados todavía.</p>
+        <EmptyState
+          icon={Receipt}
+          title={categoryFilter === ALL_CATEGORIES ? "Todavía no hay gastos" : "No hay gastos en esta categoría"}
+          description="Registra cada pago o cotización con su proveedor y fecha de vencimiento."
+        />
       ) : (
         <div className="space-y-2">
           {filtered.map((expense) => (
@@ -92,6 +116,7 @@ export function ExpenseList({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

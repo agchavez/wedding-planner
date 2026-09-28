@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Printer, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Printer, Trash2, Plus, CalendarClock } from "lucide-react";
 import { deleteTimelineEvent, reorderTimelineEvents } from "@/app/(app)/linea-tiempo/actions";
 import { TIMELINE_CATEGORY_COLOR, TIMELINE_CATEGORY_LABEL } from "@/app/(app)/linea-tiempo/categories";
 import { TimelineFormDialog } from "@/app/(app)/linea-tiempo/TimelineFormDialog";
@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { TimelineEvent } from "@/generated/prisma";
+import { useWeddingAccess } from "@/components/WeddingAccess";
+import { EmptyState } from "@/components/EmptyState";
 
 function formatTime(date: Date | null) {
   if (!date) return "Hora por definir";
@@ -34,7 +36,6 @@ function formatTime(date: Date | null) {
 
 /** Fila usada tanto en pantalla como en la lista que se imprime/exporta. */
 function TimelineRow({ item, dragHandle }: { item: TimelineEvent; dragHandle?: React.ReactNode }) {
-  const [, startTransition] = useTransition();
 
   return (
     <Card className="print:border-none print:shadow-none">
@@ -77,7 +78,8 @@ function TimelineRow({ item, dragHandle }: { item: TimelineEvent; dragHandle?: R
             }
             title={`¿Eliminar "${item.title}"?`}
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteTimelineEvent(item.id))}
+            onConfirm={() => deleteTimelineEvent(item.id)}
+            successMessage="Momento eliminado"
           />
         </div>
       </CardContent>
@@ -86,7 +88,11 @@ function TimelineRow({ item, dragHandle }: { item: TimelineEvent; dragHandle?: R
 }
 
 function SortableTimelineRow({ item }: { item: TimelineEvent }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const { canEdit } = useWeddingAccess();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !canEdit,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
@@ -94,6 +100,7 @@ function SortableTimelineRow({ item }: { item: TimelineEvent }) {
       <TimelineRow
         item={item}
         dragHandle={
+          canEdit && (
           <button
             {...attributes}
             {...listeners}
@@ -102,6 +109,7 @@ function SortableTimelineRow({ item }: { item: TimelineEvent }) {
           >
             <GripVertical className="size-4" />
           </button>
+          )
         }
       />
     </div>
@@ -134,19 +142,28 @@ export function TimelineView({ eventId, items }: { eventId: string; items: Timel
   return (
     <div>
       <div className="mb-4 flex justify-end gap-2 print:hidden">
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer className="size-3.5" />
-          Exportar
+        <Button variant="outline" onClick={() => window.print()}>
+          <Printer className="size-4" />
+          Imprimir
         </Button>
         <TimelineFormDialog
           eventId={eventId}
-          triggerRender={<Button size="sm" />}
-          triggerChildren={<>Agregar momento</>}
+          triggerRender={<Button />}
+          triggerChildren={
+            <>
+              <Plus className="size-4" />
+              Agregar momento
+            </>
+          }
         />
       </div>
 
       {ordered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">Todavía no hay momentos en este evento.</p>
+        <EmptyState
+          icon={CalendarClock}
+          title="Todavía no hay momentos"
+          description="Agrega cada momento del día con su hora y duración: llegada, ceremonia, brindis, primer baile…"
+        />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={ordered.map((i) => i.id)} strategy={verticalListSortingStrategy}>

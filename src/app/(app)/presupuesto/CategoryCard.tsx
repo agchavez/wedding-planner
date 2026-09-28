@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { Pencil, Tag, Trash2 } from "lucide-react";
 import { deleteCategory } from "@/app/(app)/presupuesto/actions";
 import { CategoryFormDialog } from "@/app/(app)/presupuesto/CategoryFormDialog";
@@ -9,10 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Expense, ExpenseCategory } from "@/generated/prisma";
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
+import { formatMoney } from "@/lib/format";
 
 export function CategoryCard({
   category,
@@ -23,7 +19,6 @@ export function CategoryCard({
   expenses: Expense[];
   currency: string;
 }) {
-  const [, startTransition] = useTransition();
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
   const totalPaid = expenses.reduce((sum, e) => sum + e.amountPaid, 0);
   const overBudget = category.estimatedBudget > 0 && totalActual > category.estimatedBudget;
@@ -71,7 +66,8 @@ export function CategoryCard({
             }
             title={`¿Eliminar la categoría "${category.name}"?`}
             description="Se eliminarán también todos los gastos registrados en esta categoría. Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteCategory(category.id))}
+            onConfirm={() => deleteCategory(category.id)}
+            successMessage="Categoría eliminada"
           />
         </div>
       </CardContent>

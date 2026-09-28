@@ -3,7 +3,9 @@
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { createSong, updateSong } from "@/app/(app)/canciones/actions";
 import { SONG_CATEGORY_LABEL, SONG_CATEGORY_OPTIONS } from "@/app/(app)/canciones/categories";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,11 @@ export function SongFormDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const { canEdit } = useWeddingAccess();
   const isEdit = Boolean(song);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -37,13 +43,18 @@ export function SongFormDialog({
           id="song-form"
           action={(formData) => {
             startTransition(async () => {
-              if (song) {
-                await updateSong(song.id, formData);
-              } else {
-                await createSong(formData);
+              try {
+                if (song) {
+                  await updateSong(song.id, formData);
+                } else {
+                  await createSong(formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(song ? "Canción actualizada" : "Canción agregada");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="grid grid-cols-1 gap-3 sm:grid-cols-2"
@@ -75,7 +86,7 @@ export function SongFormDialog({
             <Label htmlFor="requestedBy">Pedida por</Label>
             <Input id="requestedBy" name="requestedBy" defaultValue={song?.requestedBy} className="mt-1" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-foreground">
+          <label className="flex items-center gap-2 self-end pb-2 text-sm text-foreground">
             <Checkbox name="mustPlay" defaultChecked={song?.mustPlay} />
             Debe tocarse sí o sí
           </label>
@@ -85,7 +96,7 @@ export function SongFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="song-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar canción"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar canción"}
           </Button>
         </DialogFooter>
       </DialogContent>

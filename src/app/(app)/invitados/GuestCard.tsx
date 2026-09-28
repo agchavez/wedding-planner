@@ -105,7 +105,8 @@ export function GuestCard({
             }
             title={`¿Eliminar a ${guest.fullName}?`}
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteGuest(guest.id))}
+            onConfirm={() => deleteGuest(guest.id)}
+            successMessage="Invitado eliminado"
           />
         </div>
       </CardContent>

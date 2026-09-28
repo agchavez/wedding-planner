@@ -13,12 +13,6 @@ export default async function InvitadosPage() {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Invitados</h1>
-        <p className="text-sm text-muted-foreground">Gestiona la lista de invitados, su RSVP y su mesa asignada.</p>
-      </div>
-      <GuestList guests={guests} tableOptions={tableOptions} />
-    </div>
+    <GuestList guests={guests} tableOptions={tableOptions} />
   );
 }

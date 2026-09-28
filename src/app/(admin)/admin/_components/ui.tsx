@@ -11,21 +11,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AuditRow, HealthLevel } from "@/lib/admin-data";
-import { formatDateTime, initials, relativeTime } from "@/lib/format";
+import { formatDateTime, initials, relativeTime, formatIp } from "@/lib/format";
 import { roleLabel, type WeddingRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
-export function PageHeader({ title, description, actions }: { title: string; description: string; actions?: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      {actions}
-    </div>
-  );
-}
+export { PageHeader } from "@/components/PageHeader";
 
 /** Cifra principal con etiqueta; `hint` da contexto (p. ej. "+3 esta semana"). */
 export function StatTile({
@@ -142,7 +132,7 @@ export function ActivityFeed({ rows, showWedding = true }: { rows: AuditRow[]; s
                     </Link>
                   </>
                 )}
-                {row.ip && ` · ${row.ip}`}
+                {row.ip && <span className="break-all">{` · ${formatIp(row.ip)}`}</span>}
               </p>
             </div>
           </li>
@@ -170,7 +160,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-card", className)}>
+    <section className={cn("min-w-0 rounded-2xl border border-border bg-card", className)}>
       <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div>
           <h2 className="font-medium text-foreground">{title}</h2>

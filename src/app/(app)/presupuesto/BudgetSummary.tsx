@@ -1,19 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertBanner } from "@/components/AlertBanner";
 import type { BudgetAlert } from "@/lib/budgetAlerts";
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
+import { formatMoney } from "@/lib/format";
 
 export function BudgetSummary({
   totalBudget,
+  budgetSource,
   totalActual,
   totalPaid,
   currency,
   alerts,
 }: {
   totalBudget: number;
+  budgetSource: "total" | "categories" | "none";
   totalActual: number;
   totalPaid: number;
   currency: string;
@@ -27,6 +26,13 @@ export function BudgetSummary({
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Presupuesto total</p>
             <p className="font-heading text-2xl font-semibold text-foreground">{formatMoney(totalBudget, currency)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {budgetSource === "total"
+                ? "Definido en los datos de la boda"
+                : budgetSource === "categories"
+                  ? "Suma de lo estimado por categoría"
+                  : "Agrega categorías o define el total en el panel"}
+            </p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Gasto real</p>

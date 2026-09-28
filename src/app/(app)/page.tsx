@@ -7,6 +7,7 @@ import { WeddingForm } from "@/app/(app)/WeddingForm";
 import { AlertBanner } from "@/components/AlertBanner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { effectiveBudget, formatMoney } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -15,20 +16,17 @@ function daysUntil(date: Date | null) {
   return Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
-
 export default async function DashboardPage() {
   const weddingId = await getActiveWeddingId();
 
-  const [wedding, guests, expenses, songsCount, eventsCount, alerts] = await Promise.all([
+  const [wedding, guests, expenses, songsCount, eventsCount, alerts, categories] = await Promise.all([
     prisma.wedding.findUnique({ where: { id: weddingId } }),
     prisma.guest.findMany({ where: { weddingId } }),
     prisma.expense.findMany({ where: { weddingId } }),
     prisma.song.count({ where: { weddingId } }),
     prisma.timelineEvent.count({ where: { weddingId } }),
     getBudgetAlerts(),
+    prisma.expenseCategory.findMany({ where: { weddingId }, select: { estimatedBudget: true } }),
   ]);
 
   const currency = wedding?.currency ?? "HNL";
@@ -38,6 +36,7 @@ export default async function DashboardPage() {
   const totalAttending = confirmed.reduce((sum, g) => sum + 1 + g.plusOnes, 0);
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
   const days = daysUntil(wedding?.weddingDate ?? null);
+  const budget = effectiveBudget(wedding?.totalBudget ?? 0, categories.map((c) => c.estimatedBudget));
 
   return (
     <div className="space-y-8">
@@ -67,7 +66,7 @@ export default async function DashboardPage() {
           icon={Wallet}
           title="Presupuesto"
           value={formatMoney(totalActual, currency)}
-          detail={`de ${formatMoney(wedding?.totalBudget ?? 0, currency)} estimado`}
+          detail={budget.amount > 0 ? `de ${formatMoney(budget.amount, currency)} estimado` : "Sin presupuesto definido"}
         />
         <DashboardCard
           href="/canciones"

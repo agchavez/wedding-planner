@@ -1,25 +1,15 @@
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
-import { CATEGORY_LABEL, PageHeader } from "@/app/(admin)/admin/_components/ui";
+import { ActivityFeed, CATEGORY_LABEL, PageHeader } from "@/app/(admin)/admin/_components/ui";
+import { ActivityFilters } from "@/app/(admin)/admin/actividad/ActivityFilters";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { describeUserAgent, getAuditPage } from "@/lib/admin-data";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatIp } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { weddingDisplayName } from "@/lib/wedding";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-const CATEGORIES = [
-  { value: "", label: "Todo" },
-  { value: "auth", label: "Accesos" },
-  { value: "data", label: "Cambios en bodas" },
-  { value: "admin", label: "Administración" },
-];
-
-const selectClass =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export default async function AdminActivityPage({ searchParams }: PageProps<"/admin/actividad">) {
   const sp = await searchParams;
@@ -54,50 +44,14 @@ export default async function AdminActivityPage({ searchParams }: PageProps<"/ad
         description="Registro de accesos, cambios en las bodas y acciones de administración. Se conserva 180 días."
       />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Tipo de evento">
-          {CATEGORIES.map((c) => (
-            <Link
-              key={c.value}
-              href={buildHref({ categoria: c.value, page: 1 })}
-              aria-current={filters.category === c.value ? "page" : undefined}
-              className={cn(
-                "rounded-full px-3 py-1 text-sm transition-colors",
-                filters.category === c.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
-              )}
-            >
-              {c.label}
-            </Link>
-          ))}
-        </div>
-        <form className="flex flex-wrap items-center gap-2" action="/admin/actividad">
-          {filters.category && <input type="hidden" name="categoria" value={filters.category} />}
-          {filters.actorId && <input type="hidden" name="actor" value={filters.actorId} />}
-          <Input name="q" defaultValue={filters.q} placeholder="Buscar texto, correo o IP" className="w-64" />
-          <select name="boda" defaultValue={filters.weddingId} className={selectClass} aria-label="Boda">
-            <option value="">Todas las bodas</option>
-            {weddings.map((w) => (
-              <option key={w.id} value={w.id}>
-                {weddingDisplayName(w)}
-              </option>
-            ))}
-          </select>
-          <select name="result" defaultValue={filters.result} className={selectClass} aria-label="Resultado">
-            <option value="">Todos los resultados</option>
-            <option value="failed">Solo fallidos</option>
-          </select>
-          <Button type="submit" size="sm">
-            Filtrar
-          </Button>
-          {(filters.q || filters.weddingId || filters.result || filters.actorId || filters.category) && (
-            <Link href="/admin/actividad" className="text-sm text-muted-foreground hover:text-foreground">
-              Quitar filtros
-            </Link>
-          )}
-        </form>
+      <ActivityFilters weddings={weddings.map((w) => ({ id: w.id, name: weddingDisplayName(w) }))} />
+
+      {/* Móvil: línea de tiempo en vez de tabla. */}
+      <div className="rounded-2xl border border-border bg-card px-4 py-1 sm:hidden">
+        <ActivityFeed rows={rows} />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-card sm:block">
         <table className="w-full min-w-[860px] text-sm">
           <thead className="border-b border-border text-left text-xs text-muted-foreground">
             <tr>
@@ -135,7 +89,7 @@ export default async function AdminActivityPage({ searchParams }: PageProps<"/ad
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                  <p className="font-mono">{r.ip || "—"}</p>
+                  <p className="font-mono">{formatIp(r.ip)}</p>
                   <p>{describeUserAgent(r.userAgent)}</p>
                 </td>
               </tr>
