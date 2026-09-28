@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { createCategory, updateCategory } from "@/app/(app)/presupuesto/actions";
 import { toast } from "sonner";
+import { CATALOG_NAME_MAX } from "@/lib/catalog";
 import { Button } from "@/components/ui/button";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -41,10 +42,12 @@ export function CategoryFormDialog({
           action={(formData) => {
             startTransition(async () => {
               try {
-                if (category) {
-                  await updateCategory(category.id, formData);
-                } else {
-                  await createCategory(formData);
+                const result = category
+                  ? await updateCategory(category.id, formData)
+                  : await createCategory(formData);
+                if (result?.error) {
+                  toast.error(result.error);
+                  return;
                 }
                 formRef.current?.reset();
                 setOpen(false);
@@ -58,7 +61,7 @@ export function CategoryFormDialog({
         >
           <div>
             <Label htmlFor="name">Nombre</Label>
-            <Input id="name" name="name" defaultValue={category?.name} placeholder="Ej. Catering" required className="mt-1" />
+            <Input id="name" name="name" maxLength={CATALOG_NAME_MAX} defaultValue={category?.name} placeholder="Ej. Catering" required className="mt-1" />
           </div>
           <div>
             <Label htmlFor="estimatedBudget">Presupuesto estimado</Label>

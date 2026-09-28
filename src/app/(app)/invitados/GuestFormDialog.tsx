@@ -5,7 +5,7 @@ import { createGuest, updateGuest } from "@/app/(app)/invitados/actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useWeddingAccess } from "@/components/WeddingAccess";
-import { Combobox } from "@/components/ui/combobox";
+import { CatalogCombobox } from "@/components/CatalogCombobox";
 import {
   Dialog,
   DialogContent,
@@ -75,11 +75,15 @@ export function GuestFormDialog({
           </div>
           <div>
             <Label htmlFor="group">Grupo</Label>
-            <Combobox
+            <CatalogCombobox
+              id="group"
+              kind="group"
+              valueBy="name"
               name="group"
+              options={groupSuggestions.map((g) => ({ value: g, label: g }))}
               defaultValue={guest?.group}
-              suggestions={groupSuggestions}
               placeholder="Ej. Familia del novio"
+              emptyOption={{ value: "", label: "Sin grupo" }}
               className="mt-1"
             />
           </div>

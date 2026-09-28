@@ -4,15 +4,18 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getEditableWeddingId } from "@/lib/wedding";
 import { audit } from "@/lib/audit";
+import { checkCatalogName } from "@/lib/catalog-server";
 
-export async function createCategory(formData: FormData) {
+export async function createCategory(formData: FormData): Promise<{ error: string } | void> {
   const weddingId = await getEditableWeddingId();
+  const check = await checkCatalogName("category", weddingId, formData.get("name"));
+  if (!check.ok) return { error: check.error };
   const count = await prisma.expenseCategory.count({ where: { weddingId } });
 
   const category = await prisma.expenseCategory.create({
     data: {
       weddingId,
-      name: String(formData.get("name") ?? "").trim(),
+      name: check.name,
       estimatedBudget: Number(formData.get("estimatedBudget") ?? 0),
       sortOrder: count,
     },
@@ -24,12 +27,14 @@ export async function createCategory(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function updateCategory(id: string, formData: FormData) {
+export async function updateCategory(id: string, formData: FormData): Promise<{ error: string } | void> {
   const weddingId = await getEditableWeddingId();
+  const check = await checkCatalogName("category", weddingId, formData.get("name"), id);
+  if (!check.ok) return { error: check.error };
   const category = await prisma.expenseCategory.update({
     where: { id, weddingId },
     data: {
-      name: String(formData.get("name") ?? "").trim(),
+      name: check.name,
       estimatedBudget: Number(formData.get("estimatedBudget") ?? 0),
     },
   });

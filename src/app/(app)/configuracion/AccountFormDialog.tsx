@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
+import { CATALOG_NAME_MAX } from "@/lib/catalog";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createAccount, updateAccount } from "@/app/(app)/configuracion/accounts-actions";
 import { Button } from "@/components/ui/button";
@@ -42,10 +43,12 @@ export function AccountFormDialog({
           action={(formData) => {
             startTransition(async () => {
               try {
-                if (account) {
-                  await updateAccount(account.id, formData);
-                } else {
-                  await createAccount(formData);
+                const result = account
+                  ? await updateAccount(account.id, formData)
+                  : await createAccount(formData);
+                if (result?.error) {
+                  toast.error(result.error);
+                  return;
                 }
                 formRef.current?.reset();
                 setOpen(false);
@@ -59,7 +62,7 @@ export function AccountFormDialog({
         >
           <div>
             <Label htmlFor="name">Nombre</Label>
-            <Input id="name" name="name" defaultValue={account?.name} placeholder="Ej. Cuenta de ahorros" required className="mt-1" />
+            <Input id="name" name="name" maxLength={CATALOG_NAME_MAX} defaultValue={account?.name} placeholder="Ej. Cuenta de ahorros" required className="mt-1" />
           </div>
           <div>
             <Label htmlFor="notes">Notas</Label>

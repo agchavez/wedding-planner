@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getEditableWeddingId } from "@/lib/wedding";
 import { audit } from "@/lib/audit";
+import { checkCatalogName } from "@/lib/catalog-server";
 
 function vendorData(formData: FormData) {
   return {
@@ -14,18 +15,22 @@ function vendorData(formData: FormData) {
   };
 }
 
-export async function createVendor(formData: FormData) {
+export async function createVendor(formData: FormData): Promise<{ error: string } | void> {
   const weddingId = await getEditableWeddingId();
-  const item = await prisma.vendor.create({ data: { weddingId, ...vendorData(formData) } });
+  const check = await checkCatalogName("vendor", weddingId, formData.get("name"));
+  if (!check.ok) return { error: check.error };
+  const item = await prisma.vendor.create({ data: { weddingId, ...vendorData(formData), name: check.name } });
   await audit("vendor.create", `Creó el proveedor "${item.name}"`, { weddingId, targetId: item.id });
 
   revalidatePath("/configuracion");
   revalidatePath("/gastos");
 }
 
-export async function updateVendor(id: string, formData: FormData) {
+export async function updateVendor(id: string, formData: FormData): Promise<{ error: string } | void> {
   const weddingId = await getEditableWeddingId();
-  const item = await prisma.vendor.update({ where: { id, weddingId }, data: vendorData(formData) });
+  const check = await checkCatalogName("vendor", weddingId, formData.get("name"), id);
+  if (!check.ok) return { error: check.error };
+  const item = await prisma.vendor.update({ where: { id, weddingId }, data: { ...vendorData(formData), name: check.name } });
   await audit("vendor.update", `Editó el proveedor "${item.name}"`, { weddingId, targetId: id });
 
   revalidatePath("/configuracion");

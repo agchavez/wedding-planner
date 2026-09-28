@@ -5,12 +5,11 @@ import { createExpense, updateExpense } from "@/app/(app)/gastos/actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useWeddingAccess } from "@/components/WeddingAccess";
-import { Combobox } from "@/components/ui/combobox";
+import { CatalogCombobox } from "@/components/CatalogCombobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Expense, ExpenseCategory } from "@/generated/prisma";
 import { toDateOnlyValue } from "@/lib/format";
@@ -73,28 +72,29 @@ export function ExpenseFormDialog({
           </div>
           <div>
             <Label htmlFor="categoryId">Categoría</Label>
-            <Select name="categoryId" defaultValue={expense?.categoryId ?? defaultCategoryId}>
-              <SelectTrigger className="mt-1 w-full">
-                <SelectValue placeholder="Selecciona una categoría">
-                  {(value: string) => categories.find((c) => c.id === value)?.name ?? "Selecciona una categoría"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CatalogCombobox
+              id="categoryId"
+              kind="category"
+              valueBy="id"
+              name="categoryId"
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              defaultValue={expense?.categoryId ?? defaultCategoryId}
+              placeholder="Selecciona una categoría"
+              required
+              className="mt-1"
+            />
           </div>
           <div>
             <Label htmlFor="vendor">Proveedor</Label>
-            <Combobox
+            <CatalogCombobox
+              id="vendor"
+              kind="vendor"
+              valueBy="name"
               name="vendor"
+              options={vendorSuggestions.map((v) => ({ value: v, label: v }))}
               defaultValue={expense?.vendor}
-              suggestions={vendorSuggestions}
               placeholder="Nombre del proveedor"
+              emptyOption={{ value: "", label: "Sin proveedor" }}
               className="mt-1"
             />
           </div>
