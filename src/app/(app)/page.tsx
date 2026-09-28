@@ -19,10 +19,11 @@ function daysUntil(date: Date | null) {
 export default async function DashboardPage() {
   const weddingId = await getActiveWeddingId();
 
-  const [wedding, guests, expenses, songsCount, eventsCount, alerts, categories] = await Promise.all([
+  const [wedding, guests, expenses, contributions, songsCount, eventsCount, alerts, categories] = await Promise.all([
     prisma.wedding.findUnique({ where: { id: weddingId } }),
     prisma.guest.findMany({ where: { weddingId } }),
     prisma.expense.findMany({ where: { weddingId } }),
+    prisma.budgetContribution.findMany({ where: { weddingId } }),
     prisma.song.count({ where: { weddingId } }),
     prisma.timelineEvent.count({ where: { weddingId } }),
     getBudgetAlerts(),
@@ -35,8 +36,10 @@ export default async function DashboardPage() {
   const declined = guests.filter((g) => g.rsvpStatus === "declined");
   const totalAttending = confirmed.reduce((sum, g) => sum + 1 + g.plusOnes, 0);
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
+  const totalBudget = contributions.reduce((sum, c) => sum + c.amount, 0);
   const days = daysUntil(wedding?.weddingDate ?? null);
-  const budget = effectiveBudget(wedding?.totalBudget ?? 0, categories.map((c) => c.estimatedBudget));
+  // Presupuesto: la suma de los aportes o, si no hay, lo estimado en las categorías.
+  const budget = effectiveBudget(totalBudget, categories.map((c) => c.estimatedBudget));
 
   return (
     <div className="space-y-8">
@@ -66,7 +69,7 @@ export default async function DashboardPage() {
           icon={Wallet}
           title="Presupuesto"
           value={formatMoney(totalActual, currency)}
-          detail={budget.amount > 0 ? `de ${formatMoney(budget.amount, currency)} estimado` : "Sin presupuesto definido"}
+          detail={budget.amount > 0 ? `de ${formatMoney(budget.amount, currency)} ${budget.source === "total" ? "en aportes" : "estimado"}` : "Sin presupuesto definido"}
         />
         <DashboardCard
           href="/canciones"

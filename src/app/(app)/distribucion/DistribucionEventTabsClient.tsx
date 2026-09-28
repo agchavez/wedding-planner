@@ -9,9 +9,16 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Background } from "@/app/(app)/distribucion/canvasStore";
+import type { RoomPoint } from "@/lib/seatGeometry";
 import type { LayoutElement, WeddingEvent } from "@/generated/prisma";
 
-type LayoutData = { elements: LayoutElement[]; canvasWidth: number; canvasHeight: number; background: Background };
+type LayoutData = {
+  elements: LayoutElement[];
+  canvasWidth: number;
+  canvasHeight: number;
+  background: Background;
+  roomShape: RoomPoint[];
+};
 
 export function DistribucionEventTabsClient({
   events,
@@ -48,6 +55,7 @@ export function DistribucionEventTabsClient({
     canvasWidth: 2000,
     canvasHeight: 1400,
     background: "indoor" as Background,
+    roomShape: [],
   };
 
   return (
@@ -98,6 +106,7 @@ export function DistribucionEventTabsClient({
         canvasWidth={activeLayout.canvasWidth}
         canvasHeight={activeLayout.canvasHeight}
         initialBackground={activeLayout.background}
+        initialRoomShape={activeLayout.roomShape}
       />
     </Tabs>
   );

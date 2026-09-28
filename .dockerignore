@@ -10,3 +10,5 @@ deploy
 Dockerfile
 .dockerignore
 docker-compose.yml
+uploads
+public/uploads

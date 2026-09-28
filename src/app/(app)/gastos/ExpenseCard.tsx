@@ -1,14 +1,17 @@
 "use client";
 
-import { Pencil, Receipt, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
 import { deleteExpense } from "@/app/(app)/gastos/actions";
 import { ExpenseFormDialog } from "@/app/(app)/gastos/ExpenseFormDialog";
+import { PaymentFormDialog } from "@/app/(app)/gastos/PaymentFormDialog";
+import { PaymentRow } from "@/app/(app)/gastos/PaymentRow";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { STATUS_LABEL } from "@/app/(app)/gastos/constants";
-import type { Expense, ExpenseCategory } from "@/generated/prisma";
+import type { Account, Expense, ExpenseCategory, ExpensePayment } from "@/generated/prisma";
 import { formatCalendarDate, formatMoney } from "@/lib/format";
 
 const STATUS_CLASSES: Record<string, string> = {
@@ -23,13 +26,18 @@ export function ExpenseCard({
   categories,
   currency,
   vendorSuggestions,
+  payments,
+  accounts,
 }: {
   expense: Expense;
   categoryName: string;
   categories: ExpenseCategory[];
   currency: string;
   vendorSuggestions: string[];
+  payments: ExpensePayment[];
+  accounts: Account[];
 }) {
+  const [showPayments, setShowPayments] = useState(false);
 
   return (
     <Card>
@@ -61,6 +69,10 @@ export function ExpenseCard({
         </div>
 
         <div className="flex items-center gap-2 sm:shrink-0">
+          <Button variant="outline" size="sm" onClick={() => setShowPayments((v) => !v)}>
+            {showPayments ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            {payments.length > 0 ? `Pagos (${payments.length})` : "Pagos"}
+          </Button>
           <ExpenseFormDialog
             expense={expense}
             categories={categories}
@@ -88,6 +100,37 @@ export function ExpenseCard({
           />
         </div>
       </CardContent>
+
+      {showPayments && (
+        <div className="space-y-2 border-t border-border px-4 py-3">
+          {payments.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Todavía no hay pagos registrados para este gasto.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {payments.map((payment) => (
+                <PaymentRow
+                  key={payment.id}
+                  expenseId={expense.id}
+                  payment={payment}
+                  currency={currency}
+                  accounts={accounts}
+                />
+              ))}
+            </div>
+          )}
+          <PaymentFormDialog
+            expenseId={expense.id}
+            accounts={accounts}
+            triggerRender={<Button variant="outline" size="sm" />}
+            triggerChildren={
+              <>
+                <Plus className="size-3.5" />
+                Agregar pago
+              </>
+            }
+          />
+        </div>
+      )}
     </Card>
   );
 }

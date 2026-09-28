@@ -9,10 +9,19 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = Boolean(getSessionCookie(request));
 
-  // Login, registro, landing y enlaces de invitación son públicos. Una cookie vencida no debe
+  // Login, registro, landing, enlaces de invitación y los enlaces compartidos (agenda de un
+  // evento y galería de fotos, de solo lectura) son públicos. Una cookie vencida no debe
   // impedir llegar al login (evita bucles de redirección);
   // la propia página de login redirige al panel si la sesión es válida.
-  if (pathname === "/login" || pathname === "/registro" || pathname === "/inicio" || pathname.startsWith("/invitacion/")) return NextResponse.next();
+  if (
+    pathname === "/login" ||
+    pathname === "/registro" ||
+    pathname === "/inicio" ||
+    pathname.startsWith("/invitacion/") ||
+    pathname.startsWith("/agenda/") ||
+    pathname.startsWith("/galeria/")
+  )
+    return NextResponse.next();
 
   // Sin sesión, la raíz muestra la landing pública; con sesión, el panel de la boda.
   if (pathname === "/" && !hasSession) return NextResponse.rewrite(new URL("/inicio", request.url));

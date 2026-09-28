@@ -7,12 +7,13 @@ export const dynamic = "force-dynamic";
 
 export default async function InvitadosPage() {
   const weddingId = await getActiveWeddingId();
-  const [guests, tableOptions] = await Promise.all([
+  const [guests, tableOptions, groups] = await Promise.all([
     prisma.guest.findMany({ where: { weddingId }, orderBy: { fullName: "asc" } }),
     getTableOptionsWithOccupancy(),
+    prisma.guestGroup.findMany({ where: { weddingId }, orderBy: { name: "asc" } }),
   ]);
 
   return (
-    <GuestList guests={guests} tableOptions={tableOptions} />
+    <GuestList guests={guests} tableOptions={tableOptions} groupNames={groups.map((g) => g.name)} />
   );
 }

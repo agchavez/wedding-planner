@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExpenseCard } from "@/app/(app)/gastos/ExpenseCard";
 import { ExpenseFormDialog } from "@/app/(app)/gastos/ExpenseFormDialog";
-import type { Expense, ExpenseCategory } from "@/generated/prisma";
+import type { Account, Expense, ExpenseCategory, ExpensePayment } from "@/generated/prisma";
 import { PageHeader } from "@/components/PageHeader";
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
@@ -17,18 +17,24 @@ export function ExpenseList({
   expenses,
   categories,
   currency,
+  vendorNames = [],
+  paymentsByExpense,
+  accounts,
 }: {
   expenses: Expense[];
   categories: ExpenseCategory[];
   currency: string;
+  vendorNames?: string[];
+  paymentsByExpense: Record<string, ExpensePayment[]>;
+  accounts: Account[];
 }) {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
 
   const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
 
   const vendorSuggestions = useMemo(
-    () => Array.from(new Set(expenses.map((e) => e.vendor).filter(Boolean))).sort(),
-    [expenses]
+    () => Array.from(new Set([...vendorNames, ...expenses.map((e) => e.vendor)].filter(Boolean))).sort(),
+    [expenses, vendorNames]
   );
 
   const filtered = useMemo(
@@ -43,10 +49,10 @@ export function ExpenseList({
         <EmptyState
           icon={Receipt}
           title="Primero crea una categoría"
-          description="Cada gasto pertenece a una categoría del presupuesto (catering, música, flores…)."
+          description="Cada gasto pertenece a una categoría del presupuesto (catering, música, flores…). Se crean en Configuración."
           action={
-            <Button nativeButton={false} render={<Link href="/presupuesto" />}>
-              Ir a Presupuesto
+            <Button nativeButton={false} render={<Link href="/configuracion" />}>
+              Ir a Configuración
             </Button>
           }
         />
@@ -112,6 +118,8 @@ export function ExpenseList({
               categories={categories}
               currency={currency}
               vendorSuggestions={vendorSuggestions}
+              payments={paymentsByExpense[expense.id] ?? []}
+              accounts={accounts}
             />
           ))}
         </div>

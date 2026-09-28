@@ -91,17 +91,6 @@ export function WeddingForm({ wedding }: { wedding: Wedding }) {
         <Input id="venueAddress" name="venueAddress" defaultValue={wedding.venueAddress} className="mt-1" />
       </div>
       <div>
-        <Label htmlFor="totalBudget">Presupuesto total</Label>
-        <Input
-          id="totalBudget"
-          name="totalBudget"
-          type="number"
-          step="0.01"
-          defaultValue={wedding.totalBudget}
-          className="mt-1"
-        />
-      </div>
-      <div>
         <Label htmlFor="currency">Moneda</Label>
         <Input id="currency" name="currency" defaultValue={wedding.currency} className="mt-1" />
       </div>

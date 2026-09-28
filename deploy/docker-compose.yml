@@ -8,6 +8,9 @@ services:
     env_file: .env
     environment:
       TZ: America/Tegucigalpa
+    volumes:
+      # Comprobantes de pago subidos desde Gastos (ver src/lib/uploads.ts).
+      - uploads:/app/uploads
     expose:
       - "3000"
     logging:
@@ -32,5 +35,6 @@ services:
       - app
 
 volumes:
+  uploads:
   caddy-data:
   caddy-config:

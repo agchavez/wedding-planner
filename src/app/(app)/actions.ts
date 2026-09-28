@@ -20,7 +20,6 @@ export async function updateWeddingDetails(formData: FormData) {
       partner2: String(formData.get("partner2") ?? ""),
       venueName: String(formData.get("venueName") ?? ""),
       venueAddress: String(formData.get("venueAddress") ?? ""),
-      totalBudget: Number(formData.get("totalBudget") ?? 0),
       currency: String(formData.get("currency") ?? "HNL"),
       weddingDate: parseDateOnly(weddingDateRaw),
     },

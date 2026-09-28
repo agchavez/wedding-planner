@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
+import { dateOnlyStr, todayStrWeddingTz } from "@/lib/dates";
 import { effectiveBudget, formatCalendarDate, formatMoney } from "@/lib/format";
 
 export type BudgetAlert = {
@@ -11,16 +12,19 @@ const UPCOMING_DAYS = 7;
 
 export async function getBudgetAlerts(): Promise<BudgetAlert[]> {
   const weddingId = await getActiveWeddingId();
-  const [wedding, categories, expenses] = await Promise.all([
+  const [wedding, categories, expenses, contributions] = await Promise.all([
     prisma.wedding.findUnique({ where: { id: weddingId } }),
     prisma.expenseCategory.findMany({ where: { weddingId } }),
     prisma.expense.findMany({ where: { weddingId } }),
+    prisma.budgetContribution.findMany({ where: { weddingId } }),
   ]);
 
   const alerts: BudgetAlert[] = [];
 
+  const totalBudget = contributions.reduce((sum, c) => sum + c.amount, 0);
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
-  const budget = effectiveBudget(wedding?.totalBudget ?? 0, categories.map((c) => c.estimatedBudget));
+  // Presupuesto: la suma de los aportes o, si no hay, lo estimado en las categorías.
+  const budget = effectiveBudget(totalBudget, categories.map((c) => c.estimatedBudget));
   if (budget.amount > 0 && totalActual > budget.amount) {
     alerts.push({
       type: "total_exceeded",
@@ -41,16 +45,17 @@ export async function getBudgetAlerts(): Promise<BudgetAlert[]> {
     }
   }
 
-  const now = new Date();
-  const upcomingLimit = new Date(now.getTime() + UPCOMING_DAYS * 24 * 60 * 60 * 1000);
+  const todayStr = todayStrWeddingTz();
+  const upcomingLimitStr = dateOnlyStr(new Date(Date.now() + UPCOMING_DAYS * 24 * 60 * 60 * 1000));
   for (const expense of expenses) {
     if (expense.paymentStatus === "paid" || !expense.dueDate) continue;
-    if (expense.dueDate < now) {
+    const dueDateStr = dateOnlyStr(expense.dueDate);
+    if (dueDateStr < todayStr) {
       alerts.push({
         type: "payment_overdue",
         message: `Pago vencido: "${expense.description}" (venció el ${formatDate(expense.dueDate)}).`,
       });
-    } else if (expense.dueDate <= upcomingLimit) {
+    } else if (dueDateStr <= upcomingLimitStr) {
       alerts.push({
         type: "payment_upcoming",
         message: `Pago próximo: "${expense.description}" vence el ${formatDate(expense.dueDate)}.`,

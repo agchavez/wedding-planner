@@ -18,7 +18,15 @@ const FILTERS = [
   { value: "declined", label: "Rechazados" },
 ] as const;
 
-export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOptions: TableOption[] }) {
+export function GuestList({
+  guests,
+  tableOptions,
+  groupNames = [],
+}: {
+  guests: Guest[];
+  tableOptions: TableOption[];
+  groupNames?: string[];
+}) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["value"]>("all");
 
   const filtered = useMemo(
@@ -35,8 +43,8 @@ export function GuestList({ guests, tableOptions }: { guests: Guest[]; tableOpti
   );
 
   const groupSuggestions = useMemo(
-    () => Array.from(new Set(guests.map((g) => g.group).filter(Boolean))).sort(),
-    [guests]
+    () => Array.from(new Set([...groupNames, ...guests.map((g) => g.group)].filter(Boolean))).sort(),
+    [guests, groupNames]
   );
 
   return (

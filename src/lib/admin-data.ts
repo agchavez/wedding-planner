@@ -303,13 +303,15 @@ export type AdminWedding = {
 export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]> {
   const where = onlyId ? { id: onlyId } : {};
   const weddingFilter = onlyId ? { weddingId: onlyId } : {};
-  const [weddings, members, guestGroups, confirmedGroups, expenseGroups, songGroups, invites, lastActivity, categoryGroups] =
+  const [weddings, members, guestGroups, confirmedGroups, expenseGroups, contributionGroups, songGroups, invites, lastActivity, categoryGroups] =
     await Promise.all([
       prisma.wedding.findMany({ where, orderBy: { createdAt: "desc" } }),
       mongoDb.collection("member").find(onlyId ? { organizationId: { $in: [onlyId, new ObjectId(onlyId)] } } : {}).toArray(),
       prisma.guest.groupBy({ by: ["weddingId"], where: weddingFilter, _count: { _all: true } }),
       prisma.guest.groupBy({ by: ["weddingId"], where: { ...weddingFilter, rsvpStatus: "confirmed" }, _count: { _all: true } }),
       prisma.expense.groupBy({ by: ["weddingId"], where: weddingFilter, _sum: { actualAmount: true } }),
+      // El presupuesto total de una boda es la suma de sus aportes.
+      prisma.budgetContribution.groupBy({ by: ["weddingId"], where: weddingFilter, _sum: { amount: true } }),
       prisma.song.groupBy({ by: ["weddingId"], where: weddingFilter, _count: { _all: true } }),
       mongoDb
         .collection("invitation")
@@ -340,6 +342,7 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
   const confirmed = count(confirmedGroups);
   const songs = count(songGroups);
   const spent = new Map(expenseGroups.map((g) => [g.weddingId ?? "", g._sum.actualAmount ?? 0]));
+  const budget = new Map(contributionGroups.map((g) => [g.weddingId ?? "", g._sum.amount ?? 0]));
   const pending = new Map(invites.map((i) => [idString(i._id), i.count]));
   const last = new Map(lastActivity.map((l) => [l._id, l.last]));
   const categoryEstimates = new Map(categoryGroups.map((g) => [g.weddingId ?? "", g._sum.estimatedBudget ?? 0]));
@@ -369,8 +372,8 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
     guests: guests.get(w.id) ?? 0,
     confirmedGuests: confirmed.get(w.id) ?? 0,
     spent: spent.get(w.id) ?? 0,
-    // Igual que en la app: el total definido o, si no hay, la suma de las categorías.
-    totalBudget: effectiveBudget(w.totalBudget, [categoryEstimates.get(w.id) ?? 0]).amount,
+    // Igual que en la app: la suma de los aportes o, si no hay, la de las categorías.
+    totalBudget: effectiveBudget(budget.get(w.id) ?? 0, [categoryEstimates.get(w.id) ?? 0]).amount,
     currency: w.currency,
     songs: songs.get(w.id) ?? 0,
     pendingInvites: pending.get(w.id) ?? 0,

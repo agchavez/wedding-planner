@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { DistribucionEventTabsClient } from "@/app/(app)/distribucion/DistribucionEventTabsClient";
 import type { Background } from "@/app/(app)/distribucion/canvasStore";
+import type { RoomPoint } from "@/lib/seatGeometry";
 import type { LayoutElement } from "@/generated/prisma";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -16,7 +17,7 @@ export default async function DistribucionPage() {
 
   const layoutByEvent: Record<
     string,
-    { elements: LayoutElement[]; canvasWidth: number; canvasHeight: number; background: Background }
+    { elements: LayoutElement[]; canvasWidth: number; canvasHeight: number; background: Background; roomShape: RoomPoint[] }
   > = {};
   for (const layout of layouts) {
     if (!layout.eventId) continue;
@@ -25,6 +26,7 @@ export default async function DistribucionPage() {
       canvasWidth: layout.canvasWidth,
       canvasHeight: layout.canvasHeight,
       background: layout.background === "garden" ? "garden" : "indoor",
+      roomShape: layout.roomShape as RoomPoint[],
     };
   }
 

@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { auth } from "@/lib/auth";
 import { mongoDb } from "@/lib/mongo";
 import { prisma } from "@/lib/prisma";
+import { idString } from "@/lib/ids";
 
 /**
  * Crea el primer administrador a partir de ADMIN_EMAIL / ADMIN_PASSWORD si todavía no
@@ -11,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 export async function bootstrapAdmin() {
   await ensureAuthIndexes();
   await migrateLegacyWeddings();
+  await migrateTotalBudgetToContributions();
 
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
@@ -93,5 +95,26 @@ async function migrateLegacyWeddings() {
     }
     await users.updateOne({ _id: user._id }, { $unset: { weddingId: "" } });
     console.log(`[bootstrap] Boda ${weddingId} migrada a organización para ${user.email}`);
+  }
+}
+
+/**
+ * Modelo anterior: el presupuesto era un número fijo (`Wedding.totalBudget`). Ahora es la
+ * suma de los aportes (BudgetContribution). Las bodas que tenían un total y ningún aporte
+ * reciben un aporte "Presupuesto inicial" por ese monto; luego se quita el campo viejo.
+ */
+async function migrateTotalBudgetToContributions() {
+  const weddings = mongoDb.collection("Wedding");
+  const legacy = await weddings.find({ totalBudget: { $exists: true } }).toArray();
+  for (const wedding of legacy) {
+    const weddingId = idString(wedding._id);
+    const amount = Number(wedding.totalBudget) || 0;
+    if (amount > 0 && (await prisma.budgetContribution.count({ where: { weddingId } })) === 0) {
+      await prisma.budgetContribution.create({
+        data: { weddingId, contributor: "other", otherLabel: "Presupuesto inicial", amount },
+      });
+      console.log(`[bootstrap] Boda ${weddingId}: presupuesto total ${amount} migrado a aporte`);
+    }
+    await weddings.updateOne({ _id: wedding._id }, { $unset: { totalBudget: "" } });
   }
 }

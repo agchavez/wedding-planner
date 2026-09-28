@@ -16,10 +16,51 @@ model Wedding {
   weddingDate  DateTime?
   venueName    String    @default("")
   venueAddress String    @default("")
-  totalBudget  Float     @default(0)
   currency     String    @default("HNL")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// Conexión OAuth con el Google Drive de la persona (singleton, igual patrón que Wedding).
+// El access/refresh token permiten subir fotos y videos a una carpeta dedicada en su Drive.
+model GoogleDriveConnection {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId    String?   @db.ObjectId
+  accountEmail String    @default("")
+  accessToken  String
+  refreshToken String
+  expiryDate   DateTime?
+  folderId     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Foto, video, mapa o link de referencia para la boda (ej. fotos del local, video de
+// inspiración, ubicación en Google Maps). Si hay una GoogleDriveConnection, los archivos
+// subidos van a una carpeta del Drive de la persona; si no, se guardan localmente.
+model MediaItem {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId   String?  @db.ObjectId
+  // image | video | map | link
+  type        String   @default("link")
+  url         String
+  driveFileId String?
+  label       String   @default("")
+  notes       String   @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Grupo familiar/social de invitados (ej. "Familia del novio", "Amigos de la novia"),
+// gestionado en Configuración. Igual que Vendor/Account: solo alimenta las sugerencias del
+// campo "Grupo" en el formulario de invitados, Guest.group sigue siendo texto libre.
+model GuestGroup {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId String?  @db.ObjectId
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Guest {
@@ -48,6 +89,20 @@ model ExpenseCategory {
   updatedAt       DateTime @updatedAt
 }
 
+// Directorio de proveedores, gestionado en Configuración. Expense.vendor sigue siendo texto
+// libre (no una relación) para no romper gastos existentes; este modelo solo alimenta las
+// sugerencias del campo "Proveedor" en el formulario de gastos.
+model Vendor {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId   String?  @db.ObjectId
+  name        String
+  contactName String   @default("")
+  phone       String   @default("")
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Expense {
   id              String    @id @default(auto()) @map("_id") @db.ObjectId
   weddingId       String?   @db.ObjectId
@@ -63,6 +118,52 @@ model Expense {
   notes           String    @default("")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+// Aporte de dinero de una persona (novio, novia, papás, etc.) hacia el presupuesto de la boda.
+// El presupuesto total se calcula como la suma de estos aportes (ver BudgetSummary).
+model BudgetContribution {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId   String?   @db.ObjectId
+  // groom | bride | groom_parents | bride_parents | other
+  contributor String    @default("other")
+  // Solo se usa cuando contributor = "other".
+  otherLabel  String    @default("")
+  amount      Float     @default(0)
+  date        DateTime?
+  notes       String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Cuenta/fuente de dinero desde la que se pagan los gastos (ej. "Cuenta de ahorros",
+// "Efectivo"), gestionada en Configuración. Igual que Vendor: solo alimenta el selector de
+// ExpensePayment, no es una relación estricta.
+model Account {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId String?  @db.ObjectId
+  name      String
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Un pago individual hecho hacia un Expense — permite registrar abonos/cuotas por
+// separado (en vez de un solo "amountPaid") y adjuntar el comprobante de cada uno.
+// Expense.amountPaid se recalcula automáticamente como la suma de estos pagos.
+model ExpensePayment {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  expenseId   String    @db.ObjectId
+  // Referencia suelta a Account.id — de qué cuenta salió el dinero. Null = sin especificar.
+  accountId   String?   @db.ObjectId
+  amount      Float     @default(0)
+  date        DateTime?
+  // Ruta pública del comprobante subido (ver src/app/gastos/payments-actions.ts), ej. "/uploads/receipts/xxx.jpg".
+  receiptUrl  String    @default("")
+  receiptName String    @default("")
+  notes       String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Song {
@@ -130,6 +231,12 @@ type LayoutElement {
   zIndex      Int     @default(0)
 }
 
+// Vértice del polígono que define el contorno del local (ver SeatingLayout.roomShape).
+type RoomPoint {
+  x Float
+  y Float
+}
+
 // Distribución visual de un evento de la boda (una por WeddingEvent — comparten el mismo id
 // que su WeddingEvent, ver getOrCreateSeatingLayout en lib/seatingLayout.ts).
 model SeatingLayout {
@@ -140,6 +247,8 @@ model SeatingLayout {
   canvasHeight Int             @default(1400)
   // indoor | garden — estilo visual del salón (interior o ceremonia al aire libre).
   background   String          @default("indoor")
+  // Contorno del local (polígono). Vacío = sin definir, se muestra un rectángulo simple.
+  roomShape    RoomPoint[]
   elements     LayoutElement[]
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt

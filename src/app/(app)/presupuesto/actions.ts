@@ -43,6 +43,8 @@ export async function updateCategory(id: string, formData: FormData) {
 export async function deleteCategory(id: string) {
   const weddingId = await getEditableWeddingId();
   await prisma.expenseCategory.findFirstOrThrow({ where: { id, weddingId }, select: { id: true } });
+  const expenseIds = (await prisma.expense.findMany({ where: { categoryId: id, weddingId }, select: { id: true } })).map((e) => e.id);
+  await prisma.expensePayment.deleteMany({ where: { expenseId: { in: expenseIds } } });
   await prisma.expense.deleteMany({ where: { categoryId: id, weddingId } });
   const category = await prisma.expenseCategory.delete({ where: { id, weddingId } });
   await audit("budget_category.delete", `Eliminó la categoría "${category.name}" y sus gastos`, { weddingId, targetId: id });
