@@ -25,19 +25,13 @@ export default async function GastosPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Gastos</h1>
-        <p className="text-sm text-muted-foreground">Registro de todos los gastos, sin importar la categoría.</p>
-      </div>
-      <ExpenseList
-        expenses={expenses}
-        categories={categories}
-        currency={wedding?.currency ?? "HNL"}
-        vendorNames={vendors.map((v) => v.name)}
-        paymentsByExpense={paymentsByExpense}
-        accounts={accounts}
-      />
-    </div>
+    <ExpenseList
+      expenses={expenses}
+      categories={categories}
+      currency={wedding?.currency ?? "HNL"}
+      vendorNames={vendors.map((v) => v.name)}
+      paymentsByExpense={paymentsByExpense}
+      accounts={accounts}
+    />
   );
 }

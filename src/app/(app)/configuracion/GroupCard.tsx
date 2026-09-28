@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { Pencil, Trash2, Users } from "lucide-react";
 import { deleteGroup } from "@/app/(app)/configuracion/groups-actions";
 import { GroupFormDialog } from "@/app/(app)/configuracion/GroupFormDialog";
@@ -10,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { GuestGroup } from "@/generated/prisma";
 
 export function GroupCard({ group }: { group: GuestGroup }) {
-  const [, startTransition] = useTransition();
 
   return (
     <Card size="sm">
@@ -42,7 +40,8 @@ export function GroupCard({ group }: { group: GuestGroup }) {
             }
             title={`¿Eliminar el grupo "${group.name}"?`}
             description="Los invitados que ya lo usaban conservan el nombre como texto libre. Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteGroup(group.id))}
+            onConfirm={() => deleteGroup(group.id)}
+            successMessage="Grupo eliminado"
           />
         </div>
       </CardContent>

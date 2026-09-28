@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -25,11 +25,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Song } from "@/generated/prisma";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 
 function SongItem({ song }: { song: Song }) {
-  const [, startTransition] = useTransition();
+  const { canEdit } = useWeddingAccess();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: song.id,
+    disabled: !canEdit,
   });
 
   const style = {
@@ -45,19 +47,21 @@ function SongItem({ song }: { song: Song }) {
       className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3"
     >
       <div className="flex items-center gap-3">
-        <button
-          {...attributes}
-          {...listeners}
-          className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
-          aria-label="Arrastrar para reordenar"
-        >
-          <GripVertical className="size-4" />
-        </button>
+        {canEdit && (
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
+            aria-label="Arrastrar para reordenar"
+          >
+            <GripVertical className="size-4" />
+          </button>
+        )}
         <div>
           <p className="flex items-center gap-2 font-medium text-foreground">
             {song.title}
             {song.mustPlay && (
-              <Badge variant="outline" className="border-transparent bg-emerald-100 text-emerald-800">
+              <Badge variant="outline" className="border-transparent bg-primary/10 text-primary">
                 Obligatoria
               </Badge>
             )}
@@ -89,7 +93,8 @@ function SongItem({ song }: { song: Song }) {
           }
           title={`¿Eliminar la canción "${song.title}"?`}
           description="Esta acción no se puede deshacer."
-          onConfirm={() => startTransition(() => deleteSong(song.id))}
+          onConfirm={() => deleteSong(song.id)}
+          successMessage="Canción eliminada"
         />
       </div>
     </div>

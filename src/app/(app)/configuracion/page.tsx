@@ -11,6 +11,8 @@ import { GroupFormDialog } from "@/app/(app)/configuracion/GroupFormDialog";
 import { GroupCard } from "@/app/(app)/configuracion/GroupCard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +40,10 @@ export default async function ConfiguracionPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Configuración</h1>
-        <p className="text-sm text-muted-foreground">
-          Administra las categorías de gasto, los proveedores, las cuentas y los grupos de invitados.
-        </p>
-      </div>
+      <PageHeader
+        title="Configuración"
+        description="Administra las categorías de gasto, los proveedores, las cuentas y los grupos de invitados."
+      />
 
       <Tabs defaultValue="categorias">
         <TabsList>
@@ -78,7 +78,11 @@ export default async function ConfiguracionPage() {
             />
           </div>
           {categories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Todavía no hay categorías de gasto. Agrega la primera arriba.</p>
+            <EmptyState
+              icon={Tag}
+              title="Todavía no hay categorías"
+              description="Divide el presupuesto en categorías (catering, fotografía, flores…) con un monto estimado."
+            />
           ) : (
             <div className="space-y-2">
               {categories.map((category) => (
@@ -106,7 +110,11 @@ export default async function ConfiguracionPage() {
             />
           </div>
           {vendors.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Todavía no hay proveedores registrados. Agrega el primero arriba.</p>
+            <EmptyState
+              icon={Store}
+              title="Todavía no hay proveedores"
+              description="Guarda el contacto de cada proveedor; aparecerán como sugerencia al registrar un gasto."
+            />
           ) : (
             <div className="space-y-2">
               {vendors.map((vendor) => (
@@ -129,9 +137,11 @@ export default async function ConfiguracionPage() {
             />
           </div>
           {accounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Todavía no hay cuentas registradas. Agrega la primera arriba (ej. &quot;Cuenta de ahorros&quot;, &quot;Efectivo&quot;).
-            </p>
+            <EmptyState
+              icon={Landmark}
+              title="Todavía no hay cuentas"
+              description="Las cuentas son de dónde sale el dinero de cada pago (ej. «Cuenta de ahorros», «Efectivo»)."
+            />
           ) : (
             <div className="space-y-2">
               {accounts.map((account) => (
@@ -160,9 +170,11 @@ export default async function ConfiguracionPage() {
             />
           </div>
           {groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Todavía no hay grupos registrados. Agrega el primero arriba (ej. &quot;Familia del novio&quot;).
-            </p>
+            <EmptyState
+              icon={Users}
+              title="Todavía no hay grupos"
+              description="Agrupa a tus invitados (ej. «Familia del novio», «Amigos de la universidad»)."
+            />
           ) : (
             <div className="space-y-2">
               {groups.map((group) => (

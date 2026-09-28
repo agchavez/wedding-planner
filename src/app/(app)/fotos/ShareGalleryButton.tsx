@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Link2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 /** Copia el enlace público (solo lectura) de la galería de fotos/videos/links. */
@@ -13,9 +14,11 @@ export function ShareGalleryButton({ weddingId }: { weddingId: string }) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      toast.success("Enlace copiado", { description: "Cualquiera con el enlace puede ver la galería, sin poder editarla." });
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.prompt("Copia el enlace:", url);
+      // Sin permiso de portapapeles: se muestra el enlace para copiarlo a mano.
+      toast("Copia este enlace", { description: url, duration: 15000 });
     }
   }
 

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { idString } from "@/lib/ids";
 import { parseWeddingRole, type WeddingRole } from "@/lib/permissions";
 import { weddingDisplayName } from "@/lib/wedding";
+import { effectiveBudget } from "@/lib/format";
 
 const DAY = 24 * 60 * 60 * 1000;
 export const APP_TIMEZONE = process.env.TZ || "America/Tegucigalpa";
@@ -302,7 +303,7 @@ export type AdminWedding = {
 export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]> {
   const where = onlyId ? { id: onlyId } : {};
   const weddingFilter = onlyId ? { weddingId: onlyId } : {};
-  const [weddings, members, guestGroups, confirmedGroups, expenseGroups, contributionGroups, songGroups, invites, lastActivity] =
+  const [weddings, members, guestGroups, confirmedGroups, expenseGroups, contributionGroups, songGroups, invites, lastActivity, categoryGroups] =
     await Promise.all([
       prisma.wedding.findMany({ where, orderBy: { createdAt: "desc" } }),
       mongoDb.collection("member").find(onlyId ? { organizationId: { $in: [onlyId, new ObjectId(onlyId)] } } : {}).toArray(),
@@ -325,6 +326,7 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
           { $group: { _id: "$weddingId", last: { $max: "$createdAt" } } },
         ])
         .toArray(),
+      prisma.expenseCategory.groupBy({ by: ["weddingId"], where: weddingFilter, _sum: { estimatedBudget: true } }),
     ]);
 
   const userIds = [...new Set(members.map((m) => idString(m.userId)))].filter((id) => ObjectId.isValid(id));
@@ -343,6 +345,7 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
   const budget = new Map(contributionGroups.map((g) => [g.weddingId ?? "", g._sum.amount ?? 0]));
   const pending = new Map(invites.map((i) => [idString(i._id), i.count]));
   const last = new Map(lastActivity.map((l) => [l._id, l.last]));
+  const categoryEstimates = new Map(categoryGroups.map((g) => [g.weddingId ?? "", g._sum.estimatedBudget ?? 0]));
 
   const membersByWedding = new Map<string, AdminWedding["members"]>();
   for (const m of members) {
@@ -369,7 +372,8 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
     guests: guests.get(w.id) ?? 0,
     confirmedGuests: confirmed.get(w.id) ?? 0,
     spent: spent.get(w.id) ?? 0,
-    totalBudget: budget.get(w.id) ?? 0,
+    // Igual que en la app: la suma de los aportes o, si no hay, la de las categorías.
+    totalBudget: effectiveBudget(budget.get(w.id) ?? 0, [categoryEstimates.get(w.id) ?? 0]).amount,
     currency: w.currency,
     songs: songs.get(w.id) ?? 0,
     pendingInvites: pending.get(w.id) ?? 0,

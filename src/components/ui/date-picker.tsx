@@ -3,13 +3,21 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, CalendarClock, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarClock, ChevronDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { FIELD_TRIGGER_CLASS } from "@/components/ui/field-trigger";
+
+/** "16:30" → "4:30 p. m.", igual que la lista de la línea de tiempo. */
+function formatTime12(value: string) {
+  const [h, m] = value.split(":").map(Number);
+  const date = new Date(2000, 0, 1, h, m);
+  return new Intl.DateTimeFormat("es-HN", { hour: "numeric", minute: "2-digit" }).format(date);
+}
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
@@ -45,16 +53,26 @@ export function TimePicker({
           <Button
             type="button"
             variant="outline"
-            className={cn("w-full justify-start font-normal", !value && "text-muted-foreground", className)}
+            className={cn(FIELD_TRIGGER_CLASS, !value && "text-muted-foreground", className)}
           />
         }
       >
-        <Clock className="size-4" />
-        {value || placeholder}
+        <span className="flex min-w-0 items-center gap-2">
+          <Clock className="size-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{value ? formatTime12(value) : placeholder}</span>
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2" align="start">
         <div className="flex items-center gap-2">
-          <Select value={hour ?? undefined} onValueChange={(v) => setHour(v)}>
+          <Select
+            value={hour}
+            onValueChange={(v) => {
+              setHour(v);
+              // Con la hora elegida, los minutos arrancan en :00 si aún no hay.
+              if (minute === null) setMinute("00");
+            }}
+          >
             <SelectTrigger className="h-8 flex-1">
               <SelectValue placeholder="HH" />
             </SelectTrigger>
@@ -67,7 +85,13 @@ export function TimePicker({
             </SelectContent>
           </Select>
           <span className="text-muted-foreground">:</span>
-          <Select value={minute ?? undefined} onValueChange={(v) => setMinute(v)}>
+          <Select
+            value={minute}
+            onValueChange={(v) => {
+              setMinute(v);
+              if (hour !== null) setOpen(false);
+            }}
+          >
             <SelectTrigger className="h-8 flex-1">
               <SelectValue placeholder="mm" />
             </SelectTrigger>
@@ -127,12 +151,15 @@ export function DatePicker({
             id={id}
             type="button"
             variant="outline"
-            className={cn("w-full justify-start font-normal", !date && "text-muted-foreground", className)}
+            className={cn(FIELD_TRIGGER_CLASS, !date && "text-muted-foreground", className)}
           />
         }
       >
-        <CalendarIcon className="size-4" />
-        {date ? format(date, "d 'de' MMMM 'de' yyyy", { locale: es }) : placeholder}
+        <span className="flex min-w-0 items-center gap-2">
+          <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{date ? format(date, "d 'de' MMMM 'de' yyyy", { locale: es }) : placeholder}</span>
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
@@ -205,12 +232,17 @@ export function DateTimePicker({
           <Button
             type="button"
             variant="outline"
-            className={cn("w-full justify-start font-normal", !date && "text-muted-foreground", className)}
+            className={cn(FIELD_TRIGGER_CLASS, !date && "text-muted-foreground", className)}
           />
         }
       >
-        <CalendarClock className="size-4" />
-        {date ? `${format(date, "d MMM yyyy", { locale: es })}, ${time}` : placeholder}
+        <span className="flex min-w-0 items-center gap-2">
+          <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">
+            {date ? `${format(date, "d MMM yyyy", { locale: es })}, ${formatTime12(time)}` : placeholder}
+          </span>
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="w-auto space-y-2 p-2" align="start">
         <Calendar mode="single" selected={date} onSelect={setDate} locale={es} autoFocus />

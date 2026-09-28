@@ -7,6 +7,7 @@ import { WeddingForm } from "@/app/(app)/WeddingForm";
 import { AlertBanner } from "@/components/AlertBanner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { effectiveBudget, formatMoney } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +16,10 @@ function daysUntil(date: Date | null) {
   return Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
-
 export default async function DashboardPage() {
   const weddingId = await getActiveWeddingId();
 
-  const [wedding, guests, expenses, contributions, songsCount, eventsCount, alerts] = await Promise.all([
+  const [wedding, guests, expenses, contributions, songsCount, eventsCount, alerts, categories] = await Promise.all([
     prisma.wedding.findUnique({ where: { id: weddingId } }),
     prisma.guest.findMany({ where: { weddingId } }),
     prisma.expense.findMany({ where: { weddingId } }),
@@ -30,6 +27,7 @@ export default async function DashboardPage() {
     prisma.song.count({ where: { weddingId } }),
     prisma.timelineEvent.count({ where: { weddingId } }),
     getBudgetAlerts(),
+    prisma.expenseCategory.findMany({ where: { weddingId }, select: { estimatedBudget: true } }),
   ]);
 
   const currency = wedding?.currency ?? "HNL";
@@ -40,6 +38,8 @@ export default async function DashboardPage() {
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
   const totalBudget = contributions.reduce((sum, c) => sum + c.amount, 0);
   const days = daysUntil(wedding?.weddingDate ?? null);
+  // Presupuesto: la suma de los aportes o, si no hay, lo estimado en las categorías.
+  const budget = effectiveBudget(totalBudget, categories.map((c) => c.estimatedBudget));
 
   return (
     <div className="space-y-8">
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
           icon={Wallet}
           title="Presupuesto"
           value={formatMoney(totalActual, currency)}
-          detail={`de ${formatMoney(totalBudget, currency)} en aportes`}
+          detail={budget.amount > 0 ? `de ${formatMoney(budget.amount, currency)} ${budget.source === "total" ? "en aportes" : "estimado"}` : "Sin presupuesto definido"}
         />
         <DashboardCard
           href="/canciones"

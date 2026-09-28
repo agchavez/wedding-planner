@@ -14,6 +14,7 @@ import { Toolbar } from "@/app/(app)/distribucion/Toolbar";
 import { PropertiesPanel } from "@/app/(app)/distribucion/PropertiesPanel";
 import { saveLayout } from "@/app/(app)/distribucion/actions";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { cn } from "@/lib/utils";
 import { simplifyFreehandShape, type RoomPoint } from "@/lib/seatGeometry";
 import type { LayoutElement } from "@/generated/prisma";
@@ -70,6 +71,8 @@ export function SeatingEditor({
   const resetView = useCanvasStore((s) => s.resetView);
   const rotateRoomShape = useCanvasStore((s) => s.rotateRoomShape);
   const setRoomShapeFromPoints = useCanvasStore((s) => s.setRoomShapeFromPoints);
+  const setViewCenter = useCanvasStore((s) => s.setViewCenter);
+  const { canEdit } = useWeddingAccess();
 
   const nodeRefs = useRef(new Map<string, Konva.Group>());
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -111,6 +114,11 @@ export function SeatingEditor({
     // Solo se usa el valor inicial cargado del servidor; después el store es la fuente de verdad.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Centro de la zona visible, en coordenadas del lienzo: ahí aparecen los elementos nuevos.
+  useEffect(() => {
+    setViewCenter({ x: (stageSize.width / 2 - stageX) / zoom, y: (stageSize.height / 2 - stageY) / zoom });
+  }, [stageSize, zoom, stageX, stageY, setViewCenter]);
 
   const registerRef = useCallback((id: string, node: Konva.Group | null) => {
     if (node) nodeRefs.current.set(id, node);
@@ -215,20 +223,22 @@ export function SeatingEditor({
   const isRoundSelected = selected?.type === "table-round";
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className={cn("grid min-w-0 grid-cols-1 gap-4", canEdit && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Toolbar />
-            <CanvasSizeControl />
-            <AmbienteControl />
-            <RoomShapeControl />
+        {canEdit && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Toolbar />
+              <CanvasSizeControl />
+              <AmbienteControl />
+              <RoomShapeControl />
+            </div>
+            <div className="flex items-center gap-3">
+              <SaveIndicator status={saveStatus} dirty={dirty} />
+              <Button onClick={performSave}>Guardar ahora</Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <SaveIndicator status={saveStatus} dirty={dirty} />
-            <Button onClick={performSave}>Guardar ahora</Button>
-          </div>
-        </div>
+        )}
 
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon-sm" onClick={() => zoomBy(1 / ZOOM_STEP)}>
@@ -295,7 +305,8 @@ export function SeatingEditor({
                 <CanvasElement
                   key={el.id}
                   element={el}
-                  isSelected={el.id === selectedId}
+                  isSelected={canEdit && el.id === selectedId}
+                  editable={canEdit}
                   onSelect={selectElement}
                   onChange={updateElement}
                   registerRef={registerRef}
@@ -303,6 +314,7 @@ export function SeatingEditor({
               ))}
               <Transformer
                 ref={transformerRef}
+                visible={canEdit}
                 rotateEnabled
                 keepRatio={isRoundSelected}
                 boundBoxFunc={(oldBox, newBox) => {
@@ -320,7 +332,7 @@ export function SeatingEditor({
         </div>
       </div>
 
-      <PropertiesPanel />
+      {canEdit && <PropertiesPanel />}
     </div>
   );
 }

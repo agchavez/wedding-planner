@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
 import { deleteExpense } from "@/app/(app)/gastos/actions";
 import { ExpenseFormDialog } from "@/app/(app)/gastos/ExpenseFormDialog";
@@ -12,17 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { STATUS_LABEL } from "@/app/(app)/gastos/constants";
 import type { Account, Expense, ExpenseCategory, ExpensePayment } from "@/generated/prisma";
-import { formatCalendarDate } from "@/lib/format";
+import { formatCalendarDate, formatMoney } from "@/lib/format";
 
 const STATUS_CLASSES: Record<string, string> = {
   pending: "",
   partially_paid: "border-transparent bg-amber-100 text-amber-800",
   paid: "border-transparent bg-emerald-100 text-emerald-800",
 };
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
 
 export function ExpenseCard({
   expense,
@@ -41,7 +37,6 @@ export function ExpenseCard({
   payments: ExpensePayment[];
   accounts: Account[];
 }) {
-  const [, startTransition] = useTransition();
   const [showPayments, setShowPayments] = useState(false);
 
   return (
@@ -100,7 +95,8 @@ export function ExpenseCard({
             }
             title={`¿Eliminar el gasto "${expense.description}"?`}
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteExpense(expense.id))}
+            onConfirm={() => deleteExpense(expense.id)}
+            successMessage="Gasto eliminado"
           />
         </div>
       </CardContent>

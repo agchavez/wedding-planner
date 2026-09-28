@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { dateOnlyStr, todayStrWeddingTz } from "@/lib/dates";
-import { formatCalendarDate } from "@/lib/format";
+import { effectiveBudget, formatCalendarDate, formatMoney } from "@/lib/format";
 
 export type BudgetAlert = {
   type: "category_exceeded" | "total_exceeded" | "payment_overdue" | "payment_upcoming";
@@ -23,10 +23,12 @@ export async function getBudgetAlerts(): Promise<BudgetAlert[]> {
 
   const totalBudget = contributions.reduce((sum, c) => sum + c.amount, 0);
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
-  if (totalBudget > 0 && totalActual > totalBudget) {
+  // Presupuesto: la suma de los aportes o, si no hay, lo estimado en las categorías.
+  const budget = effectiveBudget(totalBudget, categories.map((c) => c.estimatedBudget));
+  if (budget.amount > 0 && totalActual > budget.amount) {
     alerts.push({
       type: "total_exceeded",
-      message: `El presupuesto total fue superado: ${formatMoney(totalActual, wedding?.currency)} de ${formatMoney(totalBudget, wedding?.currency)}.`,
+      message: `El presupuesto total fue superado: ${formatMoney(totalActual, wedding?.currency)} de ${formatMoney(budget.amount, wedding?.currency)}.`,
     });
   }
 
@@ -62,14 +64,6 @@ export async function getBudgetAlerts(): Promise<BudgetAlert[]> {
   }
 
   return alerts;
-}
-
-function formatMoney(amount: number, currency?: string) {
-  return new Intl.NumberFormat("es-HN", {
-    style: "currency",
-    currency: currency || "HNL",
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 function formatDate(date: Date) {

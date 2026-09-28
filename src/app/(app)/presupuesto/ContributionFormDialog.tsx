@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createContribution, updateContribution } from "@/app/(app)/presupuesto/contributions-actions";
 import { CONTRIBUTOR_OPTIONS, CONTRIBUTOR_LABEL } from "@/app/(app)/presupuesto/contributorOptions";
 import { Button } from "@/components/ui/button";
@@ -28,9 +30,13 @@ export function ContributionFormDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const { canEdit } = useWeddingAccess();
   const formRef = useRef<HTMLFormElement>(null);
   const [contributor, setContributor] = useState(contribution?.contributor ?? "groom");
   const isEdit = Boolean(contribution);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog
@@ -50,13 +56,18 @@ export function ContributionFormDialog({
           id="contribution-form"
           action={(formData) => {
             startTransition(async () => {
-              if (contribution) {
-                await updateContribution(contribution.id, formData);
-              } else {
-                await createContribution(formData);
+              try {
+                if (contribution) {
+                  await updateContribution(contribution.id, formData);
+                } else {
+                  await createContribution(formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(contribution ? "Aporte actualizado" : "Aporte registrado");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="space-y-3"

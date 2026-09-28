@@ -4,22 +4,60 @@ import { useState, useTransition } from "react";
 import { LogOut } from "lucide-react";
 import { revokeSessionAction } from "@/app/(admin)/admin/actions";
 import { Avatar } from "@/app/(admin)/admin/_components/ui";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AdminSession } from "@/lib/admin-data";
-import { formatDateTime, relativeTime } from "@/lib/format";
+import { formatDateTime, relativeTime, formatIp } from "@/lib/format";
 
 export function SessionsTable({ sessions, currentToken }: { sessions: AdminSession[]; currentToken: string }) {
-  const [error, setError] = useState<string | null>(null);
   const [pendingToken, setPendingToken] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  function revoke(session: AdminSession) {
+    setPendingToken(session.token);
+    startTransition(async () => {
+      const result = await revokeSessionAction(session.token, session.userId);
+      if (result.error) toast.error(result.error);
+      else toast.success(`Se cerró la sesión de ${session.userName}.`);
+      setPendingToken(null);
+    });
+  }
+
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="rounded-lg border border-destructive/25 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive">{error}</p>
-      )}
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      {/* Móvil: tarjetas apiladas en vez de tabla. */}
+      <ul className="space-y-2 sm:hidden">
+        {sessions.map((s) => {
+          const isCurrent = s.token === currentToken;
+          return (
+            <li key={s.id} className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-start gap-3">
+                <Avatar name={s.userName} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{s.userName}</p>
+                  <p className="truncate text-xs text-muted-foreground">{s.userEmail}</p>
+                </div>
+                {isCurrent && <Badge variant="secondary">Esta sesión</Badge>}
+              </div>
+              <p className="mt-3 text-sm text-foreground">
+                {s.device} · <span className="font-mono text-xs text-muted-foreground">{formatIp(s.ip)}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground" suppressHydrationWarning>
+                Activa {relativeTime(s.updatedAt).toLowerCase()}
+              </p>
+              {!isCurrent && (
+                <Button variant="outline" size="sm" className="mt-3 w-full" disabled={pendingToken !== null} onClick={() => revoke(s)}>
+                  <LogOut className="size-3.5" />
+                  {pendingToken === s.token ? "Cerrando…" : "Cerrar sesión"}
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-card sm:block">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="border-b border-border text-left text-xs text-muted-foreground">
             <tr>
@@ -46,7 +84,7 @@ export function SessionsTable({ sessions, currentToken }: { sessions: AdminSessi
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-foreground">{s.device}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{s.ip || "IP desconocida"}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{formatIp(s.ip)}</p>
                   </td>
                   <td suppressHydrationWarning className="px-4 py-3 text-foreground" title={formatDateTime(s.updatedAt)}>
                     {relativeTime(s.updatedAt)}
@@ -60,15 +98,7 @@ export function SessionsTable({ sessions, currentToken }: { sessions: AdminSessi
                         variant="ghost"
                         size="sm"
                         disabled={pendingToken !== null}
-                        onClick={() => {
-                          setError(null);
-                          setPendingToken(s.token);
-                          startTransition(async () => {
-                            const result = await revokeSessionAction(s.token, s.userId);
-                            if (result.error) setError(result.error);
-                            setPendingToken(null);
-                          });
-                        }}
+                        onClick={() => revoke(s)}
                       >
                         <LogOut className="size-3.5" />
                         {pendingToken === s.token ? "Cerrando…" : "Cerrar sesión"}

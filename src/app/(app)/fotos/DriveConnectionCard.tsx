@@ -5,6 +5,7 @@ import { HardDrive } from "lucide-react";
 import { disconnectDrive } from "@/app/(app)/fotos/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 
 export function DriveConnectionCard({
   configured,
@@ -14,6 +15,7 @@ export function DriveConnectionCard({
   accountEmail: string | null;
 }) {
   const [isPending, startTransition] = useTransition();
+  const { canEdit } = useWeddingAccess();
 
   if (!configured) return null;
 
@@ -29,10 +31,12 @@ export function DriveConnectionCard({
               Conectado con <span className="font-medium">{accountEmail}</span>
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">Conecta tu Google Drive para subir fotos y videos.</p>
+            <p className="text-sm text-muted-foreground">
+              {canEdit ? "Conecta tu Google Drive para subir fotos y videos." : "Google Drive no está conectado."}
+            </p>
           )}
         </div>
-        {accountEmail ? (
+        {!canEdit ? null : accountEmail ? (
           <Button variant="outline" size="sm" disabled={isPending} onClick={() => startTransition(disconnectDrive)}>
             {isPending ? "Desconectando..." : "Desconectar"}
           </Button>

@@ -26,6 +26,7 @@ import {
   type ActionResult,
 } from "@/app/(admin)/admin/actions";
 import { Avatar, RoleChip } from "@/app/(admin)/admin/_components/ui";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,8 +54,16 @@ import type { AdminUser } from "@/lib/admin-data";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Notice = { kind: "ok" | "error"; message: string } | null;
-type Modal = { type: "create" } | { type: "password" | "delete"; user: AdminUser } | null;
+type ConfirmModal = {
+  type: "confirm";
+  title: string;
+  description: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  run: () => Promise<ActionResult>;
+  success: string;
+};
+type Modal = { type: "create" } | { type: "password" | "delete"; user: AdminUser } | ConfirmModal | null;
 type Filter = "all" | "admins" | "no-wedding" | "banned";
 
 const FILTERS: { value: Filter; label: string }[] = [
@@ -67,7 +76,6 @@ const FILTERS: { value: Filter; label: string }[] = [
 export function UsersTable({ users, currentUserId }: { users: AdminUser[]; currentUserId: string }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [notice, setNotice] = useState<Notice>(null);
   const [modal, setModal] = useState<Modal>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -83,18 +91,108 @@ export function UsersTable({ users, currentUserId }: { users: AdminUser[]; curre
   }, [users, query, filter]);
 
   function perform(action: () => Promise<ActionResult>, success: string, onDone?: () => void) {
-    setNotice(null);
     startTransition(async () => {
       const result = await action();
       if (result.error) {
-        setNotice({ kind: "error", message: result.error });
+        toast.error(result.error);
         return;
       }
-      setNotice({ kind: "ok", message: success });
+      toast.success(success);
       onDone?.();
     });
   }
   const close = () => setModal(null);
+
+  function renderActions(user: AdminUser, isSelf: boolean) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon-sm" aria-label={`Acciones para ${user.name}`} />}
+        >
+          <MoreHorizontal />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuItem render={<Link href={`/admin/actividad?actor=${user.id}`} />}>
+            <Activity />
+            Ver su actividad
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setModal({ type: "password", user })}>
+            <KeyRound />
+            Restablecer contraseña
+          </DropdownMenuItem>
+          {!isSelf && user.activeSessions > 0 && (
+            <DropdownMenuItem
+              onClick={() =>
+                setModal({
+                  type: "confirm",
+                  title: `¿Cerrar las sesiones de ${user.name}?`,
+                  description: "Tendrá que volver a iniciar sesión en todos sus dispositivos.",
+                  confirmLabel: "Cerrar sesiones",
+                  run: () => revokeUserSessionsAction(user.id),
+                  success: `Se cerraron las sesiones de ${user.name}.`,
+                })
+              }
+            >
+              <LogOut />
+              Cerrar sus sesiones
+            </DropdownMenuItem>
+          )}
+          {!isSelf && (
+            <>
+              <DropdownMenuItem
+                onClick={() =>
+                  setModal({
+                    type: "confirm",
+                    title:
+                      user.role === "admin"
+                        ? `¿Quitar el rol de administrador a ${user.name}?`
+                        : `¿Hacer administrador a ${user.name}?`,
+                    description:
+                      user.role === "admin"
+                        ? "Perderá acceso a esta consola. Sus bodas no cambian."
+                        : "Podrá ver todas las bodas, usuarios y la auditoría, y gestionar cuentas.",
+                    confirmLabel: user.role === "admin" ? "Quitar administrador" : "Hacer administrador",
+                    destructive: user.role === "admin",
+                    run: () => setRoleAction(user.id, user.role === "admin" ? "user" : "admin"),
+                    success:
+                      user.role === "admin"
+                        ? `${user.name} ya no es administrador.`
+                        : `${user.name} ahora es administrador.`,
+                  })
+                }
+              >
+                {user.role === "admin" ? <ShieldOff /> : <ShieldCheck />}
+                {user.role === "admin" ? "Quitar administrador" : "Hacer administrador"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  setModal({
+                    type: "confirm",
+                    title: user.banned ? `¿Reactivar la cuenta de ${user.name}?` : `¿Suspender la cuenta de ${user.name}?`,
+                    description: user.banned
+                      ? "Podrá volver a iniciar sesión."
+                      : "Se cerrarán sus sesiones y no podrá entrar hasta que la reactives.",
+                    confirmLabel: user.banned ? "Reactivar" : "Suspender",
+                    destructive: !user.banned,
+                    run: () => setBannedAction(user.id, !user.banned),
+                    success: user.banned ? `${user.name} fue reactivado.` : `${user.name} fue suspendido.`,
+                  })
+                }
+              >
+                {user.banned ? <UserCheck /> : <Ban />}
+                {user.banned ? "Reactivar cuenta" : "Suspender cuenta"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={() => setModal({ type: "delete", user })}>
+                <Trash2 />
+                Eliminar cuenta
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -133,20 +231,53 @@ export function UsersTable({ users, currentUserId }: { users: AdminUser[]; curre
         </Button>
       </div>
 
-      {notice && (
-        <p
-          role="status"
-          className={
-            notice.kind === "ok"
-              ? "rounded-lg bg-accent px-3.5 py-2.5 text-sm text-accent-foreground"
-              : "rounded-lg border border-destructive/25 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive"
-          }
-        >
-          {notice.message}
-        </p>
-      )}
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      {/* Móvil: tarjetas apiladas en vez de tabla. */}
+      <ul className="space-y-2 sm:hidden">
+        {filtered.map((user) => {
+          const isSelf = user.id === currentUserId;
+          return (
+            <li key={user.id} className={cn("rounded-2xl border border-border bg-card p-4", user.banned && "bg-muted/40")}>
+              <div className="flex items-start gap-3">
+                <Avatar name={user.name} />
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-1.5 font-medium text-foreground">
+                    <span className="truncate">{user.name}</span>
+                    {isSelf && <span className="text-xs font-normal text-muted-foreground">(tú)</span>}
+                    {user.role === "admin" && <Badge>Admin</Badge>}
+                    {user.banned && <Badge variant="destructive">Suspendido</Badge>}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                </div>
+                {renderActions(user, isSelf)}
+              </div>
+              {user.weddings.length > 0 && (
+                <ul className="mt-3 space-y-1 border-t border-border pt-3">
+                  {user.weddings.map((w) => (
+                    <li key={w.id} className="flex items-center gap-2 text-sm">
+                      <Heart className="size-3.5 shrink-0 text-decorative" />
+                      <Link href={`/admin/bodas/${w.id}`} className="min-w-0 flex-1 truncate text-foreground">
+                        {w.name}
+                      </Link>
+                      <RoleChip role={w.role} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 text-xs text-muted-foreground" suppressHydrationWarning>
+                Último acceso: {relativeTime(user.lastSeen).toLowerCase()} · alta {formatDate(user.createdAt)}
+              </p>
+            </li>
+          );
+        })}
+        {filtered.length === 0 && (
+          <li className="rounded-2xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+            Ningún usuario coincide con los filtros.
+          </li>
+        )}
+      </ul>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-card sm:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-border text-left text-xs text-muted-foreground">
             <tr>
@@ -207,66 +338,7 @@ export function UsersTable({ users, currentUserId }: { users: AdminUser[]; curre
                   </td>
                   <td suppressHydrationWarning className="px-4 py-3 text-muted-foreground">{formatDate(user.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={<Button variant="ghost" size="icon-sm" aria-label={`Acciones para ${user.name}`} />}
-                      >
-                        <MoreHorizontal />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-56">
-                        <DropdownMenuItem render={<Link href={`/admin/actividad?actor=${user.id}`} />}>
-                          <Activity />
-                          Ver su actividad
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setModal({ type: "password", user })}>
-                          <KeyRound />
-                          Restablecer contraseña
-                        </DropdownMenuItem>
-                        {!isSelf && user.activeSessions > 0 && (
-                          <DropdownMenuItem
-                            onClick={() =>
-                              perform(() => revokeUserSessionsAction(user.id), `Se cerraron las sesiones de ${user.name}.`)
-                            }
-                          >
-                            <LogOut />
-                            Cerrar sus sesiones
-                          </DropdownMenuItem>
-                        )}
-                        {!isSelf && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                perform(
-                                  () => setRoleAction(user.id, user.role === "admin" ? "user" : "admin"),
-                                  user.role === "admin"
-                                    ? `${user.name} ya no es administrador.`
-                                    : `${user.name} ahora es administrador.`
-                                )
-                              }
-                            >
-                              {user.role === "admin" ? <ShieldOff /> : <ShieldCheck />}
-                              {user.role === "admin" ? "Quitar administrador" : "Hacer administrador"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                perform(
-                                  () => setBannedAction(user.id, !user.banned),
-                                  user.banned ? `${user.name} fue reactivado.` : `${user.name} fue suspendido.`
-                                )
-                              }
-                            >
-                              {user.banned ? <UserCheck /> : <Ban />}
-                              {user.banned ? "Reactivar cuenta" : "Suspender cuenta"}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onClick={() => setModal({ type: "delete", user })}>
-                              <Trash2 />
-                              Eliminar cuenta
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {renderActions(user, isSelf)}
                   </td>
                 </tr>
               );
@@ -330,6 +402,26 @@ export function UsersTable({ users, currentUserId }: { users: AdminUser[]; curre
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {modal?.type === "confirm" && (
+        <AlertDialog open onOpenChange={(o) => !o && close()}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{modal.title}</AlertDialogTitle>
+              <AlertDialogDescription>{modal.description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel render={<Button variant="outline" />}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                render={<Button variant={modal.destructive ? "destructive" : "default"} disabled={isPending} />}
+                onClick={() => perform(modal.run, modal.success, close)}
+              >
+                {modal.confirmLabel}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {modal?.type === "delete" && (

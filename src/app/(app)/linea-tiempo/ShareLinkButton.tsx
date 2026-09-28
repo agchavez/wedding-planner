@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Link2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 /** Copia el enlace público (solo lectura) de la línea de tiempo de un evento. */
@@ -13,9 +14,11 @@ export function ShareLinkButton({ eventId }: { eventId: string }) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      toast.success("Enlace copiado", { description: "Cualquiera con el enlace puede ver la agenda, sin poder editarla." });
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.prompt("Copia el enlace:", url);
+      // Sin permiso de portapapeles: se muestra el enlace para copiarlo a mano.
+      toast("Copia este enlace", { description: url, duration: 15000 });
     }
   }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { HandCoins, Pencil, Trash2 } from "lucide-react";
 import { deleteContribution } from "@/app/(app)/presupuesto/contributions-actions";
 import { contributorDisplayLabel } from "@/app/(app)/presupuesto/contributorOptions";
@@ -9,19 +8,10 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { BudgetContribution } from "@/generated/prisma";
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return null;
-  return new Intl.DateTimeFormat("es-HN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(date));
-}
+import { formatCalendarDate, formatMoney } from "@/lib/format";
 
 export function ContributionCard({ contribution, currency }: { contribution: BudgetContribution; currency: string }) {
-  const [, startTransition] = useTransition();
-  const date = formatDate(contribution.date);
+  const date = contribution.date ? formatCalendarDate(contribution.date) : null;
 
   return (
     <Card size="sm">
@@ -62,7 +52,8 @@ export function ContributionCard({ contribution, currency }: { contribution: Bud
             }
             title="¿Eliminar este aporte?"
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteContribution(contribution.id))}
+            onConfirm={() => deleteContribution(contribution.id)}
+            successMessage="Aporte eliminado"
           />
         </div>
       </CardContent>

@@ -4,16 +4,16 @@ import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Armchair,
   CalendarClock,
   Check,
   Images,
   ChevronsUpDown,
   Heart,
   Plus,
+  UserRound,
   UserRoundPlus,
-  KeyRound,
   LayoutDashboard,
-  LayoutGrid,
   ListMusic,
   LogOut,
   Receipt,
@@ -66,7 +66,7 @@ const LINK_GROUPS = [
     links: [
       { href: "/canciones", label: "Canciones", icon: ListMusic },
       { href: "/linea-tiempo", label: "Línea de tiempo", icon: CalendarClock },
-      { href: "/distribucion", label: "Distribución del salón", icon: LayoutGrid },
+      { href: "/distribucion", label: "Distribución del salón", icon: Armchair },
       { href: "/fotos", label: "Fotos", icon: Images },
     ],
   },
@@ -181,15 +181,8 @@ export function UserMenu({ user }: { user: SidebarUser }) {
             <ChevronsUpDown className="ml-auto size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="min-w-56">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>
-                {user.name}
-                {user.isAdmin && <span className="ml-2 text-xs text-muted-foreground">Admin</span>}
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push("/cuenta")}>
-              <KeyRound />
+              <UserRound />
               Mi cuenta
             </DropdownMenuItem>
             {user.isAdmin && (

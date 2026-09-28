@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createVendor, updateVendor } from "@/app/(app)/configuracion/vendors-actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,8 +22,12 @@ export function VendorFormDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const { canEdit } = useWeddingAccess();
   const formRef = useRef<HTMLFormElement>(null);
   const isEdit = Boolean(vendor);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -35,13 +41,18 @@ export function VendorFormDialog({
           id="vendor-form"
           action={(formData) => {
             startTransition(async () => {
-              if (vendor) {
-                await updateVendor(vendor.id, formData);
-              } else {
-                await createVendor(formData);
+              try {
+                if (vendor) {
+                  await updateVendor(vendor.id, formData);
+                } else {
+                  await createVendor(formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(vendor ? "Proveedor actualizado" : "Proveedor agregado");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="space-y-3"

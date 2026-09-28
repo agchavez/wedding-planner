@@ -1,21 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
 import { FileText, Pencil, Trash2 } from "lucide-react";
 import { deletePayment } from "@/app/(app)/gastos/payments-actions";
 import { PaymentFormDialog } from "@/app/(app)/gastos/PaymentFormDialog";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import type { Account, ExpensePayment } from "@/generated/prisma";
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return null;
-  return new Intl.DateTimeFormat("es-HN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(date));
-}
+import { formatCalendarDate, formatMoney } from "@/lib/format";
 
 export function PaymentRow({
   expenseId,
@@ -28,8 +19,7 @@ export function PaymentRow({
   currency: string;
   accounts?: Account[];
 }) {
-  const [, startTransition] = useTransition();
-  const date = formatDate(payment.date);
+  const date = payment.date ? formatCalendarDate(payment.date) : null;
   const accountName = payment.accountId ? accounts.find((a) => a.id === payment.accountId)?.name : null;
 
   return (
@@ -71,7 +61,8 @@ export function PaymentRow({
           }
           title="¿Eliminar este pago?"
           description="Esta acción no se puede deshacer."
-          onConfirm={() => startTransition(() => deletePayment(payment.id, expenseId))}
+          onConfirm={() => deletePayment(payment.id, expenseId)}
+            successMessage="Pago eliminado"
         />
       </div>
     </div>

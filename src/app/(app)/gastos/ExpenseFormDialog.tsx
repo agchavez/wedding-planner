@@ -2,7 +2,9 @@
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { createExpense, updateExpense } from "@/app/(app)/gastos/actions";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -31,7 +33,11 @@ export function ExpenseFormDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const { canEdit } = useWeddingAccess();
   const isEdit = Boolean(expense);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -45,13 +51,18 @@ export function ExpenseFormDialog({
           id="expense-form"
           action={(formData) => {
             startTransition(async () => {
-              if (expense) {
-                await updateExpense(expense.id, formData);
-              } else {
-                await createExpense(formData);
+              try {
+                if (expense) {
+                  await updateExpense(expense.id, formData);
+                } else {
+                  await createExpense(formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(expense ? "Gasto actualizado" : "Gasto registrado");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="grid grid-cols-1 gap-3 sm:grid-cols-2"
@@ -129,7 +140,7 @@ export function ExpenseFormDialog({
             Cancelar
           </Button>
           <Button type="submit" form="expense-form" disabled={isPending}>
-            {isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Agregar gasto"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Agregar gasto"}
           </Button>
         </DialogFooter>
       </DialogContent>

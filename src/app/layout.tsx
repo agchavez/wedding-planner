@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Playfair_Display, Geist } from "next/font/google";
+import Script from "next/script";
+import { Toaster } from "@/components/ui/sonner";
 import { CUSTOM_COLORS_STORAGE_KEY, CUSTOM_COLOR_KEYS, DEFAULT_THEME, THEME_STORAGE_KEY } from "@/lib/theme";
 import "./globals.css";
 
@@ -46,10 +48,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
-      <body className="min-h-full bg-background">{children}</body>
+      <body className="min-h-full bg-background">
+        {/* Aplica el tema guardado antes de pintar, para evitar un parpadeo de colores. */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

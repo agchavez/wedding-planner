@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { requireWeddingContext } from "@/lib/wedding";
 import { parseWeddingRole } from "@/lib/permissions";
 import { ParticipantsManager, type Participant, type PendingInvite } from "@/app/(app)/participantes/ParticipantsManager";
+import { PageHeader } from "@/components/PageHeader";
 
 export const metadata: Metadata = { title: "Participantes · Wedplan" };
 export const dynamic = "force-dynamic";
@@ -38,12 +39,7 @@ export default async function ParticipantesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Participantes</h1>
-        <p className="text-sm text-muted-foreground">
-          Quiénes organizan esta boda contigo y qué puede hacer cada uno.
-        </p>
-      </div>
+      <PageHeader title="Participantes" description={"Quiénes organizan esta boda contigo y qué puede hacer cada uno."} />
       <ParticipantsManager
         participants={participants}
         invites={invites}

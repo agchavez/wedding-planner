@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { deleteWeddingEvent } from "@/app/(app)/linea-tiempo/events-actions";
 import { EventFormDialog } from "@/app/(app)/linea-tiempo/EventFormDialog";
@@ -19,7 +19,6 @@ export function EventTabsClient({
   itemsByEvent: Record<string, TimelineEvent[]>;
 }) {
   const [activeId, setActiveId] = useState(events[0]?.id ?? "");
-  const [, startTransition] = useTransition();
 
   if (events.length === 0) {
     return (
@@ -60,7 +59,7 @@ export function EventTabsClient({
             triggerChildren={
               <>
                 <Plus className="size-3.5" />
-                Nuevo evento
+                Crear evento
               </>
             }
             onCreated={setActiveId}
@@ -80,13 +79,12 @@ export function EventTabsClient({
             }
             title={`¿Eliminar el evento "${activeEvent.name}"?`}
             description="Se eliminarán también todos los momentos de su línea de tiempo. Esta acción no se puede deshacer."
-            onConfirm={() =>
-              startTransition(async () => {
-                await deleteWeddingEvent(activeEvent.id);
-                const remaining = events.filter((e) => e.id !== activeEvent.id);
-                setActiveId(remaining[0]?.id ?? "");
-              })
-            }
+            onConfirm={async () => {
+              await deleteWeddingEvent(activeEvent.id);
+              const remaining = events.filter((e) => e.id !== activeEvent.id);
+              setActiveId(remaining[0]?.id ?? "");
+            }}
+            successMessage="Evento eliminado"
           />
         </div>
       </div>

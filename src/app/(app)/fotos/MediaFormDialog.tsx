@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createMediaItem } from "@/app/(app)/fotos/actions";
 import { MEDIA_TYPE_OPTIONS } from "@/app/(app)/fotos/constants";
 import { Button } from "@/components/ui/button";
@@ -22,10 +24,14 @@ export function MediaFormDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const { canEdit } = useWeddingAccess();
   const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState<string>("image");
 
   const canUpload = driveConnected && (type === "image" || type === "video");
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -39,10 +45,15 @@ export function MediaFormDialog({
           id="media-form"
           action={(formData) => {
             startTransition(async () => {
-              await createMediaItem(formData);
-              formRef.current?.reset();
-              setType("image");
-              setOpen(false);
+              try {
+                await createMediaItem(formData);
+                formRef.current?.reset();
+                setType("image");
+                setOpen(false);
+                toast.success("Agregado a Fotos");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
+              }
             });
           }}
           className="space-y-3"

@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
+import { toast } from "sonner";
+import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createPayment, updatePayment } from "@/app/(app)/gastos/payments-actions";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -34,8 +36,12 @@ export function PaymentFormDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const { canEdit } = useWeddingAccess();
   const formRef = useRef<HTMLFormElement>(null);
   const isEdit = Boolean(payment);
+
+  // Los roles de solo lectura no ven controles de edición (el servidor también lo impide).
+  if (!canEdit) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -49,13 +55,18 @@ export function PaymentFormDialog({
           id="payment-form"
           action={(formData) => {
             startTransition(async () => {
-              if (payment) {
-                await updatePayment(payment.id, expenseId, formData);
-              } else {
-                await createPayment(expenseId, formData);
+              try {
+                if (payment) {
+                  await updatePayment(payment.id, expenseId, formData);
+                } else {
+                  await createPayment(expenseId, formData);
+                }
+                formRef.current?.reset();
+                setOpen(false);
+                toast.success(payment ? "Pago actualizado" : "Pago registrado");
+              } catch {
+                toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
-              formRef.current?.reset();
-              setOpen(false);
             });
           }}
           className="space-y-3"

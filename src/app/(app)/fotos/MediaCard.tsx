@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { ExternalLink, Film, Image as ImageIcon, Link2, MapPin, Trash2 } from "lucide-react";
 import { deleteMediaItem } from "@/app/(app)/fotos/actions";
 import { MEDIA_TYPE_LABEL } from "@/app/(app)/fotos/constants";
@@ -18,7 +17,6 @@ const TYPE_ICON: Record<string, typeof ImageIcon> = {
 };
 
 export function MediaCard({ item }: { item: MediaItem }) {
-  const [, startTransition] = useTransition();
   const Icon = TYPE_ICON[item.type] ?? Link2;
 
   return (
@@ -51,7 +49,8 @@ export function MediaCard({ item }: { item: MediaItem }) {
             }
             title={`¿Eliminar "${item.label || "este elemento"}"?`}
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteMediaItem(item.id))}
+            onConfirm={() => deleteMediaItem(item.id)}
+            successMessage="Eliminado de Fotos"
           />
         </div>
       </CardContent>

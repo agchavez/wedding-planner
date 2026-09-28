@@ -10,6 +10,7 @@ import {
   updateParticipantRoleAction,
   type ActionResult,
 } from "@/app/(app)/participantes/actions";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,6 @@ export type Participant = {
 
 export type PendingInvite = { id: string; email: string; role: WeddingRole; expiresAt: string; link: string };
 
-type Notice = { kind: "ok" | "error"; message: string } | null;
 
 const dateFormat = new Intl.DateTimeFormat("es-HN", { dateStyle: "medium" });
 
@@ -77,36 +77,22 @@ export function ParticipantsManager({
   canManage: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [notice, setNotice] = useState<Notice>(null);
   const [newLink, setNewLink] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const assignableRoles = WEDDING_ROLES.filter((r) => r.value !== "owner" || myRole === "owner");
 
   function perform(action: () => Promise<ActionResult | void>, success: string) {
-    setNotice(null);
     startTransition(async () => {
       const result = await action();
-      if (result?.error) setNotice({ kind: "error", message: result.error });
-      else setNotice({ kind: "ok", message: success });
+      if (result?.error) toast.error(result.error);
+      else toast.success(success);
     });
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-6">
-        {notice && (
-          <p
-            role="status"
-            className={
-              notice.kind === "ok"
-                ? "rounded-lg bg-accent px-3.5 py-2.5 text-sm text-accent-foreground"
-                : "rounded-lg border border-destructive/25 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive"
-            }
-          >
-            {notice.message}
-          </p>
-        )}
 
         <Card className="py-0">
           <CardContent className="px-0">
@@ -158,6 +144,7 @@ export function ParticipantsManager({
                           title={`¿Quitar a ${p.name}?`}
                           description="Dejará de ver y editar esta boda. Podrás invitarle de nuevo cuando quieras."
                           onConfirm={() => perform(() => removeParticipantAction(p.id, p.name), `${p.name} ya no participa en la boda.`)}
+                          confirmLabel="Quitar"
                         />
                       </div>
                     ) : (
@@ -218,6 +205,8 @@ export function ParticipantsManager({
             title="¿Salir de esta boda?"
             description="Dejarás de verla. Para volver necesitarás una nueva invitación."
             onConfirm={() => perform(() => leaveWeddingAction(), "Saliste de la boda.")}
+            confirmLabel="Salir de la boda"
+            requiresEdit={false}
           />
         )}
       </div>
@@ -234,14 +223,14 @@ export function ParticipantsManager({
                 ref={formRef}
                 className="space-y-4"
                 action={(formData) => {
-                  setNotice(null);
                   setNewLink(null);
                   startTransition(async () => {
                     const result = await inviteParticipantAction(formData);
                     if (result.error) {
-                      setNotice({ kind: "error", message: result.error });
+                      toast.error(result.error);
                       return;
                     }
+                    toast.success("Invitación creada. Comparte el enlace.");
                     formRef.current?.reset();
                     setNewLink(result.link ?? null);
                   });

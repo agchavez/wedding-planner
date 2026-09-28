@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, FileText, Landmark, Pencil, Trash2 } from "lucide-react";
 import { deleteAccount } from "@/app/(app)/configuracion/accounts-actions";
 import { AccountFormDialog } from "@/app/(app)/configuracion/AccountFormDialog";
@@ -8,15 +8,7 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Account, ExpensePayment } from "@/generated/prisma";
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("es-HN", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return null;
-  return new Intl.DateTimeFormat("es-HN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(date));
-}
+import { formatCalendarDate, formatMoney } from "@/lib/format";
 
 export function AccountCard({
   account,
@@ -29,7 +21,6 @@ export function AccountCard({
   expenseDescriptionById: Record<string, string>;
   currency: string;
 }) {
-  const [, startTransition] = useTransition();
   const [showPayments, setShowPayments] = useState(false);
   const total = payments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -73,7 +64,8 @@ export function AccountCard({
             }
             title={`¿Eliminar la cuenta "${account.name}"?`}
             description="Los pagos que ya la usaban quedarán sin cuenta asignada. Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteAccount(account.id))}
+            onConfirm={() => deleteAccount(account.id)}
+            successMessage="Cuenta eliminada"
           />
         </div>
       </CardContent>
@@ -88,8 +80,8 @@ export function AccountCard({
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
                     {formatMoney(payment.amount, currency)}
-                    {formatDate(payment.date) && (
-                      <span className="font-normal text-muted-foreground"> · {formatDate(payment.date)}</span>
+                    {payment.date && (
+                      <span className="font-normal text-muted-foreground"> · {formatCalendarDate(payment.date)}</span>
                     )}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">

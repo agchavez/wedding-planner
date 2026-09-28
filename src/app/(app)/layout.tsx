@@ -1,6 +1,7 @@
 import { Eye } from "lucide-react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SiteHeader } from "@/components/SiteHeader";
+import { WeddingAccessProvider } from "@/components/WeddingAccess";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/permissions";
@@ -30,7 +31,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             Tu rol en esta boda es {roleLabel(ctx.role).toLowerCase()}: puedes ver todo, pero no hacer cambios.
           </div>
         )}
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+          <WeddingAccessProvider value={{ canEdit: ctx?.canEdit ?? true, canManage: ctx?.canManage ?? true }}>
+            {children}
+          </WeddingAccessProvider>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

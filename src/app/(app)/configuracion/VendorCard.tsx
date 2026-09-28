@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { Pencil, Store, Trash2 } from "lucide-react";
 import { deleteVendor } from "@/app/(app)/configuracion/vendors-actions";
 import { VendorFormDialog } from "@/app/(app)/configuracion/VendorFormDialog";
@@ -10,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { Vendor } from "@/generated/prisma";
 
 export function VendorCard({ vendor }: { vendor: Vendor }) {
-  const [, startTransition] = useTransition();
 
   return (
     <Card size="sm">
@@ -47,7 +45,8 @@ export function VendorCard({ vendor }: { vendor: Vendor }) {
             }
             title={`¿Eliminar el proveedor "${vendor.name}"?`}
             description="Esta acción no se puede deshacer."
-            onConfirm={() => startTransition(() => deleteVendor(vendor.id))}
+            onConfirm={() => deleteVendor(vendor.id)}
+            successMessage="Proveedor eliminado"
           />
         </div>
       </CardContent>
