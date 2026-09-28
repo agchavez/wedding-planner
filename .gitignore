@@ -50,3 +50,7 @@ next-env.d.ts
 .cursor/
 skills-lock.json
 .gstack/
+
+# Archivos subidos en desarrollo (comprobantes de pago)
+/uploads/
+/public/uploads/

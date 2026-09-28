@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Playfair_Display, Geist } from "next/font/google";
-import { DEFAULT_THEME, THEME_STORAGE_KEY } from "@/lib/theme";
+import { CUSTOM_COLORS_STORAGE_KEY, CUSTOM_COLOR_KEYS, DEFAULT_THEME, THEME_STORAGE_KEY } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,6 +27,15 @@ const themeInitScript = `
 try {
   var t = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)}) || ${JSON.stringify(DEFAULT_THEME)};
   document.documentElement.setAttribute("data-theme", t);
+  var raw = localStorage.getItem(${JSON.stringify(CUSTOM_COLORS_STORAGE_KEY)});
+  if (raw) {
+    var custom = JSON.parse(raw);
+    var keys = ${JSON.stringify(CUSTOM_COLOR_KEYS)};
+    for (var i = 0; i < keys.length; i++) {
+      var v = custom[keys[i]];
+      if (v) document.documentElement.style.setProperty("--" + keys[i], v);
+    }
+  }
 } catch (e) {}
 `;
 

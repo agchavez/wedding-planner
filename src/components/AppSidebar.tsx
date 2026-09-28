@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarClock,
   Check,
+  Images,
   ChevronsUpDown,
   Heart,
   Plus,
@@ -16,6 +17,7 @@ import {
   ListMusic,
   LogOut,
   Receipt,
+  Settings,
   ShieldCheck,
   Users,
   Wallet,
@@ -26,6 +28,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -40,37 +43,59 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { SettingsSheet } from "@/components/settings-sheet";
 import { authClient } from "@/lib/auth-client";
 import { roleLabel } from "@/lib/permissions";
 import type { WeddingSummary } from "@/lib/wedding";
+import type { Wedding } from "@/generated/prisma";
 
 export type SidebarUser = { name: string; email: string; isAdmin: boolean };
 
-const LINKS = [
-  { href: "/", label: "Panel", icon: LayoutDashboard },
-  { href: "/invitados", label: "Invitados", icon: Users },
-  { href: "/presupuesto", label: "Presupuesto", icon: Wallet },
-  { href: "/gastos", label: "Gastos", icon: Receipt },
-  { href: "/canciones", label: "Canciones", icon: ListMusic },
-  { href: "/linea-tiempo", label: "Línea de tiempo", icon: CalendarClock },
-  { href: "/distribucion", label: "Distribución del salón", icon: LayoutGrid },
-  { href: "/participantes", label: "Participantes", icon: UserRoundPlus },
+const LINK_GROUPS = [
+  {
+    label: "Principal",
+    links: [
+      { href: "/", label: "Panel", icon: LayoutDashboard },
+      { href: "/invitados", label: "Invitados", icon: Users },
+      { href: "/presupuesto", label: "Presupuesto", icon: Wallet },
+      { href: "/gastos", label: "Gastos", icon: Receipt },
+    ],
+  },
+  {
+    label: "La boda",
+    links: [
+      { href: "/canciones", label: "Canciones", icon: ListMusic },
+      { href: "/linea-tiempo", label: "Línea de tiempo", icon: CalendarClock },
+      { href: "/distribucion", label: "Distribución del salón", icon: LayoutGrid },
+      { href: "/fotos", label: "Fotos", icon: Images },
+    ],
+  },
+  {
+    label: "Sistema",
+    links: [
+      { href: "/participantes", label: "Participantes", icon: UserRoundPlus },
+      { href: "/configuracion", label: "Configuración", icon: Settings },
+    ],
+  },
 ];
 
 export function AppSidebar({
   user,
   weddings,
   activeWeddingId,
+  wedding,
+  canEdit,
 }: {
   user: SidebarUser;
   weddings: WeddingSummary[];
   activeWeddingId: string | null;
+  wedding: Wedding | null;
+  canEdit: boolean;
 }) {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon" className="print:hidden">
+    <Sidebar collapsible="icon" variant="floating" className="print:hidden">
       <SidebarHeader>
         <Link href="/" className="flex h-12 items-center gap-2 px-2 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:px-0">
           <BrandMark className="size-8" />
@@ -81,39 +106,39 @@ export function AppSidebar({
         <WeddingSwitcher weddings={weddings} activeWeddingId={activeWeddingId} />
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {LINKS.map((link) => (
-                <SidebarMenuItem key={link.href}>
-                  <SidebarMenuButton
-                    isActive={pathname === link.href}
-                    tooltip={link.label}
-                    render={<Link href={link.href} />}
-                  >
-                    <link.icon />
-                    <span>{link.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {user.isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    tooltip="Consola de administración"
-                    render={<Link href="/admin" />}
-                  >
-                    <ShieldCheck />
-                    <span>Consola de administración</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {LINK_GROUPS.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.links.map((link) => (
+                  <SidebarMenuItem key={link.href}>
+                    <SidebarMenuButton
+                      isActive={pathname === link.href}
+                      tooltip={link.label}
+                      render={<Link href={link.href} />}
+                    >
+                      <link.icon />
+                      <span>{link.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+                {group.label === "Sistema" && user.isAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Consola de administración" render={<Link href="/admin" />}>
+                      <ShieldCheck />
+                      <span>Consola de administración</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <div className="flex justify-center group-data-[collapsible=icon]:hidden">
-          <ThemeSwitcher />
+          <SettingsSheet wedding={wedding} canEdit={canEdit} />
         </div>
         <UserMenu user={user} />
       </SidebarFooter>

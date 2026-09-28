@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateSeatingLayout } from "@/lib/seatingLayout";
 import { getEditableWeddingId } from "@/lib/wedding";
 import { audit } from "@/lib/audit";
-import { isChairBlock, isTableType, type ElementType } from "@/lib/seatGeometry";
+import { isChairBlock, isTableType, type ElementType, type RoomPoint } from "@/lib/seatGeometry";
 import type { LayoutElement } from "@/generated/prisma";
 
 const VALID_TYPES: ElementType[] = [
@@ -56,16 +56,25 @@ function sanitizeElement(raw: LayoutElement): LayoutElement | null {
   };
 }
 
+function sanitizeRoomShape(points: RoomPoint[]): RoomPoint[] {
+  if (!Array.isArray(points) || points.length < 3) return [];
+  return points
+    .filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y))
+    .map((p) => ({ x: clamp(p.x, -2000, 6000), y: clamp(p.y, -2000, 6000) }));
+}
+
 export async function saveLayout(
   eventId: string,
   elements: LayoutElement[],
   canvasWidth: number,
   canvasHeight: number,
-  background: string
+  background: string,
+  roomShape: RoomPoint[] = []
 ) {
   const weddingId = await getEditableWeddingId();
   const layout = await getOrCreateSeatingLayout(eventId);
   const sanitized = elements.map(sanitizeElement).filter((el): el is LayoutElement => el !== null);
+  const sanitizedRoomShape = sanitizeRoomShape(roomShape);
 
   await prisma.seatingLayout.update({
     where: { id: layout.id },
@@ -74,6 +83,7 @@ export async function saveLayout(
       canvasWidth: clamp(canvasWidth, 800, 4000),
       canvasHeight: clamp(canvasHeight, 800, 4000),
       background: background === "garden" ? "garden" : "indoor",
+      roomShape: sanitizedRoomShape.length >= 3 ? sanitizedRoomShape : [],
     },
   });
 

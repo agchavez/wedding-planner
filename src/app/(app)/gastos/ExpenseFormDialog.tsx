@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { STATUS_LABEL } from "@/app/(app)/gastos/constants";
 import type { Expense, ExpenseCategory } from "@/generated/prisma";
 import { toDateOnlyValue } from "@/lib/format";
 
@@ -89,19 +88,6 @@ export function ExpenseFormDialog({
             />
           </div>
           <div>
-            <Label htmlFor="paymentStatus">Estado de pago</Label>
-            <Select name="paymentStatus" defaultValue={expense?.paymentStatus ?? "pending"}>
-              <SelectTrigger className="mt-1 w-full">
-                <SelectValue>{(value: string) => STATUS_LABEL[value] ?? value}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pendiente</SelectItem>
-                <SelectItem value="partially_paid">Pago parcial</SelectItem>
-                <SelectItem value="paid">Pagado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
             <Label htmlFor="dueDate">Fecha de vencimiento</Label>
             <DatePicker name="dueDate" defaultValue={toDateOnlyValue(expense?.dueDate)} className="mt-1" />
           </div>
@@ -127,21 +113,16 @@ export function ExpenseFormDialog({
               className="mt-1"
             />
           </div>
-          <div>
-            <Label htmlFor="amountPaid">Monto pagado</Label>
-            <Input
-              id="amountPaid"
-              name="amountPaid"
-              type="number"
-              step="0.01"
-              defaultValue={expense?.amountPaid ?? 0}
-              className="mt-1"
-            />
-          </div>
           <div className="sm:col-span-2">
             <Label htmlFor="notes">Notas</Label>
             <Textarea id="notes" name="notes" defaultValue={expense?.notes} rows={2} className="mt-1" />
           </div>
+          {isEdit && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              El monto pagado y el estado de pago se calculan según los pagos que registres para este gasto (con
+              &quot;Ver pagos&quot; en la tarjeta).
+            </p>
+          )}
         </form>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>

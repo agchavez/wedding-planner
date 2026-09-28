@@ -19,6 +19,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
+    "googleapis": "^180.0.0",
     "konva": "^10.3.2",
     "lucide-react": "^1.40.0",
     "mongodb": "^7.6.0",

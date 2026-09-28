@@ -47,7 +47,11 @@ export function Combobox({
           <CommandInput value={value} onValueChange={setValue} placeholder="Buscar o escribir…" />
           <CommandList>
             <CommandEmpty>
-              <span className="text-xs">Sin coincidencias — se usará &quot;{value}&quot;.</span>
+              <span className="text-xs text-muted-foreground">
+                {value.trim()
+                  ? <>Sin coincidencias — se usará &quot;{value}&quot;.</>
+                  : "Escribe para buscar o agregar uno nuevo."}
+              </span>
             </CommandEmpty>
             <CommandGroup>
               {suggestions.map((s) => (

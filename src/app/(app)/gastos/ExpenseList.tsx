@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExpenseCard } from "@/app/(app)/gastos/ExpenseCard";
 import { ExpenseFormDialog } from "@/app/(app)/gastos/ExpenseFormDialog";
-import type { Expense, ExpenseCategory } from "@/generated/prisma";
+import type { Account, Expense, ExpenseCategory, ExpensePayment } from "@/generated/prisma";
 
 const ALL_CATEGORIES = "all";
 
@@ -14,18 +14,24 @@ export function ExpenseList({
   expenses,
   categories,
   currency,
+  vendorNames = [],
+  paymentsByExpense,
+  accounts,
 }: {
   expenses: Expense[];
   categories: ExpenseCategory[];
   currency: string;
+  vendorNames?: string[];
+  paymentsByExpense: Record<string, ExpensePayment[]>;
+  accounts: Account[];
 }) {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
 
   const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
 
   const vendorSuggestions = useMemo(
-    () => Array.from(new Set(expenses.map((e) => e.vendor).filter(Boolean))).sort(),
-    [expenses]
+    () => Array.from(new Set([...vendorNames, ...expenses.map((e) => e.vendor)].filter(Boolean))).sort(),
+    [expenses, vendorNames]
   );
 
   const filtered = useMemo(
@@ -36,7 +42,7 @@ export function ExpenseList({
   if (categories.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Primero crea al menos una categoría en Presupuesto para poder registrar gastos.
+        Primero crea al menos una categoría en Configuración para poder registrar gastos.
       </p>
     );
   }
@@ -88,6 +94,8 @@ export function ExpenseList({
               categories={categories}
               currency={currency}
               vendorSuggestions={vendorSuggestions}
+              payments={paymentsByExpense[expense.id] ?? []}
+              accounts={accounts}
             />
           ))}
         </div>

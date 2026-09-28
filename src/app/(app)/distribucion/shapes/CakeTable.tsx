@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Circle, Text } from "react-konva";
+import { LucideVectorIcon } from "@/app/(app)/distribucion/shapes/LucideVectorIcon";
 
 const ICON_COLOR = "#a8415c";
 
@@ -27,12 +28,13 @@ export const CakeTable = memo(function CakeTable({
         shadowBlur={6}
         shadowOffsetY={2}
       />
+      <LucideVectorIcon name="Cake" y={-radius * 0.35} size={Math.min(20, radius * 0.5)} color={ICON_COLOR} strokeWidth={2} />
       <Text
-        text={`🎂\n${label}`}
+        text={label}
+        y={radius * 0.15}
         width={width}
-        height={width}
+        height={radius}
         offsetX={width / 2}
-        offsetY={width / 2}
         align="center"
         verticalAlign="middle"
         fontSize={13}

@@ -302,13 +302,15 @@ export type AdminWedding = {
 export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]> {
   const where = onlyId ? { id: onlyId } : {};
   const weddingFilter = onlyId ? { weddingId: onlyId } : {};
-  const [weddings, members, guestGroups, confirmedGroups, expenseGroups, songGroups, invites, lastActivity] =
+  const [weddings, members, guestGroups, confirmedGroups, expenseGroups, contributionGroups, songGroups, invites, lastActivity] =
     await Promise.all([
       prisma.wedding.findMany({ where, orderBy: { createdAt: "desc" } }),
       mongoDb.collection("member").find(onlyId ? { organizationId: { $in: [onlyId, new ObjectId(onlyId)] } } : {}).toArray(),
       prisma.guest.groupBy({ by: ["weddingId"], where: weddingFilter, _count: { _all: true } }),
       prisma.guest.groupBy({ by: ["weddingId"], where: { ...weddingFilter, rsvpStatus: "confirmed" }, _count: { _all: true } }),
       prisma.expense.groupBy({ by: ["weddingId"], where: weddingFilter, _sum: { actualAmount: true } }),
+      // El presupuesto total de una boda es la suma de sus aportes.
+      prisma.budgetContribution.groupBy({ by: ["weddingId"], where: weddingFilter, _sum: { amount: true } }),
       prisma.song.groupBy({ by: ["weddingId"], where: weddingFilter, _count: { _all: true } }),
       mongoDb
         .collection("invitation")
@@ -338,6 +340,7 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
   const confirmed = count(confirmedGroups);
   const songs = count(songGroups);
   const spent = new Map(expenseGroups.map((g) => [g.weddingId ?? "", g._sum.actualAmount ?? 0]));
+  const budget = new Map(contributionGroups.map((g) => [g.weddingId ?? "", g._sum.amount ?? 0]));
   const pending = new Map(invites.map((i) => [idString(i._id), i.count]));
   const last = new Map(lastActivity.map((l) => [l._id, l.last]));
 
@@ -366,7 +369,7 @@ export async function getAdminWeddings(onlyId?: string): Promise<AdminWedding[]>
     guests: guests.get(w.id) ?? 0,
     confirmedGuests: confirmed.get(w.id) ?? 0,
     spent: spent.get(w.id) ?? 0,
-    totalBudget: w.totalBudget,
+    totalBudget: budget.get(w.id) ?? 0,
     currency: w.currency,
     songs: songs.get(w.id) ?? 0,
     pendingInvites: pending.get(w.id) ?? 0,

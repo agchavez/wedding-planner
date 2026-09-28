@@ -4,7 +4,8 @@ import { memo, useEffect, useRef } from "react";
 import { Circle, Group, Rect } from "react-konva";
 import type Konva from "konva";
 import type { LayoutElement } from "@/generated/prisma";
-import { ELEMENT_EMOJI, ELEMENT_LABELS, ZONE_STYLES, isZoneType, type ElementType } from "@/lib/seatGeometry";
+import { ELEMENT_ICON_NAME, ELEMENT_LABELS, ZONE_STYLES, isZoneType, type ElementType } from "@/lib/seatGeometry";
+import type { LUCIDE_ICON_PATHS } from "@/app/(app)/distribucion/lucideIconPaths";
 import { RoundTable } from "@/app/(app)/distribucion/shapes/RoundTable";
 import { RectTable } from "@/app/(app)/distribucion/shapes/RectTable";
 import { CakeTable } from "@/app/(app)/distribucion/shapes/CakeTable";
@@ -61,7 +62,7 @@ export const CanvasElement = memo(function CanvasElement({
               width={width}
               height={height}
               label={label || ELEMENT_LABELS[elementType]}
-              icon={ELEMENT_EMOJI[elementType]}
+              iconName={ELEMENT_ICON_NAME[elementType] as keyof typeof LUCIDE_ICON_PATHS | undefined}
               fill={fill}
               defaultFill={style?.fill ?? "#eee"}
               iconColor={style?.iconColor ?? "#555"}

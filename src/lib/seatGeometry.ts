@@ -117,23 +117,20 @@ export const ELEMENT_ICONS: Record<ElementType, LucideIcon> = {
   hallway: ArrowLeftRight,
 };
 
-// Emoji para dibujar dentro del canvas de Konva (Text nativo: rápido y síncrono, sin
-// cargar ninguna imagen). Los íconos de lucide-react (ELEMENT_ICONS) se usan solo en la
-// UI normal del DOM (barra de herramientas, panel de propiedades), donde no hay costo.
-export const ELEMENT_EMOJI: Record<ElementType, string> = {
-  "table-round": "⭕",
-  "table-rectangular": "▭",
-  "table-sweetheart": "💕",
-  "table-cake": "🎂",
-  "chair-row": "🪑",
-  stage: "🎻",
-  "dance-floor": "💃",
-  "photo-area": "📸",
-  altar: "⛪",
-  aisle: "🌿",
-  entrance: "🚪",
-  restroom: "🚻",
-  hallway: "↔️",
+// Nombre del ícono (clave de LUCIDE_ICON_PATHS, ver lucideIconPaths.ts) para dibujar dentro
+// del canvas de Konva con LucideVectorIcon — íconos Lucide reales como formas nativas, sin
+// depender de emoji (cuya apariencia varía según el sistema operativo/navegador).
+export const ELEMENT_ICON_NAME: Partial<Record<ElementType, string>> = {
+  "table-sweetheart": "Heart",
+  "table-cake": "Cake",
+  stage: "Mic",
+  "dance-floor": "Disc3",
+  "photo-area": "Camera",
+  altar: "Church",
+  aisle: "Footprints",
+  entrance: "DoorOpen",
+  restroom: "Bath",
+  hallway: "ArrowLeftRight",
 };
 
 type ZoneStyle = { fill: string; iconColor: string };
@@ -213,6 +210,123 @@ export function getDefaultElementShape(type: ElementType): DefaultElementShape {
     case "hallway":
       return { width: 260, height: 70, capacity: null, rows: null, columns: null };
   }
+}
+
+export type RoomPoint = { x: number; y: number };
+export type RoomShapePreset = "rectangle" | "l-shape" | "t-shape";
+
+export const ROOM_SHAPE_PRESETS: { value: RoomShapePreset; label: string }[] = [
+  { value: "rectangle", label: "Rectángulo" },
+  { value: "l-shape", label: "Forma en L" },
+  { value: "t-shape", label: "Forma en T" },
+];
+
+/** Genera los vértices de un preset de forma del local, relativos al tamaño actual del canvas. */
+export function getRoomShapePreset(preset: RoomShapePreset, canvasWidth: number, canvasHeight: number): RoomPoint[] {
+  const margin = 40;
+  const w = canvasWidth - margin * 2;
+  const h = canvasHeight - margin * 2;
+  const x0 = margin;
+  const y0 = margin;
+
+  if (preset === "l-shape") {
+    const cutW = w * 0.4;
+    const cutH = h * 0.4;
+    return [
+      { x: x0, y: y0 },
+      { x: x0 + w, y: y0 },
+      { x: x0 + w, y: y0 + h - cutH },
+      { x: x0 + w - cutW, y: y0 + h - cutH },
+      { x: x0 + w - cutW, y: y0 + h },
+      { x: x0, y: y0 + h },
+    ];
+  }
+
+  if (preset === "t-shape") {
+    const stemW = w * 0.4;
+    const stemX = x0 + (w - stemW) / 2;
+    const barH = h * 0.35;
+    return [
+      { x: x0, y: y0 },
+      { x: x0 + w, y: y0 },
+      { x: x0 + w, y: y0 + barH },
+      { x: stemX + stemW, y: y0 + barH },
+      { x: stemX + stemW, y: y0 + h },
+      { x: stemX, y: y0 + h },
+      { x: stemX, y: y0 + barH },
+      { x: x0, y: y0 + barH },
+    ];
+  }
+
+  return [
+    { x: x0, y: y0 },
+    { x: x0 + w, y: y0 },
+    { x: x0 + w, y: y0 + h },
+    { x: x0, y: y0 + h },
+  ];
+}
+
+const MAX_ROOM_POINTS = 30;
+
+function perpendicularDistance(p: RoomPoint, a: RoomPoint, b: RoomPoint): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  return Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
+}
+
+function ramerDouglasPeucker(points: RoomPoint[], tolerance: number): RoomPoint[] {
+  if (points.length < 3) return points;
+  let maxDist = 0;
+  let index = 0;
+  const first = points[0];
+  const last = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i++) {
+    const dist = perpendicularDistance(points[i], first, last);
+    if (dist > maxDist) {
+      maxDist = dist;
+      index = i;
+    }
+  }
+  if (maxDist > tolerance) {
+    const left = ramerDouglasPeucker(points.slice(0, index + 1), tolerance);
+    const right = ramerDouglasPeucker(points.slice(index), tolerance);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+}
+
+/**
+ * Convierte un trazo libre (muchos puntos capturados del mouse) en un polígono simple
+ * de pocos vértices editables — usado por el modo "Dibujar forma a mano libre".
+ */
+export function simplifyFreehandShape(rawPoints: RoomPoint[], tolerance = 10): RoomPoint[] {
+  // Descarta puntos casi idénticos consecutivos (ruido del muestreo del mouse).
+  const deduped: RoomPoint[] = [];
+  for (const p of rawPoints) {
+    const prev = deduped[deduped.length - 1];
+    if (!prev || Math.hypot(p.x - prev.x, p.y - prev.y) > 4) deduped.push(p);
+  }
+  if (deduped.length < 3) return [];
+
+  let simplified = ramerDouglasPeucker(deduped, tolerance);
+  // El trazo es un lazo cerrado: si el último punto quedó casi sobre el primero, se descarta
+  // (el propio polígono cerrado ya une el último punto con el primero).
+  const first = simplified[0];
+  const last = simplified[simplified.length - 1];
+  if (simplified.length > 3 && Math.hypot(last.x - first.x, last.y - first.y) < tolerance * 2) {
+    simplified = simplified.slice(0, -1);
+  }
+
+  // Si quedaron demasiados vértices, sube la tolerancia hasta bajar del máximo manejable.
+  let looseTolerance = tolerance;
+  while (simplified.length > MAX_ROOM_POINTS) {
+    looseTolerance *= 1.5;
+    simplified = ramerDouglasPeucker(deduped, looseTolerance);
+  }
+
+  return simplified.length >= 3 ? simplified : [];
 }
 
 export const TOOL_GROUPS: { label: string; types: ElementType[] }[] = [

@@ -22,10 +22,11 @@ function formatMoney(amount: number, currency: string) {
 export default async function DashboardPage() {
   const weddingId = await getActiveWeddingId();
 
-  const [wedding, guests, expenses, songsCount, eventsCount, alerts] = await Promise.all([
+  const [wedding, guests, expenses, contributions, songsCount, eventsCount, alerts] = await Promise.all([
     prisma.wedding.findUnique({ where: { id: weddingId } }),
     prisma.guest.findMany({ where: { weddingId } }),
     prisma.expense.findMany({ where: { weddingId } }),
+    prisma.budgetContribution.findMany({ where: { weddingId } }),
     prisma.song.count({ where: { weddingId } }),
     prisma.timelineEvent.count({ where: { weddingId } }),
     getBudgetAlerts(),
@@ -37,6 +38,7 @@ export default async function DashboardPage() {
   const declined = guests.filter((g) => g.rsvpStatus === "declined");
   const totalAttending = confirmed.reduce((sum, g) => sum + 1 + g.plusOnes, 0);
   const totalActual = expenses.reduce((sum, e) => sum + e.actualAmount, 0);
+  const totalBudget = contributions.reduce((sum, c) => sum + c.amount, 0);
   const days = daysUntil(wedding?.weddingDate ?? null);
 
   return (
@@ -67,7 +69,7 @@ export default async function DashboardPage() {
           icon={Wallet}
           title="Presupuesto"
           value={formatMoney(totalActual, currency)}
-          detail={`de ${formatMoney(wedding?.totalBudget ?? 0, currency)} estimado`}
+          detail={`de ${formatMoney(totalBudget, currency)} en aportes`}
         />
         <DashboardCard
           href="/canciones"

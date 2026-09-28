@@ -1,11 +1,13 @@
 import { memo } from "react";
 import { Rect, Text } from "react-konva";
+import { LucideVectorIcon } from "@/app/(app)/distribucion/shapes/LucideVectorIcon";
+import type { LUCIDE_ICON_PATHS } from "@/app/(app)/distribucion/lucideIconPaths";
 
 export const ZoneShape = memo(function ZoneShape({
   width,
   height,
   label,
-  icon,
+  iconName,
   fill,
   defaultFill,
   iconColor,
@@ -13,11 +15,13 @@ export const ZoneShape = memo(function ZoneShape({
   width: number;
   height: number;
   label: string;
-  icon: string;
+  iconName?: keyof typeof LUCIDE_ICON_PATHS;
   fill: string | null;
   defaultFill: string;
   iconColor: string;
 }) {
+  const iconSize = Math.min(24, width * 0.3, height * 0.3);
+
   return (
     <>
       <Rect
@@ -31,15 +35,18 @@ export const ZoneShape = memo(function ZoneShape({
         dash={[7, 5]}
         cornerRadius={12}
       />
+      {iconName && (
+        <LucideVectorIcon name={iconName} y={-height * 0.14} size={iconSize} color={iconColor} strokeWidth={2} />
+      )}
       <Text
-        text={`${icon}\n${label}`}
+        text={label}
+        y={height * 0.08}
         width={width}
-        height={height}
+        height={height * 0.6}
         offsetX={width / 2}
-        offsetY={height / 2}
         align="center"
         verticalAlign="middle"
-        fontSize={14}
+        fontSize={13}
         fontStyle="600"
         fill={iconColor}
         listening={false}

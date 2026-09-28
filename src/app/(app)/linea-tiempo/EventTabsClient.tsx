@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { deleteWeddingEvent } from "@/app/(app)/linea-tiempo/events-actions";
 import { EventFormDialog } from "@/app/(app)/linea-tiempo/EventFormDialog";
 import { TimelineView } from "@/app/(app)/linea-tiempo/TimelineView";
+import { ShareLinkButton } from "@/app/(app)/linea-tiempo/ShareLinkButton";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +54,7 @@ export function EventTabsClient({
           ))}
         </TabsList>
         <div className="flex items-center gap-2">
+          <ShareLinkButton eventId={activeEvent.id} />
           <EventFormDialog
             triggerRender={<Button variant="outline" size="sm" />}
             triggerChildren={

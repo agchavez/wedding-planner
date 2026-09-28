@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Rect, Text } from "react-konva";
 import { computeSeatPositions } from "@/lib/seatGeometry";
 import { ChairIcon } from "@/app/(app)/distribucion/shapes/ChairIcon";
+import { LucideVectorIcon } from "@/app/(app)/distribucion/shapes/LucideVectorIcon";
 
 export const RectTable = memo(function RectTable({
   width,
@@ -39,8 +40,11 @@ export const RectTable = memo(function RectTable({
       {seats.map((seat, i) => (
         <ChairIcon key={i} x={seat.x} y={seat.y} rotation={seat.rotation} color={isSweetheart ? "#a8415c" : "#a8845c"} />
       ))}
+      {isSweetheart && (
+        <LucideVectorIcon name="Heart" x={-width / 2 + 14} size={14} color="#a8415c" strokeWidth={2.5} />
+      )}
       <Text
-        text={isSweetheart ? `💕 ${label}` : label}
+        text={label}
         width={width}
         height={height}
         offsetX={width / 2}
