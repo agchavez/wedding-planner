@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   DndContext,
   PointerSensor,
@@ -142,10 +143,12 @@ export function TimelineView({ eventId, items }: { eventId: string; items: Timel
   return (
     <div>
       <div className="mb-4 flex justify-end gap-2 print:hidden">
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="size-4" />
-          Imprimir
-        </Button>
+        {ordered.length > 0 && (
+          <Button variant="outline" nativeButton={false} render={<Link href={`/imprimir/linea-tiempo/${eventId}`} />}>
+            <Printer className="size-4" />
+            Imprimir
+          </Button>
+        )}
         <TimelineFormDialog
           eventId={eventId}
           triggerRender={<Button />}
