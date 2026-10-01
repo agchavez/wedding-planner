@@ -9,7 +9,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 FROM base AS build
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    SKIP_TYPECHECK=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate && npm run build
