@@ -103,16 +103,22 @@ Solo cambia `MONGODB_URI` en `.env.local` por la cadena de conexión de Atlas (q
 
 ## 🚢 Despliegue
 
-Cada push a `main` ejecuta `.github/workflows/deploy.yml`: construye la imagen Docker en GitHub Actions, la copia por SSH al servidor y levanta `deploy/docker-compose.yml` (app + Caddy con HTTPS automático) en `/opt/wedding-planner`.
+Producción corre en [Dokploy](https://dokploy.partners.hn) (proyecto **Wedding Planner**, entorno `production`) en https://wedding.partners.hn.
 
-| Tipo | Nombre | Uso |
-| --- | --- | --- |
-| Secret | `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | Acceso SSH al servidor |
-| Secret | `MONGODB_URI` | MongoDB Atlas (base `weddingplanner`) |
-| Secret | `BETTER_AUTH_SECRET` | Firma de sesiones |
-| Secret | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador inicial (solo se usa si no existe ningún admin) |
-| Secret | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Inicio de sesión con Google (opcional) |
-| Variable | `DOMAIN` | Dominio público (Caddy obtiene el certificado) |
+- Dokploy está conectado al repo por la GitHub App: cada push a `main` dispara un build con el `Dockerfile` y un redeploy automático (los PRs pasan antes por `ci.yml`).
+- HTTPS lo resuelve Traefik de Dokploy con Let's Encrypt; el healthcheck es `/api/health`.
+- Los comprobantes subidos viven en el volumen `wedding-planner-uploads`, montado en `/app/uploads`.
+
+Las variables de entorno se configuran en Dokploy (app → *Environment*), no en GitHub:
+
+| Variable | Uso |
+| --- | --- |
+| `MONGODB_URI` | MongoDB Atlas (base `weddingplanner`) |
+| `BETTER_AUTH_SECRET` | Firma de sesiones |
+| `BETTER_AUTH_URL` | `https://wedding.partners.hn` |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador inicial (solo se usa si no existe ningún admin) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Inicio de sesión con Google (opcional) |
+| `TZ` | `America/Tegucigalpa` |
 
 ## 📁 Estructura del proyecto
 

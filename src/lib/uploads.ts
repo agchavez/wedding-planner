@@ -5,7 +5,7 @@ import path from "node:path";
 /**
  * Carpeta de archivos subidos (comprobantes de pago). Vive fuera de public/: Next solo sirve
  * lo que estaba en public/ al compilar, y los comprobantes no deben ser públicos. Se sirven
- * con control de acceso desde /api/uploads/… En Docker es un volumen (ver deploy/).
+ * con control de acceso desde /api/uploads/… En Dokploy es un volumen montado en /app/uploads.
  */
 export const UPLOADS_ROOT = process.env.UPLOADS_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads");
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
