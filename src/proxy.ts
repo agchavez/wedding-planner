@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+import { AUTH_COOKIE_PREFIX } from "@/lib/auth-cookie";
 
 /**
  * Chequeo optimista: si no hay cookie de sesión, redirige al login. La validación real
@@ -7,7 +8,7 @@ import { getSessionCookie } from "better-auth/cookies";
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = Boolean(getSessionCookie(request));
+  const hasSession = Boolean(getSessionCookie(request, { cookiePrefix: AUTH_COOKIE_PREFIX }));
 
   // Login, registro, landing, enlaces de invitación y los enlaces compartidos (agenda de un
   // evento y galería de fotos, de solo lectura) son públicos. Una cookie vencida no debe
