@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
+import { CATALOG_NAME_MAX } from "@/lib/catalog";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createGroup, updateGroup } from "@/app/(app)/configuracion/groups-actions";
 import { Button } from "@/components/ui/button";
@@ -41,10 +42,12 @@ export function GroupFormDialog({
           action={(formData) => {
             startTransition(async () => {
               try {
-                if (group) {
-                  await updateGroup(group.id, formData);
-                } else {
-                  await createGroup(formData);
+                const result = group
+                  ? await updateGroup(group.id, formData)
+                  : await createGroup(formData);
+                if (result?.error) {
+                  toast.error(result.error);
+                  return;
                 }
                 formRef.current?.reset();
                 setOpen(false);
@@ -61,6 +64,7 @@ export function GroupFormDialog({
             <Input
               id="name"
               name="name"
+              maxLength={CATALOG_NAME_MAX}
               defaultValue={group?.name}
               placeholder="Ej. Familia del novio"
               required
