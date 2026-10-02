@@ -4,6 +4,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin, organization } from "better-auth/plugins";
 import { clientIp, recordAudit } from "@/lib/audit-log";
+import { AUTH_COOKIE_PREFIX } from "@/lib/auth-cookie";
 import { idMatch, idString, toObjectId } from "@/lib/ids";
 import { isBuildPhase, mongoClient, mongoDb } from "@/lib/mongo";
 import { ac, weddingRoles } from "@/lib/permissions";
@@ -46,6 +47,7 @@ export const auth = betterAuth({
     },
   },
   advanced: {
+    cookiePrefix: AUTH_COOKIE_PREFIX,
     ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
   },
   databaseHooks: {
