@@ -105,7 +105,8 @@ Solo cambia `MONGODB_URI` en `.env.local` por la cadena de conexión de Atlas (q
 
 Producción corre en [Dokploy](https://dokploy.partners.hn) (proyecto **Wedding Planner**, entorno `production`) en https://wedding.partners.hn.
 
-- Dokploy está conectado al repo por la GitHub App: cada push a `main` dispara un build con el `Dockerfile` y un redeploy automático (los PRs pasan antes por `ci.yml`).
+- Cada push a `main` ejecuta `.github/workflows/deploy.yml`: construye la imagen con el `Dockerfile` en GitHub Actions, la publica en `ghcr.io/agchavez/wedding-planner` (`:sha-<commit>` y `:latest`) y con `scripts/dokploy-deploy.mjs` fija esa imagen en la app de Dokploy y la despliega. Dokploy no construye nada (los PRs pasan antes por `ci.yml`).
+- Para volver a una versión anterior: en Dokploy cambia la imagen a otro `:sha-<commit>` y despliega, o re-ejecuta el workflow `Deploy` de ese commit.
 - HTTPS lo resuelve Traefik de Dokploy con Let's Encrypt; el healthcheck es `/api/health`.
 - Los comprobantes subidos viven en el volumen `wedding-planner-uploads`, montado en `/app/uploads`.
 
@@ -119,6 +120,16 @@ Las variables de entorno se configuran en Dokploy (app → *Environment*), no en
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Administrador inicial (solo se usa si no existe ningún admin) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Inicio de sesión con Google (opcional) |
 | `TZ` | `America/Tegucigalpa` |
+
+En GitHub (environment `production`) solo va lo necesario para desplegar:
+
+| Tipo | Nombre | Uso |
+| --- | --- | --- |
+| Secret | `DOKPLOY_URL` | `https://dokploy.partners.hn` (sin `/api`) |
+| Secret | `DOKPLOY_API_KEY` | API key de Dokploy (perfil → *API/CLI*) |
+| Variable | `DOKPLOY_APP_ID` | `applicationId` de la app en Dokploy |
+
+En Dokploy la app usa *Source: Docker* con la imagen de ghcr y un registro `ghcr.io` con un PAT de solo `read:packages` (o el paquete público).
 
 ## 📁 Estructura del proyecto
 
