@@ -5,12 +5,12 @@ import { toast } from "sonner";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createPayment, updatePayment } from "@/app/(app)/gastos/payments-actions";
 import { Button } from "@/components/ui/button";
+import { CatalogCombobox } from "@/components/CatalogCombobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileDropzone } from "@/components/ui/dropzone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Account, ExpensePayment } from "@/generated/prisma";
 
@@ -89,23 +89,16 @@ export function PaymentFormDialog({
           </div>
           <div>
             <Label htmlFor="accountId">Cuenta de origen</Label>
-            <Select name="accountId" defaultValue={payment?.accountId ?? NO_ACCOUNT}>
-              <SelectTrigger className="mt-1 w-full">
-                <SelectValue>
-                  {(value: string) =>
-                    value === NO_ACCOUNT ? "Sin especificar" : accounts.find((a) => a.id === value)?.name ?? value
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_ACCOUNT}>Sin especificar</SelectItem>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CatalogCombobox
+              id="accountId"
+              kind="account"
+              valueBy="id"
+              name="accountId"
+              options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+              defaultValue={payment?.accountId ?? NO_ACCOUNT}
+              emptyOption={{ value: NO_ACCOUNT, label: "Sin especificar" }}
+              className="mt-1"
+            />
           </div>
           <div>
             <Label htmlFor="receipt">Comprobante</Label>

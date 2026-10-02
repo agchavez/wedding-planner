@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
+import { CATALOG_NAME_MAX } from "@/lib/catalog";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createVendor, updateVendor } from "@/app/(app)/configuracion/vendors-actions";
 import { Button } from "@/components/ui/button";
@@ -42,10 +43,12 @@ export function VendorFormDialog({
           action={(formData) => {
             startTransition(async () => {
               try {
-                if (vendor) {
-                  await updateVendor(vendor.id, formData);
-                } else {
-                  await createVendor(formData);
+                const result = vendor
+                  ? await updateVendor(vendor.id, formData)
+                  : await createVendor(formData);
+                if (result?.error) {
+                  toast.error(result.error);
+                  return;
                 }
                 formRef.current?.reset();
                 setOpen(false);
@@ -59,7 +62,7 @@ export function VendorFormDialog({
         >
           <div>
             <Label htmlFor="name">Nombre</Label>
-            <Input id="name" name="name" defaultValue={vendor?.name} placeholder="Ej. Fotografía Luz" required className="mt-1" />
+            <Input id="name" name="name" maxLength={CATALOG_NAME_MAX} defaultValue={vendor?.name} placeholder="Ej. Fotografía Luz" required className="mt-1" />
           </div>
           <div>
             <Label htmlFor="contactName">Persona de contacto</Label>
