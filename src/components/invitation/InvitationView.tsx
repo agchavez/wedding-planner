@@ -42,9 +42,17 @@ export type InvitationViewProps = {
   guest: InvitationGuestData | null;
   /** Token del enlace; sin él (vista previa del editor o ejemplos) el RSVP no se envía. */
   token?: string;
-  /** Dentro del editor: sin altura de pantalla completa ni animaciones de entrada. */
+  /** Dentro del editor: sin altura de pantalla completa (las animaciones sí se ven). */
   embedded?: boolean;
+  /**
+   * Las animaciones esperan a que sea `true` (la invitación pública lo activa al abrir el
+   * sobre, para que la portada se anime a la vista y no detrás del sobre).
+   */
+  started?: boolean;
 };
+
+/** Orden en una cascada de animación (ver .inv-rise, .inv-pop… en globals.css). */
+const order = (i: number) => ({ "--i": i }) as CSSProperties;
 
 export function themeStyle(themeName: string): CSSProperties {
   const t = invitationTheme(themeName);
@@ -83,10 +91,10 @@ const ITINERARY_ICON: Record<string, LucideIcon> = {
 const isSafeUrl = (url: string) => /^https?:\/\//i.test(url) || /^\/(?!\/)/.test(url);
 
 /** Hace aparecer los bloques `.inv-reveal` al entrar en pantalla. */
-function useReveal(rootRef: React.RefObject<HTMLElement | null>, enabled: boolean) {
+function useReveal(rootRef: React.RefObject<HTMLElement | null>, enabled: boolean, started: boolean) {
   useEffect(() => {
     const root = rootRef.current;
-    if (!root) return;
+    if (!root || !started) return;
     const items = Array.from(root.querySelectorAll<HTMLElement>(".inv-reveal"));
     if (!enabled || typeof IntersectionObserver === "undefined") {
       items.forEach((el) => el.classList.add("is-visible"));
@@ -105,7 +113,7 @@ function useReveal(rootRef: React.RefObject<HTMLElement | null>, enabled: boolea
     );
     items.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [rootRef, enabled]);
+  }, [rootRef, enabled, started]);
 }
 
 /** Día del evento (año, mes 0-11, día) en la zona de la boda, con nombres en español. */
@@ -158,8 +166,14 @@ function Countdown({ target }: { target: string }) {
       {units.map((u, i) => (
         <div key={u.label} className="flex items-start gap-1.5">
           <div className="flex min-w-14 flex-col items-center">
-            <span className="text-[2.6rem] leading-none font-medium tabular-nums">
-              {now === null ? "–" : String(u.value).padStart(2, "0")}
+            <span className="overflow-hidden text-[2.6rem] leading-none font-medium tabular-nums">
+              {now === null ? (
+                "–"
+              ) : (
+                <span key={u.value} className="inv-tick">
+                  {String(u.value).padStart(2, "0")}
+                </span>
+              )}
             </span>
             <span className="inv-caps mt-2 text-[0.55rem] opacity-75">{u.label}</span>
           </div>
@@ -186,7 +200,11 @@ function MonthCalendar({ year, month, day }: { year: number; month: number; day:
         ))}
         {cells.map((n, i) => (
           <span key={i} className="relative flex h-7 items-center justify-center text-sm tabular-nums">
-            {n === day && <Heart className="absolute size-7 text-(--inv-accent)" fill="currentColor" strokeWidth={0} aria-hidden />}
+            {n === day && (
+              <span className="inv-pop absolute inset-0 flex items-center justify-center" style={order(4)} aria-hidden>
+                <Heart className="inv-beat size-7 text-(--inv-accent)" fill="currentColor" strokeWidth={0} />
+              </span>
+            )}
             <span className={cn("relative", n === day && "font-semibold text-(--inv-paper)")}>{n ?? ""}</span>
           </span>
         ))}
@@ -272,7 +290,9 @@ function Title({ eyebrow, title }: { eyebrow?: string; title: string }) {
   return (
     <div className="mb-7">
       {eyebrow && <p className="inv-caps text-[0.68rem] text-(--inv-muted)">{eyebrow}</p>}
-      <h2 className="inv-script mt-1 text-[2.75rem] leading-tight text-(--inv-accent)">{title}</h2>
+      <h2 className="inv-script mt-1 text-[2.75rem] leading-tight text-(--inv-accent)">
+        <span className="inv-draw">{title}</span>
+      </h2>
       <HeartDivider className="mt-2" />
     </div>
   );
@@ -313,10 +333,14 @@ function EventBlock({
   const href = mapsUrl(mapUrl, place, address);
   return (
     <div className="flex flex-col items-center">
-      <span className="flex size-14 items-center justify-center rounded-full bg-(--inv-band) text-(--inv-band-ink)">
+      <span className="inv-pop flex size-14 items-center justify-center rounded-full bg-(--inv-band) text-(--inv-band-ink)">
         <Icon className="size-6" strokeWidth={1.4} />
       </span>
-      <h3 className="inv-script mt-3 text-4xl text-(--inv-accent)">{title}</h3>
+      <h3 className="inv-script mt-3 text-4xl text-(--inv-accent)">
+        <span className="inv-draw" style={order(2)}>
+          {title}
+        </span>
+      </h3>
       {time && <p className="mt-1 text-xl font-semibold">{formatEventTime(time)}</p>}
       {place && <p className="inv-caps mt-1 text-[0.72rem] font-semibold">{place}</p>}
       {address && <p className="mt-0.5 text-base italic text-(--inv-muted)">{address}</p>}
@@ -353,9 +377,9 @@ const lines = (raw: string) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-export function InvitationView({ data, guest, token, embedded = false }: InvitationViewProps) {
+export function InvitationView({ data, guest, token, embedded = false, started = true }: InvitationViewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  useReveal(rootRef, !embedded);
+  useReveal(rootRef, true, started);
 
   const p1 = data.partner1 || "";
   const p2 = data.partner2 || "";
@@ -381,42 +405,69 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
     <div ref={rootRef} style={themeStyle(data.theme)} className="inv-root @container bg-(--inv-bg) text-(--inv-ink)">
       <div className="inv-paper relative mx-auto max-w-[34rem] overflow-hidden shadow-[0_0_60px_-20px_rgba(0,0,0,0.25)]">
         {/* Portada */}
-        <header className={cn("relative px-7 pt-14 pb-10 text-center", !embedded && "min-h-svh")}>
+        <header className={cn("inv-reveal inv-reveal-static relative px-7 pt-14 pb-10 text-center", !embedded && "min-h-svh")}>
           <Sprig className="absolute -top-2 -left-6 w-36 rotate-[200deg] opacity-80" />
           <Sprig className="absolute -top-2 -right-6 w-36 rotate-[200deg] opacity-80" flip />
 
-          <p className="inv-caps relative text-[0.66rem] text-(--inv-muted)">Junto a sus familias</p>
+          <p className="inv-caps inv-rise relative text-[0.66rem] text-(--inv-muted)" style={order(0)}>
+            Junto a sus familias
+          </p>
           <h1 className="relative mt-4 leading-none">
-            <span className="block text-[clamp(2.4rem,13cqw,3.6rem)] font-medium tracking-[0.08em] uppercase">{p1 || "Nuestra"}</span>
-            <span className="inv-script my-1 block text-[2.4rem] text-(--inv-accent)">{p1 && p2 ? "y" : ""}</span>
-            <span className="block text-[clamp(2.4rem,13cqw,3.6rem)] font-medium tracking-[0.08em] uppercase">{p2 || "boda"}</span>
+            <span className="inv-letters block text-[clamp(2.4rem,13cqw,3.6rem)] font-medium uppercase" style={order(0)}>
+              {p1 || "Nuestra"}
+            </span>
+            <span className="inv-script my-1 block text-[2.4rem] text-(--inv-accent)">
+              <span className="inv-draw" style={order(5)}>
+                {p1 && p2 ? "y" : ""}
+              </span>
+            </span>
+            <span className="inv-letters block text-[clamp(2.4rem,13cqw,3.6rem)] font-medium uppercase" style={order(1)}>
+              {p2 || "boda"}
+            </span>
           </h1>
-          <p className="inv-caps mt-4 text-[0.66rem] text-(--inv-muted)">te invitan a su</p>
-          <p className="inv-script text-[3.2rem] leading-tight text-(--inv-accent)">Boda</p>
+          <p className="inv-caps inv-rise mt-4 text-[0.66rem] text-(--inv-muted)" style={order(5)}>
+            te invitan a su
+          </p>
+          <p className="inv-script text-[3.2rem] leading-tight text-(--inv-accent)">
+            <span className="inv-draw" style={order(6)}>
+              Boda
+            </span>
+          </p>
 
           {cover ? (
             <div className="relative mx-auto mt-6 w-[78%]">
               <Sprig className="absolute -bottom-6 -left-10 z-10 w-28" />
               <Sprig className="absolute -right-10 -bottom-6 z-10 w-28" flip />
-              <div className="overflow-hidden rounded-t-full border-[6px] border-(--inv-paper) shadow-[0_20px_40px_-20px_rgba(0,0,0,0.45)] ring-1 ring-(--inv-gold)/50">
+              <div className="inv-unveil overflow-hidden rounded-t-full border-[6px] border-(--inv-paper) shadow-[0_20px_40px_-20px_rgba(0,0,0,0.45)] ring-1 ring-(--inv-gold)/50">
                 {/* eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja */}
                 <img src={cover} alt={[p1, p2].filter(Boolean).join(" y ")} className="aspect-[3/4] w-full object-cover" />
               </div>
             </div>
           ) : (
-            <div className="mx-auto mt-8 flex size-24 items-center justify-center rounded-full border border-(--inv-gold) text-lg tracking-[0.2em] text-(--inv-accent)">
+            <div
+              className="inv-pop mx-auto mt-8 flex size-24 items-center justify-center rounded-full border border-(--inv-gold) text-lg tracking-[0.2em] text-(--inv-accent)"
+              style={order(6)}
+            >
               {mono}
             </div>
           )}
 
-          <p className="inv-script mt-8 text-[2.4rem] leading-tight text-(--inv-accent)">{data.headline || "¡Nos casamos!"}</p>
+          <p className="inv-script mt-8 text-[2.4rem] leading-tight text-(--inv-accent)">
+            <span className="inv-draw" style={order(14)}>
+              {data.headline || "¡Nos casamos!"}
+            </span>
+          </p>
           <HeartDivider className="mt-2" />
           {!embedded && <ChevronDown className="inv-float mx-auto mt-6 size-5 text-(--inv-gold)" aria-hidden />}
         </header>
 
         {/* Saludo personal, mensaje y familia */}
         <Section className="pt-4">
-          {guest && <p className="inv-script text-[2.8rem] text-(--inv-accent)">{firstName(guest.fullName)},</p>}
+          {guest && (
+            <p className="inv-script text-[2.8rem] text-(--inv-accent)">
+              <span className="inv-draw">{firstName(guest.fullName)},</span>
+            </p>
+          )}
           <p className="mx-auto mt-3 max-w-sm text-[1.15rem] leading-relaxed">
             {data.message ||
               "Con la bendición de Dios y de nuestras familias, tenemos el honor de invitarte a celebrar el día en que uniremos nuestras vidas."}
@@ -424,7 +475,7 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
           {data.quote && <blockquote className="mx-auto mt-6 max-w-xs text-base italic text-(--inv-muted)">“{data.quote}”</blockquote>}
 
           {guest && (
-            <div className="mx-auto mt-8 flex w-fit items-center gap-4 rounded-2xl border border-(--inv-gold)/50 px-6 py-4">
+            <div className="inv-rise mx-auto mt-8 flex w-fit items-center gap-4 rounded-2xl border border-(--inv-gold)/50 px-6 py-4" style={order(3)}>
               <Armchair className="size-8 text-(--inv-accent)" strokeWidth={1.2} />
               <div className="text-left">
                 <p className="inv-caps text-[0.6rem] text-(--inv-muted)">Lugares reservados</p>
@@ -475,7 +526,9 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
             <p className="inv-caps mt-5 text-sm font-semibold text-(--inv-accent)">{day.monthName}</p>
             <div className="mt-2 flex items-center justify-center gap-4">
               <span className="inv-caps w-24 border-y border-(--inv-gold)/70 py-1.5 text-[0.65rem]">{day.weekday}</span>
-              <span className="text-6xl leading-none font-medium text-(--inv-accent)">{day.day}</span>
+              <span className="inv-pop text-6xl leading-none font-medium text-(--inv-accent)" style={order(1)}>
+                {day.day}
+              </span>
               <span className="inv-caps w-24 border-y border-(--inv-gold)/70 py-1.5 text-[0.65rem]">{day.year}</span>
             </div>
             <MonthCalendar year={day.year} month={day.month} day={day.day} />
@@ -554,12 +607,15 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
           <Section>
             <Title eyebrow="Programa" title="del gran día" />
             <ol className="relative mx-auto max-w-[19rem] text-left">
-              <span className="absolute top-6 bottom-6 left-7 w-px bg-(--inv-gold)/60" aria-hidden />
+              <span className="inv-grow-y absolute top-6 bottom-6 left-7 w-px bg-(--inv-gold)/60" aria-hidden />
               {data.itinerary.map((item, i) => {
                 const Icon = ITINERARY_ICON[item.icon] ?? Heart;
                 return (
-                  <li key={i} className="relative flex items-center gap-5 py-2.5">
-                    <span className="relative z-10 flex size-14 shrink-0 items-center justify-center rounded-full bg-(--inv-band) text-(--inv-band-ink) shadow-[0_6px_14px_-8px_rgba(0,0,0,0.5)]">
+                  <li key={i} className="inv-rise relative flex items-center gap-5 py-2.5" style={order(i * 2 + 1)}>
+                    <span
+                      style={order(i * 2 + 1)}
+                      className="inv-pop relative z-10 flex size-14 shrink-0 items-center justify-center rounded-full bg-(--inv-band) text-(--inv-band-ink) shadow-[0_6px_14px_-8px_rgba(0,0,0,0.5)]"
+                    >
                       <Icon className="size-6" strokeWidth={1.4} />
                     </span>
                     <div>
@@ -576,11 +632,19 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
         {(data.dressCode || colors.length > 0) && (
           <Band>
             <p className="inv-caps text-xs text-(--inv-gold)">Código de vestimenta</p>
-            {data.dressCode && <p className="inv-script mt-2 text-5xl">{data.dressCode}</p>}
+            {data.dressCode && (
+              <p className="inv-script mt-2 text-5xl">
+                <span className="inv-draw">{data.dressCode}</span>
+              </p>
+            )}
             {colors.length > 0 && (
               <div className="mt-6 flex justify-center gap-3">
-                {colors.map((c) => (
-                  <span key={c} className="size-10 rounded-full ring-2 ring-(--inv-band-ink)/30" style={{ background: c }} />
+                {colors.map((c, i) => (
+                  <span
+                    key={c}
+                    className="inv-pop size-10 rounded-full ring-2 ring-(--inv-band-ink)/30"
+                    style={{ background: c, ...order(i + 4) }}
+                  />
                 ))}
               </div>
             )}
@@ -590,8 +654,12 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
 
         {(data.giftsNote || hasGiftAccount || registry) && (
           <Section>
-            <Gift className="mx-auto size-9 text-(--inv-accent)" strokeWidth={1.2} />
-            <h2 className="inv-script mt-2 text-[2.75rem] leading-tight text-(--inv-accent)">Sugerencia de regalo</h2>
+            <Gift className="inv-pop mx-auto size-9 text-(--inv-accent)" strokeWidth={1.2} />
+            <h2 className="inv-script mt-2 text-[2.75rem] leading-tight text-(--inv-accent)">
+              <span className="inv-draw" style={order(1)}>
+                Sugerencia de regalo
+              </span>
+            </h2>
             <HeartDivider className="mt-2 mb-5" />
             {data.giftsNote && <p className="mx-auto max-w-sm text-[1.05rem] leading-relaxed whitespace-pre-line">{data.giftsNote}</p>}
             {hasGiftAccount && (
@@ -624,18 +692,18 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
             <Title eyebrow="Nuestra historia" title="Galería" />
             <div className="grid auto-rows-[8.5rem] grid-cols-2 gap-2">
               {gallery.slice(0, 6).map((url, i) => (
-                // eslint-disable-next-line @next/next/no-img-element -- fotos elegidas por la pareja
-                <img
+                <div
                   key={url + i}
-                  src={url}
-                  alt=""
-                  loading="lazy"
+                  style={order(i + 2)}
                   className={cn(
-                    "size-full rounded-md object-cover",
+                    "inv-rise overflow-hidden rounded-md",
                     i === 0 && gallery.length >= 3 && "row-span-2",
                     gallery.length === 1 && "col-span-2 row-span-2"
                   )}
-                />
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- fotos elegidas por la pareja */}
+                  <img src={url} alt="" loading="lazy" className="inv-zoom size-full object-cover" style={order(i + 2)} />
+                </div>
               ))}
             </div>
           </Section>
@@ -676,13 +744,17 @@ export function InvitationView({ data, guest, token, embedded = false }: Invitat
             {closingPhoto && (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja */}
-                <img src={closingPhoto} alt="" className="absolute inset-0 size-full object-cover" />
+                <img src={closingPhoto} alt="" className="inv-kenburns absolute inset-0 size-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" />
               </>
             )}
             <div className={cn("relative", closingPhoto && "text-white")}>
               <p className="inv-caps text-[0.66rem] opacity-80">Esperamos contar con tu presencia</p>
-              <p className="inv-script mt-2 text-6xl">¡Gracias!</p>
+              <p className="inv-script mt-2 text-6xl">
+                <span className="inv-draw" style={order(2)}>
+                  ¡Gracias!
+                </span>
+              </p>
               {data.closingMessage && <p className="mx-auto mt-3 max-w-xs text-base opacity-90">{data.closingMessage}</p>}
               <p className="mt-6 text-sm tracking-[0.3em] uppercase opacity-90">{[p1, p2].filter(Boolean).join(" & ")}</p>
               {data.hashtag && <p className="inv-caps mt-2 text-[0.62rem] opacity-80">{data.hashtag}</p>}
