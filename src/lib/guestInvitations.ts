@@ -12,6 +12,7 @@ import {
   whatsappUrl,
 } from "@/lib/invitationMessage";
 import type { Guest, InvitationSettings, Wedding } from "@/generated/prisma";
+import type { ItineraryEntry } from "@/lib/invitationThemes";
 
 /** Datos de la invitación ya serializables, tal como los recibe la vista (cliente). */
 export type InvitationData = {
@@ -39,6 +40,21 @@ export type InvitationData = {
   hashtag: string;
   rsvpDeadline: string | null;
   showCountdown: boolean;
+  brideParents: string;
+  groomParents: string;
+  sponsors: string;
+  itinerary: ItineraryEntry[];
+  dressCodeColors: string[];
+  giftBankName: string;
+  giftAccount: string;
+  giftAccountHolder: string;
+  giftRegistryUrl: string;
+  galleryUrls: string[];
+  songUrl: string;
+  songTitle: string;
+  adultsOnly: boolean;
+  recommendations: string;
+  closingMessage: string;
 };
 
 export type InvitationGuestData = {
@@ -122,6 +138,21 @@ export function toInvitationData(wedding: Wedding, s: InvitationSettings): Invit
     hashtag: s.hashtag,
     rsvpDeadline: iso(s.rsvpDeadline),
     showCountdown: s.showCountdown,
+    brideParents: s.brideParents,
+    groomParents: s.groomParents,
+    sponsors: s.sponsors,
+    itinerary: s.itinerary.map((i) => ({ time: i.time, title: i.title, icon: i.icon })),
+    dressCodeColors: s.dressCodeColors,
+    giftBankName: s.giftBankName,
+    giftAccount: s.giftAccount,
+    giftAccountHolder: s.giftAccountHolder,
+    giftRegistryUrl: s.giftRegistryUrl,
+    galleryUrls: s.galleryUrls,
+    songUrl: s.songUrl,
+    songTitle: s.songTitle,
+    adultsOnly: s.adultsOnly,
+    recommendations: s.recommendations,
+    closingMessage: s.closingMessage,
   };
 }
 

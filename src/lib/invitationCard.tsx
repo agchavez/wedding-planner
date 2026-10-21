@@ -25,6 +25,9 @@ const fontsPromise = Promise.all([
 ]);
 
 const PHOTO_WIDTH = 520;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+// Tope de píxeles para sharp: evita "bombas" de descompresión (imágenes chicas en bytes, enormes en píxeles).
+const MAX_PHOTO_PIXELS = 50_000_000;
 
 /**
  * La URL de portada la escribe la pareja y el servidor la descarga: solo https hacia nombres
@@ -53,13 +56,21 @@ async function loadPhoto(url: string): Promise<string | null> {
       source = await readFile(path);
     } else if (isFetchableUrl(url)) {
       const res = await fetch(url, { signal: AbortSignal.timeout(4000), redirect: "error" });
-      if (!res.ok || !res.headers.get("content-type")?.startsWith("image/")) return null;
-      source = Buffer.from(await res.arrayBuffer());
-      if (source.length > 15 * 1024 * 1024) return null;
+      if (!res.ok || !res.body || !res.headers.get("content-type")?.startsWith("image/")) return null;
+      if (Number(res.headers.get("content-length") ?? 0) > MAX_PHOTO_BYTES) return null;
+      // Lectura con tope: se corta en cuanto pasa el límite, aunque el servidor mienta en Content-Length.
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        total += chunk.byteLength;
+        if (total > MAX_PHOTO_BYTES) return null;
+        chunks.push(chunk);
+      }
+      source = Buffer.concat(chunks);
     } else {
       return null;
     }
-    const jpeg = await sharp(source)
+    const jpeg = await sharp(source, { limitInputPixels: MAX_PHOTO_PIXELS })
       .rotate()
       .resize(PHOTO_WIDTH * 2, CARD_SIZE.height * 2, { fit: "cover", position: "centre" })
       .jpeg({ quality: 80 })

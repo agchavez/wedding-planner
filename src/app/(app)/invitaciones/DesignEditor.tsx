@@ -1,7 +1,21 @@
 "use client";
 
 import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { Check, ExternalLink, Gift, Image as ImageIcon, MapPin, Palette, PartyPopper, Sparkles } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  ExternalLink,
+  Gift,
+  Image as ImageIcon,
+  Images,
+  MapPin,
+  Music,
+  Palette,
+  PartyPopper,
+  Shirt,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +27,8 @@ import { InvitationView } from "@/components/invitation/InvitationView";
 import { saveInvitationDesign, type InvitationSettingsInput } from "@/app/(app)/invitaciones/actions";
 import type { InvitationRow } from "@/app/(app)/invitaciones/shared";
 import { ExampleTemplates } from "@/app/(app)/invitaciones/ExampleTemplates";
-import { EXAMPLE_COVER_PHOTOS } from "@/lib/invitationExamples";
+import { EXAMPLE_COVER_PHOTOS, EXAMPLE_GALLERY_PHOTOS } from "@/lib/invitationExamples";
+import { GalleryEditor, ItineraryEditor, PaletteEditor } from "@/app/(app)/invitaciones/EditorWidgets";
 import { INVITATION_THEMES, monogram, type InvitationThemeName } from "@/lib/invitationThemes";
 import { parseEventDateTime } from "@/lib/eventTime";
 import type { InvitationData } from "@/lib/guestInvitations";
@@ -85,6 +100,16 @@ export function DesignEditor({
     />
   );
 
+  const area = (key: keyof DesignEditorValues, rows: number, placeholder: string) => (
+    <Textarea
+      value={String(values[key] ?? "")}
+      onChange={(e) => set(key, e.target.value as never)}
+      rows={rows}
+      disabled={!canEdit}
+      placeholder={placeholder}
+    />
+  );
+
   // Vista previa en vivo: mismas reglas que al guardar.
   const preview: InvitationData = useMemo(
     () => ({
@@ -110,27 +135,10 @@ export function DesignEditor({
   };
 
   function save() {
-    const payload: InvitationSettingsInput = {
-      theme: values.theme,
-      headline: values.headline,
-      message: values.message,
-      quote: values.quote,
-      coverImageUrl: values.coverImageUrl,
-      ceremonyTime: values.ceremonyTime,
-      ceremonyPlace: values.ceremonyPlace,
-      ceremonyAddress: values.ceremonyAddress,
-      ceremonyMapUrl: values.ceremonyMapUrl,
-      receptionTime: values.receptionTime,
-      receptionPlace: values.receptionPlace,
-      receptionAddress: values.receptionAddress,
-      receptionMapUrl: values.receptionMapUrl,
-      dressCode: values.dressCode,
-      dressCodeNote: values.dressCodeNote,
-      giftsNote: values.giftsNote,
-      hashtag: values.hashtag,
-      rsvpDeadline: values.rsvpDeadline,
-      showCountdown: values.showCountdown,
-    };
+    // Nombres, fecha y lugar de la boda no son de la invitación: se editan en Ajustes.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { partner1, partner2, weddingDate, venueName, venueAddress, ...rest } = values;
+    const payload: InvitationSettingsInput = rest;
     startTransition(async () => {
       try {
         await saveInvitationDesign(payload);
@@ -254,23 +262,80 @@ export function DesignEditor({
           <Field label="Enlace de Google Maps (opcional)">{input("receptionMapUrl", { type: "url" })}</Field>
         </Block>
 
-        <Block icon={Gift} title="Detalles">
-          <Field label="Código de vestimenta">{input("dressCode", { placeholder: "Formal" })}</Field>
-          <Field label="Nota de vestimenta">{input("dressCodeNote", { placeholder: "Evitar el color blanco" })}</Field>
-          <Field label="Mesa de regalos / lluvia de sobres" className="sm:col-span-2">
-            <Textarea
-              value={values.giftsNote}
-              onChange={(e) => set("giftsNote", e.target.value)}
-              rows={2}
-              disabled={!canEdit}
-              placeholder="Tu presencia es nuestro mejor regalo. Si deseas obsequiarnos algo, tendremos lluvia de sobres."
-            />
+        <Block icon={Users} title="Familia y padrinos">
+          <Field label="Padres de la novia" hint="Un nombre por línea.">
+            {area("brideParents", 2, "Roberto Andrade\nLucía Mejía de Andrade")}
           </Field>
+          <Field label="Padres del novio" hint="Un nombre por línea.">
+            {area("groomParents", 2, "Fernando Castillo\nMarta Rivera de Castillo")}
+          </Field>
+          <Field label="Padrinos (opcional)" hint="Uno por línea, con el formato «Rol: Nombres»." className="sm:col-span-2">
+            {area("sponsors", 3, "Padrinos de anillos: Diego y Paola Zelaya")}
+          </Field>
+        </Block>
+
+        <Block icon={CalendarClock} title="Programa del día">
+          <div className="sm:col-span-2">
+            <ItineraryEditor value={values.itinerary} onChange={(v) => set("itinerary", v)} disabled={!canEdit} />
+          </div>
+        </Block>
+
+        <Block icon={Shirt} title="Código de vestimenta">
+          <Field label="Código">{input("dressCode", { placeholder: "Formal" })}</Field>
+          <Field label="Nota">{input("dressCodeNote", { placeholder: "Evitar el color blanco" })}</Field>
+          <div className="sm:col-span-2">
+            <p className="mb-1.5 text-sm font-medium">Paleta sugerida</p>
+            <PaletteEditor value={values.dressCodeColors} onChange={(v) => set("dressCodeColors", v)} disabled={!canEdit} />
+          </div>
+        </Block>
+
+        <Block icon={Gift} title="Regalos">
+          <Field label="Mensaje" className="sm:col-span-2">
+            {area("giftsNote", 2, "Tu presencia es nuestro mejor regalo. Si deseas tener un detalle con nosotros, te dejamos esta opción.")}
+          </Field>
+          <Field label="Banco (opcional)">{input("giftBankName", { placeholder: "Banco Atlántida" })}</Field>
+          <Field label="Número de cuenta">{input("giftAccount", { placeholder: "2001 4455 6677" })}</Field>
+          <Field label="Titular">{input("giftAccountHolder")}</Field>
+          <Field label="Enlace a mesa de regalos">{input("giftRegistryUrl", { placeholder: "https://…" })}</Field>
+        </Block>
+
+        <Block icon={Images} title="Galería de fotos">
+          <div className="sm:col-span-2">
+            <GalleryEditor
+              value={values.galleryUrls}
+              onChange={(v) => set("galleryUrls", v)}
+              suggestions={EXAMPLE_GALLERY_PHOTOS}
+              disabled={!canEdit}
+            />
+          </div>
+        </Block>
+
+        <Block icon={Music} title="Nuestra canción">
+          <Field
+            label="Enlace al audio (mp3)"
+            hint="Un archivo de audio público (https://…/cancion.mp3). Los enlaces de Spotify o YouTube no se pueden reproducir aquí."
+          >
+            {input("songUrl", { placeholder: "https://…/cancion.mp3" })}
+          </Field>
+          <Field label="Texto del reproductor">{input("songTitle", { placeholder: "Dale play a nuestra canción" })}</Field>
+        </Block>
+
+        <Block icon={Sparkles} title="Detalles finales">
           <Field label="Hashtag">{input("hashtag", { placeholder: "#AnaYLuis2027" })}</Field>
           <Field label="Confirmar antes del">{input("rsvpDeadline", { type: "date" })}</Field>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <Field label="Recomendaciones" className="sm:col-span-2">
+            {area("recommendations", 2, "Llega 20 minutos antes de la ceremonia.")}
+          </Field>
+          <Field label="Mensaje de cierre" className="sm:col-span-2">
+            {input("closingMessage", { placeholder: "No vemos la hora de celebrar contigo." })}
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={values.showCountdown} onCheckedChange={(c) => set("showCountdown", Boolean(c))} disabled={!canEdit} />
             Mostrar cuenta regresiva
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={values.adultsOnly} onCheckedChange={(c) => set("adultsOnly", Boolean(c))} disabled={!canEdit} />
+            Celebración solo para adultos
           </label>
         </Block>
 
