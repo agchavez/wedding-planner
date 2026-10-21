@@ -26,3 +26,6 @@ Se redimensionaron y convirtieron a WebP.
 | cierre-jardin.webp | Wikimedia Commons, "Wooden swing at wedding venue (Unsplash).jpg" (CC0) |
 
 StockSnap: `https://stocksnap.io/photo/<id>` (licencia CC0).
+
+Las invitaciones de ejemplo (`public/ejemplos/*.jpg`) son copias en JPEG de `hero-confeti`, `tira-atardecer`, `hero-caminando` y `tira-pradera`.
+Las fotos de `public/ejemplos/galeria/` son copias en JPEG de las `tira-*`, `hero-novia`, `salon` y `cierre-jardin` de esta lista.

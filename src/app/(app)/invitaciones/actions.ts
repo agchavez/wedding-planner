@@ -6,8 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { getEditableWeddingId } from "@/lib/wedding";
 import { audit } from "@/lib/audit";
 import { parseEventDateTime } from "@/lib/eventTime";
-import { isInvitationTheme } from "@/lib/invitationThemes";
+import { isInvitationTheme, ITINERARY_ICONS, type ItineraryEntry } from "@/lib/invitationThemes";
 import { getInvitationSettings, NOT_SENT_FILTER } from "@/lib/guestInvitations";
+import { EXAMPLE_COVER_PHOTOS, findInvitationExample } from "@/lib/invitationExamples";
 
 export type InvitationSettingsInput = {
   theme: string;
@@ -29,6 +30,21 @@ export type InvitationSettingsInput = {
   hashtag: string;
   rsvpDeadline: string;
   showCountdown: boolean;
+  brideParents: string;
+  groomParents: string;
+  sponsors: string;
+  itinerary: ItineraryEntry[];
+  dressCodeColors: string[];
+  giftBankName: string;
+  giftAccount: string;
+  giftAccountHolder: string;
+  giftRegistryUrl: string;
+  galleryUrls: string[];
+  songUrl: string;
+  songTitle: string;
+  adultsOnly: boolean;
+  recommendations: string;
+  closingMessage: string;
 };
 
 const text = (value: unknown, max = 500) => String(value ?? "").trim().slice(0, max);
@@ -36,6 +52,34 @@ const text = (value: unknown, max = 500) => String(value ?? "").trim().slice(0, 
 function safeUrl(value: unknown) {
   const url = text(value, 2000);
   return /^https?:\/\//i.test(url) ? url : "";
+}
+
+/** Portada o galería: una URL http(s) o una de las fotos de ejemplo incluidas en la app. */
+function safeCoverUrl(value: unknown) {
+  const url = text(value, 2000);
+  return EXAMPLE_COVER_PHOTOS.includes(url) || /^\/ejemplos\/[\w/-]+\.jpg$/.test(url) ? url : safeUrl(url);
+}
+
+function cleanItinerary(items: unknown): ItineraryEntry[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .slice(0, 15)
+    .map((i) => ({
+      time: text(i?.time, 20),
+      title: text(i?.title, 80),
+      icon: typeof i?.icon === "string" && i.icon in ITINERARY_ICONS ? i.icon : "heart",
+    }))
+    .filter((i) => i.title);
+}
+
+function cleanColors(colors: unknown): string[] {
+  if (!Array.isArray(colors)) return [];
+  return colors.filter((c): c is string => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 6);
+}
+
+function cleanGallery(urls: unknown): string[] {
+  if (!Array.isArray(urls)) return [];
+  return urls.map(safeCoverUrl).filter(Boolean).slice(0, 8);
 }
 
 function revalidateInvitations() {
@@ -55,7 +99,7 @@ export async function saveInvitationDesign(input: InvitationSettingsInput) {
       headline: text(input.headline, 80),
       message: text(input.message, 1500),
       quote: text(input.quote, 400),
-      coverImageUrl: safeUrl(input.coverImageUrl),
+      coverImageUrl: safeCoverUrl(input.coverImageUrl),
       ceremonyTime: parseEventDateTime(input.ceremonyTime),
       ceremonyPlace: text(input.ceremonyPlace, 120),
       ceremonyAddress: text(input.ceremonyAddress, 200),
@@ -70,6 +114,21 @@ export async function saveInvitationDesign(input: InvitationSettingsInput) {
       hashtag: text(input.hashtag, 60),
       rsvpDeadline: deadline,
       showCountdown: Boolean(input.showCountdown),
+      brideParents: text(input.brideParents, 300),
+      groomParents: text(input.groomParents, 300),
+      sponsors: text(input.sponsors, 800),
+      itinerary: cleanItinerary(input.itinerary),
+      dressCodeColors: cleanColors(input.dressCodeColors),
+      giftBankName: text(input.giftBankName, 80),
+      giftAccount: text(input.giftAccount, 60),
+      giftAccountHolder: text(input.giftAccountHolder, 100),
+      giftRegistryUrl: safeUrl(input.giftRegistryUrl),
+      galleryUrls: cleanGallery(input.galleryUrls),
+      songUrl: safeUrl(input.songUrl),
+      songTitle: text(input.songTitle, 100),
+      adultsOnly: Boolean(input.adultsOnly),
+      recommendations: text(input.recommendations, 800),
+      closingMessage: text(input.closingMessage, 300),
     },
   });
   await audit("invitation.design_update", "Actualizó el diseño de la invitación", { weddingId, dedupeMinutes: 10 });
@@ -122,5 +181,40 @@ export async function regenerateInvitationLink(id: string) {
     data: { invitationToken: randomBytes(9).toString("base64url"), invitationSentAt: null },
   });
   await audit("invitation.regenerate", `Generó un enlace nuevo para "${guest.fullName}"`, { weddingId, targetId: id });
+  revalidateInvitations();
+}
+
+/**
+ * Copia el estilo y los textos de una invitación de ejemplo a la de la boda, para partir de
+ * ahí y modificarla. No toca fechas, horas, lugares, familia ni datos bancarios: esos son
+ * de cada boda.
+ */
+export async function applyInvitationExample(slug: string) {
+  const weddingId = await getEditableWeddingId();
+  const example = findInvitationExample(slug);
+  if (!example) return { error: "Ese ejemplo no existe." };
+  await getInvitationSettings(weddingId);
+  const d = example.data;
+  await prisma.invitationSettings.update({
+    where: { id: weddingId },
+    data: {
+      theme: d.theme,
+      coverImageUrl: d.coverImageUrl,
+      headline: d.headline,
+      message: d.message,
+      quote: d.quote,
+      dressCode: d.dressCode,
+      dressCodeNote: d.dressCodeNote,
+      dressCodeColors: d.dressCodeColors,
+      giftsNote: d.giftsNote,
+      showCountdown: d.showCountdown,
+      itinerary: d.itinerary,
+      galleryUrls: d.galleryUrls,
+      adultsOnly: d.adultsOnly,
+      recommendations: d.recommendations,
+      closingMessage: d.closingMessage,
+    },
+  });
+  await audit("invitation.apply_example", `Aplicó el ejemplo de invitación "${example.title}"`, { weddingId });
   revalidateInvitations();
 }

@@ -21,9 +21,28 @@ export type InvitationTheme = {
   envelopeFlap: string;
   seal: string;
   sealInk: string;
+  /** Franjas a contraste (fecha, vestimenta, cierre). */
+  band: string;
+  bandInk: string;
 };
 
 export const INVITATION_THEMES = {
+  olive: {
+    name: "Olivo",
+    description: "Verde olivo y lino, botánica y elegante",
+    background: "#e9e4d8",
+    paper: "#f6f2e9",
+    ink: "#2e3123",
+    muted: "#7b7865",
+    accent: "#4b5136",
+    gold: "#a8996a",
+    envelope: "#5d6444",
+    envelopeFlap: "#4b5136",
+    seal: "#b8975a",
+    sealInk: "#fbf6ea",
+    band: "#454a31",
+    bandInk: "#f1ecdf",
+  },
   classic: {
     name: "Clásica",
     description: "Marfil y dorado, atemporal",
@@ -37,6 +56,8 @@ export const INVITATION_THEMES = {
     envelopeFlap: "#e6d4bb",
     seal: "#8f2f3c",
     sealInk: "#f7e7d3",
+    band: "#3a2e26",
+    bandInk: "#f6efe6",
   },
   garden: {
     name: "Jardín",
@@ -51,6 +72,8 @@ export const INVITATION_THEMES = {
     envelopeFlap: "#d3dac2",
     seal: "#5d7553",
     sealInk: "#f1f3e8",
+    band: "#4c5f45",
+    bandInk: "#f1f3e8",
   },
   blush: {
     name: "Rubor",
@@ -65,6 +88,8 @@ export const INVITATION_THEMES = {
     envelopeFlap: "#ebcdc8",
     seal: "#a8415c",
     sealInk: "#fff1f2",
+    band: "#7a2f45",
+    bandInk: "#fff1f2",
   },
   noir: {
     name: "Noche",
@@ -79,6 +104,8 @@ export const INVITATION_THEMES = {
     envelopeFlap: "#2c2930",
     seal: "#d6b46a",
     sealInk: "#1a191d",
+    band: "#d6b46a",
+    bandInk: "#1a191d",
   },
 } satisfies Record<string, InvitationTheme>;
 
@@ -98,3 +125,21 @@ export function monogram(partner1: string, partner2: string) {
   const b = partner2.trim()[0]?.toUpperCase() ?? "";
   return a && b ? `${a} & ${b}` : a || b || "♥";
 }
+
+/** Íconos disponibles para el programa del día (clave → nombre visible). */
+export const ITINERARY_ICONS: Record<string, string> = {
+  rings: "Anillos",
+  church: "Ceremonia",
+  cheers: "Brindis / cóctel",
+  camera: "Fotos",
+  dinner: "Cena",
+  dance: "Baile",
+  cake: "Pastel",
+  party: "Fiesta",
+  music: "Música",
+  car: "Transporte",
+  heart: "Momento especial",
+  moon: "Despedida",
+};
+
+export type ItineraryEntry = { time: string; title: string; icon: string };

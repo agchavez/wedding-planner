@@ -8,7 +8,7 @@ import { cleanName, nameKey } from "@/lib/catalog";
 import { LABEL_COLORS, parseSide, SIDE_LABEL } from "@/lib/guestLabels";
 import { buildInvitationLinks, getInvitationSettings, NOT_SENT_FILTER } from "@/lib/guestInvitations";
 import { INVITATION_STATUS, invitationStatus, type InvitationStatus } from "@/lib/invitationMessage";
-import { isInvitationTheme, INVITATION_THEMES } from "@/lib/invitationThemes";
+import { isInvitationTheme, INVITATION_THEMES, ITINERARY_ICONS } from "@/lib/invitationThemes";
 import { parseEventDateTime, toEventDateTimeValue } from "@/lib/eventTime";
 import type { McpAuthContext } from "@/lib/mcpTokens";
 import type { Guest, GuestLabel } from "@/generated/prisma";
@@ -415,6 +415,15 @@ export function registerWeddingTools(server: McpServer) {
         message: s.message,
         quote: s.quote,
         coverImageUrl: s.coverImageUrl,
+        family: { brideParents: s.brideParents, groomParents: s.groomParents, sponsors: s.sponsors },
+        itinerary: s.itinerary,
+        dressCodeColors: s.dressCodeColors,
+        gifts: { note: s.giftsNote, bank: s.giftBankName, account: s.giftAccount, holder: s.giftAccountHolder, registryUrl: s.giftRegistryUrl },
+        galleryUrls: s.galleryUrls,
+        song: { url: s.songUrl, title: s.songTitle },
+        adultsOnly: s.adultsOnly,
+        recommendations: s.recommendations,
+        closingMessage: s.closingMessage,
         ceremony: { time: toEventDateTimeValue(s.ceremonyTime), place: s.ceremonyPlace, address: s.ceremonyAddress, mapUrl: s.ceremonyMapUrl },
         reception: { time: toEventDateTimeValue(s.receptionTime), place: s.receptionPlace, address: s.receptionAddress, mapUrl: s.receptionMapUrl },
         dressCode: s.dressCode,
@@ -455,18 +464,44 @@ export function registerWeddingTools(server: McpServer) {
         rsvpDeadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).optional(),
         showCountdown: z.boolean().optional(),
         whatsappTemplate: z.string().max(2000).optional(),
+        brideParents: z.string().max(300).optional().describe("Un nombre por línea"),
+        groomParents: z.string().max(300).optional().describe("Un nombre por línea"),
+        sponsors: z.string().max(800).optional().describe("Uno por línea: «Rol: Nombres»"),
+        itinerary: z
+          .array(
+            z.object({
+              time: z.string().max(20),
+              title: z.string().min(1).max(80),
+              icon: z.enum(Object.keys(ITINERARY_ICONS) as [string, ...string[]]),
+            })
+          )
+          .max(15)
+          .optional()
+          .describe("Programa del día, en orden"),
+        dressCodeColors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).max(6).optional(),
+        giftBankName: z.string().max(80).optional(),
+        giftAccount: z.string().max(60).optional(),
+        giftAccountHolder: z.string().max(100).optional(),
+        giftRegistryUrl: httpUrl.optional(),
+        galleryUrls: z.array(httpUrl).max(8).optional(),
+        songUrl: httpUrl.optional().describe("Archivo de audio público (mp3)"),
+        songTitle: z.string().max(100).optional(),
+        adultsOnly: z.boolean().optional(),
+        recommendations: z.string().max(800).optional(),
+        closingMessage: z.string().max(300).optional(),
       }),
     },
     async (args, ctx) => {
       const a = auth(ctx as Ctx);
       requireEdit(a);
       await getInvitationSettings(a.weddingId);
-      const { ceremonyTime, receptionTime, rsvpDeadline, theme, ...rest } = args;
+      const { ceremonyTime, receptionTime, rsvpDeadline, theme, galleryUrls, ...rest } = args;
       await prisma.invitationSettings.update({
         where: { id: a.weddingId },
         data: {
           ...rest,
           ...(theme && isInvitationTheme(theme) ? { theme } : {}),
+          ...(galleryUrls ? { galleryUrls: galleryUrls.filter(Boolean) } : {}),
           ...(ceremonyTime !== undefined ? { ceremonyTime: parseEventDateTime(ceremonyTime) } : {}),
           ...(receptionTime !== undefined ? { receptionTime: parseEventDateTime(receptionTime) } : {}),
           ...(rsvpDeadline !== undefined ? { rsvpDeadline: rsvpDeadline ? new Date(`${rsvpDeadline}T00:00:00Z`) : null } : {}),
