@@ -12,6 +12,7 @@ import {
   Music,
   Palette,
   PartyPopper,
+  Play,
   Shirt,
   Sparkles,
   Users,
@@ -85,6 +86,8 @@ export function DesignEditor({
   const { canEdit } = useWeddingAccess();
   const [values, setValues] = useState<DesignEditorValues>(initial);
   const [isPending, startTransition] = useTransition();
+  // Al cambiar, la vista previa se vuelve a montar y repite las animaciones de entrada.
+  const [replay, setReplay] = useState(0);
   const dirty = JSON.stringify(values) !== JSON.stringify(initial);
 
   function set<K extends keyof DesignEditorValues>(key: K, value: DesignEditorValues[K]) {
@@ -354,7 +357,17 @@ export function DesignEditor({
 
       <div className="xl:sticky xl:top-20 xl:self-start">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Vista previa</p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Vista previa</p>
+            <button
+              type="button"
+              onClick={() => setReplay((n) => n + 1)}
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <Play className="size-3" />
+              Ver animación
+            </button>
+          </div>
           {sampleGuest?.token && (
             <a
               href={`/i/${sampleGuest.token}?p=1`}
@@ -369,7 +382,7 @@ export function DesignEditor({
         </div>
         <div className="mx-auto w-full max-w-[24rem] overflow-hidden rounded-[2.4rem] border-[10px] border-[#1f2328] bg-[#1f2328] shadow-2xl">
           <div className="h-[44rem] overflow-y-auto overscroll-contain rounded-[1.6rem] [scrollbar-width:none]">
-            <InvitationView data={preview} guest={previewGuest} embedded />
+            <InvitationView key={replay} data={preview} guest={previewGuest} embedded />
           </div>
         </div>
       </div>

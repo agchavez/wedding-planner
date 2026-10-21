@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,10 +20,10 @@ export function Ornament({ className }: { className?: string }) {
 /** Línea fina con un corazón al centro (como separador de secciones). */
 export function HeartDivider({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center justify-center gap-3 text-(--inv-gold)", className)} aria-hidden>
-      <span className="h-px w-16 bg-current opacity-70" />
-      <Heart className="size-2.5" fill="currentColor" strokeWidth={0} />
-      <span className="h-px w-16 bg-current opacity-70" />
+    <div className={cn("inv-divider flex items-center justify-center gap-3 text-(--inv-gold)", className)} aria-hidden>
+      <span className="inv-line-l h-px w-16 bg-current opacity-70" />
+      <Heart className="inv-pop size-2.5" fill="currentColor" strokeWidth={0} style={{ "--i": 2 } as CSSProperties} />
+      <span className="inv-line-r h-px w-16 bg-current opacity-70" />
     </div>
   );
 }
@@ -30,13 +31,13 @@ export function HeartDivider({ className }: { className?: string }) {
 // Hojas a lo largo de una rama curva: [x, y, rotación, escala].
 const LEAVES: [number, number, number, number][] = [
   [26, 168, -35, 1],
-  [44, 150, 40, 0.9],
-  [52, 128, -50, 1.1],
+  [44, 150, 40, 0.95],
+  [52, 128, -50, 1.05],
   [72, 112, 30, 0.9],
   [78, 90, -55, 1],
-  [100, 76, 25, 0.8],
+  [100, 76, 25, 0.85],
   [104, 54, -60, 0.9],
-  [126, 44, 20, 0.8],
+  [126, 44, 20, 0.75],
   [132, 24, -65, 0.7],
 ];
 
@@ -48,12 +49,23 @@ export function Sprig({ className, flip = false }: { className?: string; flip?: 
       className={cn("pointer-events-none text-(--inv-accent)", flip && "-scale-x-100", className)}
       aria-hidden
     >
-      <path d="M12 196 C 40 150, 70 110, 148 12" fill="none" stroke="currentColor" strokeWidth="1.1" opacity="0.7" />
+      {/* pathLength=1: el trazo se anima de 0 a 1 sin conocer su largo real (ver .inv-stem). */}
+      <path
+        className="inv-stem"
+        pathLength={1}
+        d="M12 196 C 40 150, 70 110, 148 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        opacity="0.7"
+      />
       {LEAVES.map(([x, y, r, s], i) => (
         <g key={i} transform={`translate(${x} ${y}) rotate(${r}) scale(${s})`}>
-          <path d="M0 0 C 6 -8, 20 -10, 26 0 C 20 10, 6 8, 0 0 Z" fill="currentColor" opacity="0.2" />
-          <path d="M0 0 C 6 -8, 20 -10, 26 0 C 20 10, 6 8, 0 0 Z" fill="none" stroke="currentColor" strokeWidth="0.8" opacity="0.7" />
-          <path d="M0 0 L 22 0" stroke="currentColor" strokeWidth="0.5" opacity="0.5" />
+          <g className="inv-leaf" style={{ "--i": i } as CSSProperties}>
+            <path d="M0 0 C 6 -8, 20 -10, 26 0 C 20 10, 6 8, 0 0 Z" fill="currentColor" opacity="0.16" />
+            <path d="M0 0 C 6 -8, 20 -10, 26 0 C 20 10, 6 8, 0 0 Z" fill="none" stroke="currentColor" strokeWidth="0.8" opacity="0.65" />
+            <path d="M0 0 L 22 0" stroke="currentColor" strokeWidth="0.5" opacity="0.5" />
+          </g>
         </g>
       ))}
     </svg>
