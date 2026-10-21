@@ -11,7 +11,9 @@ export function proxy(request: NextRequest) {
   const hasSession = Boolean(getSessionCookie(request, { cookiePrefix: AUTH_COOKIE_PREFIX }));
 
   // Login, registro, landing, enlaces de invitación y los enlaces compartidos (agenda de un
-  // evento y galería de fotos, de solo lectura) son públicos. Una cookie vencida no debe
+  // evento y galería de fotos, de solo lectura) son públicos. También la invitación digital
+  // de cada invitado (/i/<token>, con su imagen de vista previa para WhatsApp) y el servidor
+  // MCP, que se autentica con su propio token (Authorization: Bearer). Una cookie vencida no debe
   // impedir llegar al login (evita bucles de redirección);
   // la propia página de login redirige al panel si la sesión es válida.
   if (
@@ -20,7 +22,10 @@ export function proxy(request: NextRequest) {
     pathname === "/inicio" ||
     pathname.startsWith("/invitacion/") ||
     pathname.startsWith("/agenda/") ||
-    pathname.startsWith("/galeria/")
+    pathname.startsWith("/galeria/") ||
+    pathname.startsWith("/i/") ||
+    pathname === "/api/mcp" ||
+    pathname.startsWith("/.well-known/")
   )
     return NextResponse.next();
 
