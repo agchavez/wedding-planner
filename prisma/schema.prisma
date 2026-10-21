@@ -64,19 +64,98 @@ model GuestGroup {
 }
 
 model Guest {
-  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
-  weddingId           String?  @db.ObjectId
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId           String?   @db.ObjectId
   fullName            String
-  group               String   @default("")
-  rsvpStatus          String   @default("pending") // pending | confirmed | declined
-  plusOnes            Int      @default(0)
-  plusOneNames        String[] @default([])
-  dietaryRestrictions String   @default("")
-  notes               String   @default("")
+  group               String    @default("")
+  rsvpStatus          String    @default("pending") // pending | confirmed | declined
+  plusOnes            Int       @default(0)
+  plusOneNames        String[]  @default([])
+  dietaryRestrictions String    @default("")
+  notes               String    @default("")
   // Referencia suelta al id de un LayoutElement embebido en SeatingLayout.elements.
   tableElementId      String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  // De qué lado viene el invitado: bride | groom | both | "" (sin definir).
+  side                String    @default("")
+  // Referencias sueltas a GuestLabel.id (etiquetas libres para filtrar: "Trabajo", "VIP"…).
+  labelIds            String[]  @default([]) @db.ObjectId
+  // Teléfono con código de país (solo dígitos al enviar por WhatsApp).
+  phone               String    @default("")
+  // Token del enlace personal de invitación (/i/<token>). Se genera la primera vez que se
+  // pide el enlace; no es @unique porque Mongo trataría los null como duplicados.
+  invitationToken     String?
+  invitationSentAt    DateTime?
+  invitationOpenedAt  DateTime?
+  invitationViews     Int       @default(0)
+  // Respuesta del invitado desde su enlace: cuántos asisten (incluyéndolo) y su mensaje.
+  rsvpRespondedAt     DateTime?
+  attendingCount      Int?
+  rsvpMessage         String    @default("")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([invitationToken])
+}
+
+// Etiqueta de invitados con color (ej. "Trabajo", "Universidad", "VIP"). Un invitado puede
+// tener varias (Guest.labelIds); sirven para filtrar la lista y los envíos de invitaciones.
+model GuestLabel {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId String?  @db.ObjectId
+  name      String
+  // Clave de LABEL_COLORS en lib/guestLabels.ts.
+  color     String   @default("rose")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Diseño y contenido de la invitación digital (una por boda, mismo id que Wedding).
+model InvitationSettings {
+  id                 String    @id @map("_id") @db.ObjectId
+  // classic | garden | noir | minimal — ver lib/invitationThemes.ts.
+  theme              String    @default("classic")
+  headline           String    @default("¡Nos casamos!")
+  message            String    @default("")
+  quote              String    @default("")
+  coverImageUrl      String    @default("")
+  ceremonyTime       DateTime?
+  ceremonyPlace      String    @default("")
+  ceremonyAddress    String    @default("")
+  ceremonyMapUrl     String    @default("")
+  receptionTime      DateTime?
+  receptionPlace     String    @default("")
+  receptionAddress   String    @default("")
+  receptionMapUrl    String    @default("")
+  dressCode          String    @default("")
+  dressCodeNote      String    @default("")
+  giftsNote          String    @default("")
+  hashtag            String    @default("")
+  rsvpDeadline       DateTime?
+  showCountdown      Boolean   @default(true)
+  // Código de país que se antepone a los teléfonos sin él (Honduras = 504).
+  defaultCountryCode String    @default("504")
+  // Mensaje de WhatsApp con variables {nombre}, {pareja}, {fecha}, {enlace}.
+  whatsappTemplate   String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// Token para que un asistente de IA (Claude, etc.) use el servidor MCP de /api/mcp en
+// nombre de una boda. Solo se guarda el hash; el token se muestra una sola vez al crearlo.
+model McpToken {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  weddingId     String    @db.ObjectId
+  name          String
+  tokenHash     String
+  // Primeros caracteres del token, para reconocerlo en la lista.
+  prefix        String
+  createdById   String
+  createdByName String    @default("")
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([tokenHash])
 }
 
 model ExpenseCategory {

@@ -21,6 +21,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  // Base de las URLs absolutas que exigen og:image y compañía (vista previa en WhatsApp).
+  metadataBase: new URL(process.env.BETTER_AUTH_URL || "http://localhost:3000"),
   title: "Wedplan",
   description: "Planificación de boda: presupuesto, invitados, canciones, línea de tiempo y distribución del salón.",
 };

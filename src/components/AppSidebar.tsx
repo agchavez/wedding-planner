@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   ListMusic,
   LogOut,
+  Mail,
   Receipt,
   Settings,
   ShieldCheck,
@@ -57,6 +58,7 @@ const LINK_GROUPS = [
     links: [
       { href: "/", label: "Panel", icon: LayoutDashboard },
       { href: "/invitados", label: "Invitados", icon: Users },
+      { href: "/invitaciones", label: "Invitaciones", icon: Mail },
       { href: "/presupuesto", label: "Presupuesto", icon: Wallet },
       { href: "/gastos", label: "Gastos", icon: Receipt },
     ],

@@ -1,4 +1,4 @@
-import { Plus, Tag, Store, Landmark, Users } from "lucide-react";
+import { Bot, Plus, Tag, Tags, Store, Landmark, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { CategoryFormDialog } from "@/app/(app)/presupuesto/CategoryFormDialog";
@@ -13,19 +13,30 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { LabelManager } from "@/app/(app)/configuracion/LabelManager";
+import { McpTokensCard } from "@/app/(app)/configuracion/McpTokensCard";
+import { publicOrigin } from "@/lib/guestInvitations";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracionPage() {
   const weddingId = await getActiveWeddingId();
-  const [categories, expenses, vendors, accounts, groups, currency] = await Promise.all([
+  const [categories, expenses, vendors, accounts, groups, currency, labels, labelUsage, mcpTokens, origin] = await Promise.all([
     prisma.expenseCategory.findMany({ where: { weddingId }, orderBy: { sortOrder: "asc" } }),
     prisma.expense.findMany({ where: { weddingId } }),
     prisma.vendor.findMany({ where: { weddingId }, orderBy: { name: "asc" } }),
     prisma.account.findMany({ where: { weddingId }, orderBy: { name: "asc" } }),
     prisma.guestGroup.findMany({ where: { weddingId }, orderBy: { name: "asc" } }),
     prisma.wedding.findUnique({ where: { id: weddingId } }).then((w) => w?.currency ?? "HNL"),
+    prisma.guestLabel.findMany({ where: { weddingId }, orderBy: { name: "asc" } }),
+    prisma.guest.findMany({ where: { weddingId }, select: { labelIds: true } }),
+    prisma.mcpToken
+      .findMany({ where: { weddingId }, orderBy: { createdAt: "desc" } })
+      .then((tokens) => tokens.filter((t) => !t.revokedAt)),
+    publicOrigin(),
   ]);
+  const labelCounts: Record<string, number> = {};
+  for (const g of labelUsage) for (const id of g.labelIds) labelCounts[id] = (labelCounts[id] ?? 0) + 1;
 
   const payments = await prisma.expensePayment.findMany({
     where: { expenseId: { in: expenses.map((e) => e.id) }, accountId: { not: null } },
@@ -42,11 +53,11 @@ export default async function ConfiguracionPage() {
     <div className="space-y-6">
       <PageHeader
         title="Configuración"
-        description="Administra las categorías de gasto, los proveedores, las cuentas y los grupos de invitados."
+        description="Administra las categorías de gasto, los proveedores, las cuentas, los grupos y etiquetas de invitados y el asistente de IA."
       />
 
       <Tabs defaultValue="categorias">
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="categorias">
             <Tag className="size-4" />
             Categorías
@@ -62,6 +73,14 @@ export default async function ConfiguracionPage() {
           <TabsTrigger value="grupos">
             <Users className="size-4" />
             Grupos
+          </TabsTrigger>
+          <TabsTrigger value="etiquetas">
+            <Tags className="size-4" />
+            Etiquetas
+          </TabsTrigger>
+          <TabsTrigger value="ia">
+            <Bot className="size-4" />
+            Asistente IA
           </TabsTrigger>
         </TabsList>
 
@@ -182,6 +201,24 @@ export default async function ConfiguracionPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="etiquetas" className="pt-2">
+          <LabelManager labels={labels.map((l) => ({ id: l.id, name: l.name, color: l.color }))} counts={labelCounts} />
+        </TabsContent>
+
+        <TabsContent value="ia" className="pt-2">
+          <McpTokensCard
+            endpoint={`${origin}/api/mcp`}
+            tokens={mcpTokens.map((t) => ({
+              id: t.id,
+              name: t.name,
+              prefix: t.prefix,
+              createdByName: t.createdByName,
+              createdAt: t.createdAt.toISOString(),
+              lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
+            }))}
+          />
         </TabsContent>
       </Tabs>
     </div>

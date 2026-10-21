@@ -19,22 +19,31 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { RSVP_LABEL } from "@/app/(app)/invitados/constants";
+import { LabelPicker } from "@/app/(app)/invitados/LabelPicker";
+import { GUEST_SIDES, SIDE_LABEL, type LabelOption } from "@/lib/guestLabels";
 import type { Guest } from "@/generated/prisma";
 
 export function GuestFormDialog({
   guest,
   groupSuggestions = [],
+  labels = [],
+  defaultSide = "",
   triggerRender,
   triggerChildren,
 }: {
   guest?: Guest;
   groupSuggestions?: string[];
+  labels?: LabelOption[];
+  /** Lado preseleccionado al agregar (p. ej. con el filtro "Novia" activo). */
+  defaultSide?: string;
   triggerRender: ReactElement;
   triggerChildren: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const [labelIds, setLabelIds] = useState<string[]>(guest?.labelIds ?? []);
+  const [createdLabels, setCreatedLabels] = useState<LabelOption[]>([]);
   const { canEdit } = useWeddingAccess();
   const isEdit = Boolean(guest);
 
@@ -42,7 +51,13 @@ export function GuestFormDialog({
   if (!canEdit) return null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setLabelIds(guest?.labelIds ?? []);
+        setOpen(next);
+      }}
+    >
       <DialogTrigger render={triggerRender}>{triggerChildren}</DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -60,6 +75,7 @@ export function GuestFormDialog({
                   await createGuest(formData);
                 }
                 formRef.current?.reset();
+                setLabelIds([]);
                 setOpen(false);
                 toast.success(guest ? "Invitado actualizado" : "Invitado agregado");
               } catch {
@@ -86,6 +102,46 @@ export function GuestFormDialog({
               emptyOption={{ value: "", label: "Sin grupo" }}
               className="mt-1"
             />
+          </div>
+          <div>
+            <Label htmlFor="side">Invitado de</Label>
+            <Select name="side" defaultValue={guest?.side || defaultSide || "none"}>
+              <SelectTrigger id="side" className="mt-1 w-full">
+                <SelectValue>{(value: string) => SIDE_LABEL[value] ?? "Sin definir"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin definir</SelectItem>
+                {GUEST_SIDES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.short}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="phone">WhatsApp</Label>
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              defaultValue={guest?.phone}
+              placeholder="9999-9999 o +1 305…"
+              className="mt-1"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Etiquetas</Label>
+            <div className="mt-1.5">
+              <LabelPicker
+                name="labelIds"
+                labels={[...labels, ...createdLabels.filter((c) => !labels.some((l) => l.id === c.id))]}
+                value={labelIds}
+                onChange={setLabelIds}
+                onLabelCreated={(label) => setCreatedLabels((prev) => [...prev, label])}
+              />
+            </div>
           </div>
           <div>
             <Label htmlFor="rsvpStatus">Confirmación</Label>

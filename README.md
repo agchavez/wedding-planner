@@ -38,7 +38,9 @@ App personal para planificar una boda de principio a fin: presupuesto, invitados
 | Módulo | Descripción |
 |---|---|
 | 💰 **Presupuesto** | Categorías de gasto con alertas cuando se supera el límite asignado |
-| 👥 **Invitados** | Lista de invitados con asignación de mesa y estado de confirmación |
+| 👥 **Invitados** | Lista por lado (novia / novio / ambos), etiquetas con color, búsqueda, acciones masivas, mesa y confirmación |
+| 💌 **Invitaciones** | Invitación digital con enlace personal por invitado (`/i/<token>`), sobre animado, RSVP, cuenta regresiva y calendario; envío por WhatsApp con vista previa personalizada y seguimiento (enviada → vista → confirmó) |
+| 🤖 **Asistente IA (MCP)** | Servidor MCP en `/api/mcp` para que Claude gestione invitados, etiquetas e invitaciones |
 | 🎵 **Canciones** | Playlist del evento organizada por categoría |
 | 🕐 **Línea de tiempo** | Cronograma del día del evento |
 | 🪑 **Distribución** | Editor visual tipo "Lego" para el layout del salón — mesas, escenario, pista de baile, zona de fotos |
@@ -100,6 +102,24 @@ Solo cambia `MONGODB_URI` en `.env.local` por la cadena de conexión de Atlas (q
 - Toda lectura pasa por `requireWeddingContext()` y toda mutación por `getEditableWeddingId()` (`src/lib/wedding.ts`): exigen sesión, limitan los datos a la boda activa y bloquean a quien tiene rol de solo lectura.
 - **Consola `/admin`** (administradores de la plataforma): resumen con salud del sistema, actividad y alertas de seguridad; bodas con sus métricas y participantes; usuarios y en qué bodas participan; auditoría filtrable; sesiones activas. El admin no crea bodas: las crean los usuarios.
 - **Auditoría** (`AuditLog`): inicios de sesión (también los fallidos, con IP), registros, cada cambio en los datos de una boda y cada acción de administración. Se conserva 180 días (índice TTL).
+
+## 💌 Invitaciones digitales y WhatsApp
+
+- Cada invitado tiene un enlace personal `/i/<token>` (se genera al abrir **Invitaciones**). La página es pública, no se indexa y registra cuándo la abrió el invitado (no cuentan la vista previa de la pareja `?p=1` ni los robots de WhatsApp/Facebook).
+- **Vista previa en WhatsApp:** `app/i/[token]/opengraph-image.tsx` genera una tarjeta 1200×630 con el nombre del invitado (~60 KB; WhatsApp descarta imágenes de más de ~300-600 KB). Requiere `BETTER_AUTH_URL` con el dominio público en HTTPS, que también es el `metadataBase`. Las fuentes de esa imagen están en `public/fonts`.
+- **Envío:** `wa.me/<teléfono>?text=…` abre el chat con el mensaje listo (WhatsApp no permite envíos masivos desde un enlace). El *envío guiado* recorre la lista uno por uno. Los teléfonos locales reciben el código de país configurado (504 por defecto).
+- El diseño (tema, textos, ceremonia, recepción, vestimenta, regalos) y la plantilla del mensaje se editan en **Invitaciones → Diseño / Mensaje**, con vista previa en vivo.
+
+## 🤖 Servidor MCP
+
+En **Configuración → Asistente IA** se crea un token (solo se guarda su hash; da acceso a una sola boda y deja de funcionar si quien lo creó sale de la boda). Para Claude Code:
+
+```bash
+claude mcp add --transport http wedplan https://wedding.partners.hn/api/mcp \
+  --header "Authorization: Bearer wp_mcp_…"
+```
+
+Herramientas: `wedding_overview`, `list_guests`, `add_guests`, `update_guest`, `list_labels`, `get_invitation_links`, `mark_invitations_sent`, `rsvp_responses`, `get_invitation_design`, `update_invitation_design`. Todo cambio queda en la auditoría como "(vía asistente de IA)".
 
 ## 🚢 Despliegue
 

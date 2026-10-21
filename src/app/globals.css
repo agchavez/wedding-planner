@@ -290,3 +290,128 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* Invitación digital (/i/<token> y vista previa en /invitaciones)        */
+/* ---------------------------------------------------------------------- */
+
+.inv-root {
+  font-family: var(--font-inv-serif), Georgia, serif;
+}
+
+.inv-script {
+  font-family: var(--font-inv-script), cursive;
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.inv-caps {
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+/* Papel con un grano muy sutil, sin imágenes externas. */
+.inv-paper {
+  background-color: var(--inv-paper);
+  background-image: radial-gradient(color-mix(in oklab, var(--inv-ink) 5%, transparent) 0.5px, transparent 0.6px);
+  background-size: 4px 4px;
+}
+
+.inv-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.inv-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Sobre de apertura */
+.inv-envelope-flap {
+  transform-origin: top center;
+  transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+  backface-visibility: hidden;
+}
+
+.inv-envelope.is-open .inv-envelope-flap {
+  transform: rotateX(180deg);
+}
+
+.inv-envelope-letter {
+  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.55s;
+}
+
+.inv-envelope.is-open .inv-envelope-letter {
+  transform: translateY(-46%);
+}
+
+.inv-envelope-seal {
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+
+.inv-envelope.is-open .inv-envelope-seal {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.inv-intro {
+  transition:
+    opacity 0.8s ease 1.5s,
+    visibility 0s linear 2.3s;
+}
+
+.inv-intro.is-done {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@keyframes inv-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--inv-seal) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+.inv-seal-pulse {
+  animation: inv-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes inv-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+.inv-float {
+  animation: inv-float 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-reveal,
+  .inv-envelope-flap,
+  .inv-envelope-letter,
+  .inv-intro {
+    transition: none;
+  }
+  .inv-reveal {
+    opacity: 1;
+    transform: none;
+  }
+  .inv-seal-pulse,
+  .inv-float {
+    animation: none;
+  }
+}
