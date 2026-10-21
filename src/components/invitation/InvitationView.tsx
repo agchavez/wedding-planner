@@ -128,7 +128,8 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   );
 }
 
-const isHttpUrl = (url: string) => /^https?:\/\//i.test(url);
+/** Solo http(s) o rutas de la propia app (fotos de ejemplo); nunca javascript:, data:, etc. */
+const isHttpUrl = (url: string) => /^https?:\/\//i.test(url) || /^\/(?!\/)/.test(url);
 
 function mapsUrl(mapUrl: string, place: string, address: string) {
   if (isHttpUrl(mapUrl)) return mapUrl;

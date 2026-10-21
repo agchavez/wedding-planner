@@ -24,6 +24,8 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/agenda/") ||
     pathname.startsWith("/galeria/") ||
     pathname.startsWith("/i/") ||
+    pathname === "/ejemplos" ||
+    pathname.startsWith("/ejemplos/") ||
     pathname === "/api/mcp" ||
     pathname.startsWith("/.well-known/")
   )
@@ -34,7 +36,7 @@ export function proxy(request: NextRequest) {
 
   if (!hasSession) {
     const url = new URL("/login", request.url);
-    if (pathname !== "/") url.searchParams.set("next", pathname);
+    if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 

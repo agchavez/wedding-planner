@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { parseEventDateTime } from "@/lib/eventTime";
 import { isInvitationTheme } from "@/lib/invitationThemes";
 import { getInvitationSettings, NOT_SENT_FILTER } from "@/lib/guestInvitations";
+import { EXAMPLE_COVER_PHOTOS, findInvitationExample } from "@/lib/invitationExamples";
 
 export type InvitationSettingsInput = {
   theme: string;
@@ -38,6 +39,12 @@ function safeUrl(value: unknown) {
   return /^https?:\/\//i.test(url) ? url : "";
 }
 
+/** Portada: una URL http(s) o una de las fotos de ejemplo incluidas en la app. */
+function safeCoverUrl(value: unknown) {
+  const url = text(value, 2000);
+  return EXAMPLE_COVER_PHOTOS.includes(url) ? url : safeUrl(url);
+}
+
 function revalidateInvitations() {
   revalidatePath("/invitaciones");
   revalidatePath("/invitados");
@@ -55,7 +62,7 @@ export async function saveInvitationDesign(input: InvitationSettingsInput) {
       headline: text(input.headline, 80),
       message: text(input.message, 1500),
       quote: text(input.quote, 400),
-      coverImageUrl: safeUrl(input.coverImageUrl),
+      coverImageUrl: safeCoverUrl(input.coverImageUrl),
       ceremonyTime: parseEventDateTime(input.ceremonyTime),
       ceremonyPlace: text(input.ceremonyPlace, 120),
       ceremonyAddress: text(input.ceremonyAddress, 200),
@@ -122,5 +129,33 @@ export async function regenerateInvitationLink(id: string) {
     data: { invitationToken: randomBytes(9).toString("base64url"), invitationSentAt: null },
   });
   await audit("invitation.regenerate", `Generó un enlace nuevo para "${guest.fullName}"`, { weddingId, targetId: id });
+  revalidateInvitations();
+}
+
+/**
+ * Copia el estilo y los textos de una invitación de ejemplo a la de la boda, para partir de
+ * ahí y modificarla. No toca fechas, horas ni lugares: esos son los de cada boda.
+ */
+export async function applyInvitationExample(slug: string) {
+  const weddingId = await getEditableWeddingId();
+  const example = findInvitationExample(slug);
+  if (!example) return { error: "Ese ejemplo no existe." };
+  await getInvitationSettings(weddingId);
+  const d = example.data;
+  await prisma.invitationSettings.update({
+    where: { id: weddingId },
+    data: {
+      theme: d.theme,
+      coverImageUrl: d.coverImageUrl,
+      headline: d.headline,
+      message: d.message,
+      quote: d.quote,
+      dressCode: d.dressCode,
+      dressCodeNote: d.dressCodeNote,
+      giftsNote: d.giftsNote,
+      showCountdown: d.showCountdown,
+    },
+  });
+  await audit("invitation.apply_example", `Aplicó el ejemplo de invitación "${example.title}"`, { weddingId });
   revalidateInvitations();
 }

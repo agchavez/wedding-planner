@@ -20,6 +20,8 @@ export function InvitationsDashboard({
   coupleNames,
   dateLabel,
   hasWeddingDate,
+  initialTab = "enviar",
+  highlightExample,
 }: {
   rows: InvitationRow[];
   labels: LabelOption[];
@@ -29,8 +31,10 @@ export function InvitationsDashboard({
   coupleNames: string;
   dateLabel: string;
   hasWeddingDate: boolean;
+  initialTab?: string;
+  highlightExample?: string;
 }) {
-  const [tab, setTab] = useState("enviar");
+  const [tab, setTab] = useState(initialTab);
   const sample = rows.find((r) => r.token) ?? null;
 
   return (
@@ -67,7 +71,14 @@ export function InvitationsDashboard({
           />
         </TabsContent>
         <TabsContent value="diseno" className="pt-4">
-          <DesignEditor initial={editor} base={data} sampleGuest={sample} />
+          {/* `key`: al aplicar un ejemplo llegan valores nuevos y el editor se reinicia con ellos. */}
+          <DesignEditor
+            key={JSON.stringify(editor)}
+            initial={editor}
+            base={data}
+            sampleGuest={sample}
+            highlightExample={highlightExample}
+          />
         </TabsContent>
         <TabsContent value="mensaje" className="pt-4">
           <MessageEditor

@@ -14,7 +14,8 @@ import type { InvitationRow } from "@/app/(app)/invitaciones/shared";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvitacionesPage() {
+export default async function InvitacionesPage({ searchParams }: PageProps<"/invitaciones">) {
+  const { tab, ejemplo } = await searchParams;
   const { weddingId, canEdit } = await requireWeddingContext();
   const [wedding, settings, guests, labels, origin] = await Promise.all([
     prisma.wedding.findUniqueOrThrow({ where: { id: weddingId } }),
@@ -62,6 +63,8 @@ export default async function InvitacionesPage() {
         coupleNames={weddingDisplayName(wedding, "Los novios")}
         dateLabel={formatWeddingDate(wedding.weddingDate)}
         hasWeddingDate={Boolean(wedding.weddingDate)}
+        initialTab={tab === "diseno" || tab === "mensaje" ? tab : "enviar"}
+        highlightExample={typeof ejemplo === "string" ? ejemplo : undefined}
       />
     </div>
   );

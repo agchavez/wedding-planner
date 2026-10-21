@@ -12,6 +12,8 @@ import { useWeddingAccess } from "@/components/WeddingAccess";
 import { InvitationView } from "@/components/invitation/InvitationView";
 import { saveInvitationDesign, type InvitationSettingsInput } from "@/app/(app)/invitaciones/actions";
 import type { InvitationRow } from "@/app/(app)/invitaciones/shared";
+import { ExampleTemplates } from "@/app/(app)/invitaciones/ExampleTemplates";
+import { EXAMPLE_COVER_PHOTOS } from "@/lib/invitationExamples";
 import { INVITATION_THEMES, monogram, type InvitationThemeName } from "@/lib/invitationThemes";
 import { parseEventDateTime } from "@/lib/eventTime";
 import type { InvitationData } from "@/lib/guestInvitations";
@@ -30,10 +32,13 @@ function Field({
   children: ReactNode;
   className?: string;
 }) {
+  // <label> envolvente: asocia el texto con el primer control del campo.
   return (
     <div className={className}>
-      <Label>{label}</Label>
-      <div className="mt-1">{children}</div>
+      <Label className="flex-col items-stretch gap-0">
+        <span>{label}</span>
+        <div className="mt-1 font-normal leading-normal select-auto">{children}</div>
+      </Label>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
@@ -55,10 +60,12 @@ export function DesignEditor({
   initial,
   base,
   sampleGuest,
+  highlightExample,
 }: {
   initial: DesignEditorValues;
   base: InvitationData;
   sampleGuest: InvitationRow | null;
+  highlightExample?: string;
 }) {
   const { canEdit } = useWeddingAccess();
   const [values, setValues] = useState<DesignEditorValues>(initial);
@@ -86,7 +93,7 @@ export function DesignEditor({
       ceremonyTime: parseEventDateTime(values.ceremonyTime)?.toISOString() ?? null,
       receptionTime: parseEventDateTime(values.receptionTime)?.toISOString() ?? null,
       rsvpDeadline: values.rsvpDeadline ? `${values.rsvpDeadline}T00:00:00.000Z` : null,
-      coverImageUrl: /^https?:\/\//.test(values.coverImageUrl) ? values.coverImageUrl : "",
+      coverImageUrl: values.coverImageUrl,
     }),
     [base, values]
   );
@@ -137,6 +144,8 @@ export function DesignEditor({
   return (
     <div className="grid gap-8 xl:grid-cols-[1fr_25rem]">
       <div className="space-y-5">
+        {canEdit && <ExampleTemplates highlight={highlightExample} />}
+
         <section className="rounded-2xl border border-border bg-card p-5">
           <h3 className="mb-4 flex items-center gap-2 font-heading text-lg font-semibold">
             <Palette className="size-4 text-decorative" />
@@ -181,8 +190,39 @@ export function DesignEditor({
 
         <Block icon={ImageIcon} title="Portada y mensaje">
           <Field label="Frase de portada">{input("headline", { placeholder: "¡Nos casamos!" })}</Field>
-          <Field label="Foto de portada (opcional)" hint="Enlace a una imagen (https://…). Sin foto, se usa un diseño de papel.">
-            {input("coverImageUrl", { placeholder: "https://…/nuestra-foto.jpg", type: "url" })}
+          <Field
+            label="Foto de portada (opcional)"
+            hint="Pega el enlace de su foto (https://…) o elige una de ejemplo. También aparece en la tarjeta de WhatsApp."
+          >
+            {input("coverImageUrl", { placeholder: "https://…/nuestra-foto.jpg" })}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                disabled={!canEdit}
+                onClick={() => set("coverImageUrl", "")}
+                className={cn(
+                  "flex h-10 w-14 items-center justify-center rounded-md border text-[0.65rem] text-muted-foreground",
+                  !values.coverImageUrl ? "border-primary ring-2 ring-primary/30" : "border-border"
+                )}
+              >
+                Sin foto
+              </button>
+              {EXAMPLE_COVER_PHOTOS.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => set("coverImageUrl", url)}
+                  className={cn(
+                    "h-10 w-14 overflow-hidden rounded-md border",
+                    values.coverImageUrl === url ? "border-primary ring-2 ring-primary/30" : "border-border"
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- miniatura local */}
+                  <img src={url} alt="" className="size-full object-cover" />
+                </button>
+              ))}
+            </div>
           </Field>
           <Field label="Mensaje de invitación" className="sm:col-span-2">
             <Textarea
