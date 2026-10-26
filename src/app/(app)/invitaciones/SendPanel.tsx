@@ -11,6 +11,8 @@ import {
   Link2,
   MailCheck,
   MoreHorizontal,
+  Pencil,
+  Plus,
   RefreshCw,
   Search,
   Sparkles,
@@ -29,6 +31,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { LabelPicker } from "@/app/(app)/invitados/LabelPicker";
 import { LabelChip } from "@/app/(app)/invitados/LabelChip";
+import { GuestFormDialog } from "@/app/(app)/invitados/GuestFormDialog";
 import {
   markInvitationsSent,
   regenerateInvitationLink,
@@ -48,6 +51,7 @@ import { GUEST_SIDES, SIDE_LABEL, type LabelOption } from "@/lib/guestLabels";
 import { INVITATION_STATUS, type InvitationStatus } from "@/lib/invitationMessage";
 import { nameKey } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import type { Guest } from "@/generated/prisma";
 
 const STATUS_ORDER: InvitationStatus[] = ["not_sent", "sent", "opened", "confirmed", "declined"];
 
@@ -143,6 +147,8 @@ function PhoneField({ row, canEdit, valid }: { row: InvitationRow; canEdit: bool
 
 export function SendPanel({
   rows,
+  guests,
+  groupSuggestions,
   labels,
   messageSettings,
   ctx,
@@ -150,6 +156,8 @@ export function SendPanel({
   needsSetup,
 }: {
   rows: InvitationRow[];
+  guests: Guest[];
+  groupSuggestions: string[];
   labels: LabelOption[];
   messageSettings: MessageSettings;
   ctx: MessageContextBase;
@@ -165,6 +173,23 @@ export function SendPanel({
   const [, startTransition] = useTransition();
 
   const labelById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
+  const guestById = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests]);
+
+  // Mismo formulario que en Invitados; GuestFormDialog no se muestra a los roles de solo lectura.
+  const addGuestButton = (
+    <GuestFormDialog
+      groupSuggestions={groupSuggestions}
+      labels={labels}
+      defaultSide={side === "all" ? "" : side}
+      triggerRender={<Button variant="outline" />}
+      triggerChildren={
+        <>
+          <Plus className="size-4" />
+          Agregar invitado
+        </>
+      }
+    />
+  );
 
   const base = useMemo(() => {
     const q = nameKey(query);
@@ -220,7 +245,8 @@ export function SendPanel({
       <EmptyState
         icon={MailCheck}
         title="Todavía no hay invitados"
-        description="Agrega a tus invitados en la sección Invitados; cada uno tendrá su enlace personal de invitación."
+        description="Agrega a tus invitados; cada uno tendrá su enlace personal de invitación."
+        action={addGuestButton}
       />
     );
   }
@@ -277,6 +303,7 @@ export function SendPanel({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {addGuestButton}
           {canEdit && (
             <Button onClick={() => setGuidedOpen(true)} disabled={toSend.length === 0} className="bg-[#25D366] text-white hover:bg-[#1ebe5a]">
               <WhatsAppIcon className="size-4" />
@@ -406,6 +433,15 @@ export function SendPanel({
                     >
                       <Copy className="size-3.5" />
                     </Button>
+                    {guestById.get(row.id) && (
+                      <GuestFormDialog
+                        guest={guestById.get(row.id)}
+                        groupSuggestions={groupSuggestions}
+                        labels={labels}
+                        triggerRender={<Button variant="outline" size="icon-sm" aria-label="Editar invitado" title="Editar invitado" />}
+                        triggerChildren={<Pencil className="size-3.5" />}
+                      />
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Más" />}>
                         <MoreHorizontal className="size-3.5" />

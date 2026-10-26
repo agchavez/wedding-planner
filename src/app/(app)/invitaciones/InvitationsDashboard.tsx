@@ -5,6 +5,7 @@ import { MessageCircle, Palette, Send } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SendPanel } from "@/app/(app)/invitaciones/SendPanel";
+import type { Guest } from "@/generated/prisma";
 import { DesignEditor, type DesignEditorValues } from "@/app/(app)/invitaciones/DesignEditor";
 import { MessageEditor } from "@/app/(app)/invitaciones/MessageEditor";
 import type { InvitationRow, MessageSettings } from "@/app/(app)/invitaciones/shared";
@@ -13,6 +14,8 @@ import type { LabelOption } from "@/lib/guestLabels";
 
 export function InvitationsDashboard({
   rows,
+  guests,
+  groupSuggestions,
   labels,
   data,
   editor,
@@ -24,6 +27,8 @@ export function InvitationsDashboard({
   highlightExample,
 }: {
   rows: InvitationRow[];
+  guests: Guest[];
+  groupSuggestions: string[];
   labels: LabelOption[];
   data: InvitationData;
   editor: DesignEditorValues;
@@ -63,6 +68,8 @@ export function InvitationsDashboard({
         <TabsContent value="enviar" className="pt-4">
           <SendPanel
             rows={rows}
+            guests={guests}
+            groupSuggestions={groupSuggestions}
             labels={labels}
             messageSettings={messageSettings}
             ctx={{ coupleNames, dateLabel }}

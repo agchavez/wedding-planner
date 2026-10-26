@@ -17,11 +17,12 @@ export const dynamic = "force-dynamic";
 export default async function InvitacionesPage({ searchParams }: PageProps<"/invitaciones">) {
   const { tab, ejemplo } = await searchParams;
   const { weddingId, canEdit } = await requireWeddingContext();
-  const [wedding, settings, guests, labels, origin] = await Promise.all([
+  const [wedding, settings, guests, labels, groups, origin] = await Promise.all([
     prisma.wedding.findUniqueOrThrow({ where: { id: weddingId } }),
     getInvitationSettings(weddingId),
     prisma.guest.findMany({ where: { weddingId }, orderBy: { fullName: "asc" } }),
     prisma.guestLabel.findMany({ where: { weddingId }, orderBy: { name: "asc" } }),
+    prisma.guestGroup.findMany({ where: { weddingId }, select: { name: true } }),
     publicOrigin(),
   ]);
   // Cada invitado necesita su enlace personal (solo quien puede editar lo genera).
@@ -51,6 +52,8 @@ export default async function InvitacionesPage({ searchParams }: PageProps<"/inv
     <div className={invitationFontClasses}>
       <InvitationsDashboard
         rows={rows}
+        guests={guests}
+        groupSuggestions={[...new Set([...groups.map((g) => g.name), ...guests.map((g) => g.group)].filter(Boolean))].sort()}
         labels={labels.map((l) => ({ id: l.id, name: l.name, color: l.color }))}
         data={data}
         editor={{
