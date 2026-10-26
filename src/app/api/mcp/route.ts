@@ -1,5 +1,8 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { registerWeddingTools } from "@/lib/mcp/weddingTools";
+import { registerBudgetTools } from "@/lib/mcp/budgetTools";
+import { registerPlanningTools } from "@/lib/mcp/planningTools";
+import { registerSeatingTools } from "@/lib/mcp/seatingTools";
 import { verifyMcpToken } from "@/lib/mcpTokens";
 
 /**
@@ -9,13 +12,20 @@ import { verifyMcpToken } from "@/lib/mcpTokens";
 const handler = createMcpHandler(
   (server) => {
     registerWeddingTools(server);
+    registerBudgetTools(server);
+    registerPlanningTools(server);
+    registerSeatingTools(server);
   },
   {
-    serverInfo: { name: "wedplan", version: "1.0.0" },
+    serverInfo: { name: "wedplan", version: "2.0.0" },
     instructions:
-      "Herramientas para gestionar los invitados y las invitaciones digitales de una boda en Wedplan. " +
-      "Empieza con wedding_overview. Los invitados tienen lado (novia/novio/ambos) y etiquetas. " +
-      "Para enviar invitaciones usa get_invitation_links: devuelve enlaces de WhatsApp que la persona abre para enviar; luego mark_invitations_sent.",
+      "Herramientas para gestionar una boda completa en Wedplan: datos de la boda, invitados (lado novia/novio/ambos, " +
+      "etiquetas, grupos, confirmaciones), invitación digital y su envío por WhatsApp, presupuesto, gastos y pagos, " +
+      "proveedores y cuentas, eventos y línea de tiempo, música, distribución del salón y mesas, fotos y actividad. " +
+      "Empieza con wedding_overview. Los ids salen de las herramientas de listado (list_guests, list_expenses, list_events, get_seating…). " +
+      "Para enviar invitaciones usa get_invitation_links: devuelve enlaces de WhatsApp que la persona abre para enviar; luego mark_invitations_sent. " +
+      "Las fechas van en formato YYYY-MM-DD y las horas de la línea de tiempo en HH:mm. " +
+      "Antes de eliminar algo (herramientas delete_* o action=delete) confirma con la persona.",
   }
 );
 

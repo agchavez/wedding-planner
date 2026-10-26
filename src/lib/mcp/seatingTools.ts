@@ -1,0 +1,281 @@
+import "server-only";
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { prisma } from "@/lib/prisma";
+import { clampCanvasSize, getOrCreateSeatingLayout, sanitizeElement, sanitizeRoomShape, VALID_ELEMENT_TYPES } from "@/lib/seatingLayout";
+import { ELEMENT_LABELS, getDefaultElementShape, getRoomShapePreset, isTableType, ROOM_SHAPE_PRESETS, type ElementType } from "@/lib/seatGeometry";
+import { auth, editor, json, log, objectId } from "@/lib/mcp/shared";
+import type { Guest, LayoutElement } from "@/generated/prisma";
+
+/**
+ * Herramientas MCP de la distribución del salón (una por evento): mesas, zonas y bloques de
+ * sillas, y la asignación de invitados a mesas. Coordenadas en el lienzo (0,0 arriba a la
+ * izquierda; por defecto 2000×1400); x/y son el centro del elemento.
+ */
+
+const elementType = z.enum(VALID_ELEMENT_TYPES as [ElementType, ...ElementType[]]);
+
+const elementFields = {
+  label: z.string().max(60).optional(),
+  tableNumber: z.number().int().min(0).max(999).optional(),
+  x: z.number().min(-2000).max(6000).optional(),
+  y: z.number().min(-2000).max(6000).optional(),
+  width: z.number().min(20).max(900).optional(),
+  height: z.number().min(20).max(900).optional(),
+  rotation: z.number().min(-360).max(360).optional(),
+  capacity: z.number().int().min(1).max(100).optional().describe("Asientos (mesas)"),
+  rows: z.number().int().min(1).max(20).optional().describe("Solo chair-row"),
+  columns: z.number().int().min(1).max(20).optional().describe("Solo chair-row"),
+};
+
+function describeElement(el: LayoutElement, guests: Guest[]) {
+  const seated = isTableType(el.type) ? guests.filter((g) => g.tableElementId === el.id) : [];
+  return {
+    id: el.id,
+    type: el.type,
+    label: el.label,
+    ...(isTableType(el.type)
+      ? {
+          tableNumber: el.tableNumber,
+          capacity: el.capacity,
+          // Cada invitado ocupa 1 + sus acompañantes.
+          seatsTaken: seated.reduce((n, g) => n + 1 + g.plusOnes, 0),
+          guests: seated.map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes })),
+        }
+      : {}),
+    ...(el.type === "chair-row" ? { rows: el.rows, columns: el.columns } : {}),
+    x: Math.round(el.x),
+    y: Math.round(el.y),
+    width: el.width,
+    height: el.height,
+    rotation: el.rotation,
+  };
+}
+
+async function layoutFor(weddingId: string, eventId: string) {
+  const event = await prisma.weddingEvent.findFirst({ where: { id: eventId, weddingId } });
+  if (!event) return null;
+  return { event, layout: await getOrCreateSeatingLayout(eventId, weddingId) };
+}
+
+async function saveElements(layoutId: string, elements: LayoutElement[]) {
+  const sanitized = elements.map(sanitizeElement).filter((el): el is LayoutElement => el !== null);
+  await prisma.seatingLayout.update({ where: { id: layoutId }, data: { elements: sanitized } });
+  return sanitized;
+}
+
+export function registerSeatingTools(server: McpServer) {
+  server.registerTool(
+    "get_seating",
+    {
+      title: "Ver distribución del salón",
+      description:
+        "Distribución de un evento: tamaño y estilo del salón, mesas (con capacidad, asientos ocupados e invitados sentados), zonas y bloques de sillas, más los invitados sin mesa. Sin eventId devuelve un resumen de todos los eventos.",
+      inputSchema: z.object({ eventId: objectId.optional() }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ eventId }, ctx) => {
+      const a = auth(ctx);
+      const guests = await prisma.guest.findMany({ where: { weddingId: a.weddingId }, orderBy: { fullName: "asc" } });
+      if (!eventId) {
+        const [events, layouts] = await Promise.all([
+          prisma.weddingEvent.findMany({ where: { weddingId: a.weddingId }, orderBy: { sortOrder: "asc" } }),
+          prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId } }),
+        ]);
+        return json({
+          elementTypes: ELEMENT_LABELS,
+          events: events.map((e) => {
+            const tables = (layouts.find((l) => l.id === e.id)?.elements ?? []).filter((el) => isTableType(el.type));
+            return {
+              eventId: e.id,
+              name: e.name,
+              tables: tables.length,
+              capacity: tables.reduce((n, t) => n + (t.capacity ?? 0), 0),
+              seatsTaken: guests.filter((g) => tables.some((t) => t.id === g.tableElementId)).reduce((n, g) => n + 1 + g.plusOnes, 0),
+            };
+          }),
+          guestsWithoutTable: guests.filter((g) => !g.tableElementId).length,
+        });
+      }
+      const found = await layoutFor(a.weddingId, eventId);
+      if (!found) return json({ error: "Evento no encontrado." });
+      const { layout, event } = found;
+      return json({
+        event: event.name,
+        canvas: { width: layout.canvasWidth, height: layout.canvasHeight, background: layout.background, roomShape: layout.roomShape },
+        elements: layout.elements.map((el) => describeElement(el, guests)),
+        guestsWithoutTable: guests
+          .filter((g) => !g.tableElementId && g.rsvpStatus !== "declined")
+          .map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes, group: g.group || null, side: g.side || null })),
+      });
+    }
+  );
+
+  server.registerTool(
+    "add_layout_elements",
+    {
+      title: "Agregar mesas o zonas al salón",
+      description:
+        "Agrega elementos a la distribución de un evento. Tipos: table-round, table-rectangular, table-sweetheart (novios), table-cake, chair-row (bloque de sillas de ceremonia), stage, dance-floor, photo-area, altar, aisle, entrance, restroom, hallway. Sin tamaño o capacidad usa los de la app (mesa redonda: 100×100, 8 personas). Las mesas sin número se numeran después de la última.",
+      inputSchema: z.object({
+        eventId: objectId,
+        elements: z.array(z.object({ type: elementType, ...elementFields })).min(1).max(100),
+      }),
+    },
+    async ({ eventId, elements }, ctx) => {
+      const a = editor(ctx);
+      const found = await layoutFor(a.weddingId, eventId);
+      if (!found) return json({ error: "Evento no encontrado." });
+      const { layout } = found;
+      let nextNumber = Math.max(0, ...layout.elements.map((el) => el.tableNumber ?? 0));
+      const added: LayoutElement[] = elements.map((input, i) => {
+        const shape = getDefaultElementShape(input.type);
+        const isTable = isTableType(input.type);
+        const tableNumber = isTable ? (input.tableNumber ?? ++nextNumber) : null;
+        if (isTable && input.tableNumber) nextNumber = Math.max(nextNumber, input.tableNumber);
+        return {
+          id: randomUUID(),
+          type: input.type,
+          label: input.label ?? (isTable ? `Mesa ${tableNumber}` : ELEMENT_LABELS[input.type]),
+          tableNumber,
+          x: input.x ?? layout.canvasWidth / 2,
+          y: input.y ?? layout.canvasHeight / 2,
+          width: input.width ?? shape.width,
+          height: input.height ?? shape.height,
+          rotation: input.rotation ?? 0,
+          capacity: input.capacity ?? shape.capacity,
+          rows: input.rows ?? shape.rows,
+          columns: input.columns ?? shape.columns,
+          fill: null,
+          zIndex: layout.elements.length + i,
+        };
+      });
+      const saved = await saveElements(layout.id, [...layout.elements, ...added]);
+      await log(a, "layout.save", `Agregó ${added.length} elementos a la distribución del salón`, eventId);
+      return json({ added: saved.filter((el) => added.some((x) => x.id === el.id)).map((el) => describeElement(el, [])) });
+    }
+  );
+
+  server.registerTool(
+    "update_layout_element",
+    {
+      title: "Editar mesa o zona",
+      description: "Mueve, redimensiona, rota o cambia nombre, número o capacidad de un elemento del salón.",
+      inputSchema: z.object({ eventId: objectId, elementId: z.string(), ...elementFields }),
+    },
+    async ({ eventId, elementId, ...patch }, ctx) => {
+      const a = editor(ctx);
+      const found = await layoutFor(a.weddingId, eventId);
+      if (!found) return json({ error: "Evento no encontrado." });
+      const { layout } = found;
+      if (!layout.elements.some((el) => el.id === elementId)) return json({ error: "Elemento no encontrado en este salón." });
+      const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+      const saved = await saveElements(
+        layout.id,
+        layout.elements.map((el) => (el.id === elementId ? { ...el, ...defined } : el))
+      );
+      await log(a, "layout.save", "Editó un elemento de la distribución del salón", eventId);
+      const guests = await prisma.guest.findMany({ where: { weddingId: a.weddingId, tableElementId: elementId } });
+      return json({ updated: describeElement(saved.find((el) => el.id === elementId)!, guests) });
+    }
+  );
+
+  server.registerTool(
+    "delete_layout_elements",
+    {
+      title: "Quitar mesas o zonas",
+      description: "Quita elementos del salón. Los invitados sentados en una mesa eliminada quedan sin mesa.",
+      inputSchema: z.object({ eventId: objectId, elementIds: z.array(z.string()).min(1).max(200) }),
+      annotations: { destructiveHint: true },
+    },
+    async ({ eventId, elementIds }, ctx) => {
+      const a = editor(ctx);
+      const found = await layoutFor(a.weddingId, eventId);
+      if (!found) return json({ error: "Evento no encontrado." });
+      const { layout } = found;
+      const remove = new Set(elementIds);
+      await saveElements(layout.id, layout.elements.filter((el) => !remove.has(el.id)));
+      const unseated = await prisma.guest.updateMany({
+        where: { weddingId: a.weddingId, tableElementId: { in: elementIds } },
+        data: { tableElementId: null },
+      });
+      await log(a, "layout.save", `Quitó ${remove.size} elementos de la distribución del salón`, eventId);
+      return json({ removed: layout.elements.filter((el) => remove.has(el.id)).length, guestsUnseated: unseated.count });
+    }
+  );
+
+  server.registerTool(
+    "update_room",
+    {
+      title: "Configurar el salón",
+      description: `Tamaño del lienzo (800–4000), estilo (indoor = salón, garden = jardín) y forma del local: un preset (${ROOM_SHAPE_PRESETS.map((p) => p.value).join(", ")}), "none" para quitarla, o roomShape con los vértices del polígono.`,
+      inputSchema: z.object({
+        eventId: objectId,
+        canvasWidth: z.number().int().optional(),
+        canvasHeight: z.number().int().optional(),
+        background: z.enum(["indoor", "garden"]).optional(),
+        shapePreset: z.enum(["none", ...ROOM_SHAPE_PRESETS.map((p) => p.value)]).optional(),
+        roomShape: z.array(z.object({ x: z.number(), y: z.number() })).min(3).max(100).optional(),
+      }),
+    },
+    async ({ eventId, canvasWidth, canvasHeight, background, shapePreset, roomShape }, ctx) => {
+      const a = editor(ctx);
+      const found = await layoutFor(a.weddingId, eventId);
+      if (!found) return json({ error: "Evento no encontrado." });
+      const { layout } = found;
+      const width = canvasWidth !== undefined ? clampCanvasSize(canvasWidth) : layout.canvasWidth;
+      const height = canvasHeight !== undefined ? clampCanvasSize(canvasHeight) : layout.canvasHeight;
+      const shape =
+        shapePreset === "none"
+          ? []
+          : shapePreset
+            ? getRoomShapePreset(shapePreset as (typeof ROOM_SHAPE_PRESETS)[number]["value"], width, height)
+            : roomShape
+              ? sanitizeRoomShape(roomShape)
+              : undefined;
+      const updated = await prisma.seatingLayout.update({
+        where: { id: layout.id },
+        data: {
+          canvasWidth: width,
+          canvasHeight: height,
+          ...(background ? { background } : {}),
+          ...(shape !== undefined ? { roomShape: shape } : {}),
+        },
+      });
+      await log(a, "layout.save", "Editó la configuración del salón", eventId);
+      return json({ canvas: { width: updated.canvasWidth, height: updated.canvasHeight, background: updated.background, roomShape: updated.roomShape } });
+    }
+  );
+
+  server.registerTool(
+    "assign_guests_to_table",
+    {
+      title: "Sentar invitados en una mesa",
+      description:
+        "Asigna invitados a una mesa (tableElementId de get_seating) o los deja sin mesa (tableElementId=null). Avisa si la mesa queda por encima de su capacidad.",
+      inputSchema: z.object({ guestIds: z.array(objectId).min(1).max(200), tableElementId: z.string().nullable() }),
+    },
+    async ({ guestIds, tableElementId }, ctx) => {
+      const a = editor(ctx);
+      let table: LayoutElement | undefined;
+      if (tableElementId) {
+        const layouts = await prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId } });
+        table = layouts.flatMap((l) => l.elements).find((el) => el.id === tableElementId && isTableType(el.type));
+        if (!table) return json({ error: "Mesa no encontrada." });
+      }
+      const result = await prisma.guest.updateMany({ where: { weddingId: a.weddingId, id: { in: guestIds } }, data: { tableElementId } });
+      await log(a, "guest.assign_table", table ? `Asignó ${result.count} invitados a "${table.label}"` : `Quitó la mesa de ${result.count} invitados`);
+      if (!table) return json({ updated: result.count });
+      const seated = await prisma.guest.findMany({ where: { weddingId: a.weddingId, tableElementId } });
+      const seatsTaken = seated.reduce((n, g) => n + 1 + g.plusOnes, 0);
+      return json({
+        updated: result.count,
+        table: table.label,
+        capacity: table.capacity,
+        seatsTaken,
+        ...(table.capacity && seatsTaken > table.capacity ? { warning: `La mesa supera su capacidad (${seatsTaken}/${table.capacity}).` } : {}),
+      });
+    }
+  );
+}

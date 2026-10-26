@@ -64,8 +64,9 @@ export async function saveTokensFromCode(code: string, redirectUri: string, wedd
   return data.accountEmail;
 }
 
-export async function getDriveConnection() {
-  const weddingId = await getActiveWeddingId();
+/** Sin weddingId usa la boda activa de la sesión; el servidor MCP pasa la del token. */
+export async function getDriveConnection(weddingId?: string) {
+  weddingId ??= await getActiveWeddingId();
   return prisma.googleDriveConnection.findFirst({ where: { weddingId } });
 }
 
@@ -73,8 +74,8 @@ export async function disconnectGoogleDrive(weddingId: string) {
   await prisma.googleDriveConnection.deleteMany({ where: { weddingId } });
 }
 
-async function getDriveClient() {
-  const connection = await getDriveConnection();
+async function getDriveClient(weddingId?: string) {
+  const connection = await getDriveConnection(weddingId);
   if (!connection || !connection.refreshToken) return null;
 
   const client = createOAuthClient();
@@ -112,8 +113,8 @@ async function ensureAppFolder(drive: ReturnType<typeof google.drive>, connectio
 }
 
 /** Sube un archivo a la carpeta "WeddingPlanner" del Drive conectado y lo hace visible por link. */
-export async function uploadFileToDrive(file: File): Promise<{ url: string; driveFileId: string } | null> {
-  const result = await getDriveClient();
+export async function uploadFileToDrive(file: File, weddingId?: string): Promise<{ url: string; driveFileId: string } | null> {
+  const result = await getDriveClient(weddingId);
   if (!result) return null;
   const { drive, connection } = result;
   const folderId = await ensureAppFolder(drive, connection.id, connection.folderId);
@@ -134,8 +135,8 @@ export async function uploadFileToDrive(file: File): Promise<{ url: string; driv
   return { url: fresh.data.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`, driveFileId: fileId };
 }
 
-export async function deleteDriveFile(driveFileId: string) {
-  const result = await getDriveClient();
+export async function deleteDriveFile(driveFileId: string, weddingId?: string) {
+  const result = await getDriveClient(weddingId);
   if (!result) return;
   try {
     await result.drive.files.delete({ fileId: driveFileId });

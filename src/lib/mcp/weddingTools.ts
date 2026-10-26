@@ -2,49 +2,24 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { prisma } from "@/lib/prisma";
-import { recordAudit } from "@/lib/audit-log";
+import { mongoDb } from "@/lib/mongo";
+import { toObjectId } from "@/lib/ids";
 import { weddingDisplayName } from "@/lib/wedding";
-import { cleanName, nameKey } from "@/lib/catalog";
-import { LABEL_COLORS, parseSide, SIDE_LABEL } from "@/lib/guestLabels";
+import { cleanName, CATALOG_NAME_MAX, nameKey } from "@/lib/catalog";
+import { checkCatalogName } from "@/lib/catalog-server";
+import { isLabelColor, LABEL_COLORS, parseSide, SIDE_LABEL } from "@/lib/guestLabels";
 import { buildInvitationLinks, getInvitationSettings, NOT_SENT_FILTER } from "@/lib/guestInvitations";
 import { INVITATION_STATUS, invitationStatus, type InvitationStatus } from "@/lib/invitationMessage";
 import { isInvitationTheme, INVITATION_THEMES, ITINERARY_ICONS } from "@/lib/invitationThemes";
 import { parseEventDateTime, toEventDateTimeValue } from "@/lib/eventTime";
-import type { McpAuthContext } from "@/lib/mcpTokens";
+import { auth, editor, httpUrl, json, log, objectId, dateOnly, parseDateOnly, toDateOnlyValue } from "@/lib/mcp/shared";
 import type { Guest, GuestLabel } from "@/generated/prisma";
 
 /**
  * Herramientas del servidor MCP (/api/mcp): permiten a un asistente de IA gestionar los
- * invitados y las invitaciones de UNA boda (la del token). Todo queda en la auditoría.
+ * datos de la boda, sus invitados, etiquetas, grupos y la invitación digital de UNA boda (la del
+ * token). Todo queda en la auditoría.
  */
-
-type Ctx = { http?: { authInfo?: { extra?: Record<string, unknown> } } };
-
-function auth(ctx: Ctx): McpAuthContext {
-  const value = ctx.http?.authInfo?.extra?.wedding as McpAuthContext | undefined;
-  if (!value) throw new Error("No autenticado.");
-  return value;
-}
-
-function requireEdit(a: McpAuthContext) {
-  if (!a.canEdit) throw new Error("Tu rol en esta boda es de solo lectura.");
-}
-
-function json(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
-}
-
-async function log(a: McpAuthContext, action: string, summary: string, targetId?: string) {
-  await recordAudit({
-    action,
-    category: "data",
-    summary: `${summary} (vía asistente de IA)`,
-    actor: { id: a.userId, name: a.userName, email: "" },
-    weddingId: a.weddingId,
-    targetId: targetId ?? null,
-    userAgent: "mcp",
-  });
-}
 
 async function weddingLabels(weddingId: string) {
   return prisma.guestLabel.findMany({ where: { weddingId }, orderBy: { name: "asc" } });
@@ -85,17 +60,11 @@ function describeGuest(g: Guest, labels: GuestLabel[], url?: string) {
     invitationViews: g.invitationViews,
     rsvpMessage: g.rsvpMessage || null,
     dietaryRestrictions: g.dietaryRestrictions || null,
+    notes: g.notes || null,
+    tableElementId: g.tableElementId || null,
     ...(url ? { invitationUrl: url } : {}),
   };
 }
-
-// Solo http(s): z.string().url() también acepta javascript:, data:, etc.
-const httpUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .refine((u) => /^https?:\/\//i.test(u), "Solo enlaces http(s)")
-  .or(z.literal(""));
 
 const sideSchema = z.enum(["bride", "groom", "both", "none"]).describe("bride = novia, groom = novio, both = ambos, none = sin definir");
 const statusSchema = z.enum(["not_sent", "sent", "opened", "confirmed", "declined"]);
@@ -109,6 +78,8 @@ const guestInput = z.object({
   plusOneNames: z.array(z.string()).optional(),
   group: z.string().max(60).optional(),
   notes: z.string().max(500).optional(),
+  dietaryRestrictions: z.string().max(300).optional(),
+  rsvpStatus: z.enum(["pending", "confirmed", "declined"]).optional(),
 });
 
 export function registerWeddingTools(server: McpServer) {
@@ -121,7 +92,7 @@ export function registerWeddingTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async (ctx) => {
-      const a = auth(ctx as Ctx);
+      const a = auth(ctx);
       const [wedding, guests, labels, settings] = await Promise.all([
         prisma.wedding.findUniqueOrThrow({ where: { id: a.weddingId } }),
         prisma.guest.findMany({ where: { weddingId: a.weddingId } }),
@@ -137,8 +108,12 @@ export function registerWeddingTools(server: McpServer) {
       );
       return json({
         couple: weddingDisplayName(wedding),
+        partner1: wedding.partner1,
+        partner2: wedding.partner2,
         weddingDate: wedding.weddingDate?.toISOString().slice(0, 10) ?? null,
         venue: wedding.venueName || null,
+        venueAddress: wedding.venueAddress || null,
+        currency: wedding.currency,
         yourAccess: a.canEdit ? "edit" : "read-only",
         totals: {
           invitations: guests.length,
@@ -172,7 +147,7 @@ export function registerWeddingTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async (args, ctx) => {
-      const a = auth(ctx as Ctx);
+      const a = auth(ctx);
       const [guests, labels] = await Promise.all([
         prisma.guest.findMany({ where: { weddingId: a.weddingId }, orderBy: { fullName: "asc" } }),
         weddingLabels(a.weddingId),
@@ -209,8 +184,7 @@ export function registerWeddingTools(server: McpServer) {
       inputSchema: z.object({ guests: z.array(guestInput).min(1).max(200) }),
     },
     async ({ guests: input }, ctx) => {
-      const a = auth(ctx as Ctx);
-      requireEdit(a);
+      const a = editor(ctx);
       const labels = await weddingLabels(a.weddingId);
       const created: Guest[] = [];
       for (const g of input) {
@@ -226,6 +200,8 @@ export function registerWeddingTools(server: McpServer) {
               plusOneNames: g.plusOneNames ?? [],
               group: g.group ?? "",
               notes: g.notes ?? "",
+              dietaryRestrictions: g.dietaryRestrictions ?? "",
+              rsvpStatus: g.rsvpStatus ?? "pending",
             },
           })
         );
@@ -248,7 +224,7 @@ export function registerWeddingTools(server: McpServer) {
       title: "Editar invitado",
       description: "Cambia datos de un invitado. Para etiquetas usa addLabels / removeLabels (por nombre).",
       inputSchema: z.object({
-        guestId: z.string(),
+        guestId: objectId,
         fullName: z.string().max(120).optional(),
         side: sideSchema.optional(),
         phone: z.string().max(30).optional(),
@@ -256,14 +232,15 @@ export function registerWeddingTools(server: McpServer) {
         plusOneNames: z.array(z.string()).optional(),
         group: z.string().max(60).optional(),
         notes: z.string().max(500).optional(),
+        dietaryRestrictions: z.string().max(300).optional(),
         rsvpStatus: z.enum(["pending", "confirmed", "declined"]).optional(),
+        attendingCount: z.number().int().min(0).max(50).nullable().optional().describe("Personas que asisten (incluido el invitado)"),
         addLabels: z.array(z.string()).optional(),
         removeLabels: z.array(z.string()).optional(),
       }),
     },
     async (args, ctx) => {
-      const a = auth(ctx as Ctx);
-      requireEdit(a);
+      const a = editor(ctx);
       const guest = await prisma.guest.findFirst({ where: { id: args.guestId, weddingId: a.weddingId } });
       if (!guest) return json({ error: "Invitado no encontrado." });
       const labels = await weddingLabels(a.weddingId);
@@ -281,7 +258,9 @@ export function registerWeddingTools(server: McpServer) {
           ...(args.plusOneNames !== undefined ? { plusOneNames: args.plusOneNames } : {}),
           ...(args.group !== undefined ? { group: args.group } : {}),
           ...(args.notes !== undefined ? { notes: args.notes } : {}),
+          ...(args.dietaryRestrictions !== undefined ? { dietaryRestrictions: args.dietaryRestrictions } : {}),
           ...(args.rsvpStatus !== undefined ? { rsvpStatus: args.rsvpStatus } : {}),
+          ...(args.attendingCount !== undefined ? { attendingCount: args.attendingCount } : {}),
           labelIds: [...new Set([...guest.labelIds, ...add])].filter((id) => !remove.has(id)),
         },
       });
@@ -298,7 +277,7 @@ export function registerWeddingTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async (ctx) => {
-      const a = auth(ctx as Ctx);
+      const a = auth(ctx);
       const [labels, guests] = await Promise.all([
         weddingLabels(a.weddingId),
         prisma.guest.findMany({ where: { weddingId: a.weddingId }, select: { labelIds: true } }),
@@ -321,8 +300,7 @@ export function registerWeddingTools(server: McpServer) {
       }),
     },
     async (args, ctx) => {
-      const a = auth(ctx as Ctx);
-      requireEdit(a);
+      const a = editor(ctx);
       const [guests, labels, wedding, settings] = await Promise.all([
         prisma.guest.findMany({ where: { weddingId: a.weddingId }, orderBy: { fullName: "asc" } }),
         weddingLabels(a.weddingId),
@@ -359,8 +337,7 @@ export function registerWeddingTools(server: McpServer) {
       inputSchema: z.object({ guestIds: z.array(z.string()).min(1).max(500), sent: z.boolean().optional() }),
     },
     async ({ guestIds, sent = true }, ctx) => {
-      const a = auth(ctx as Ctx);
-      requireEdit(a);
+      const a = editor(ctx);
       const result = await prisma.guest.updateMany({
         where: { weddingId: a.weddingId, id: { in: guestIds }, ...(sent ? NOT_SENT_FILTER : {}) },
         data: { invitationSentAt: sent ? new Date() : null },
@@ -379,7 +356,7 @@ export function registerWeddingTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async ({ limit = 50 }, ctx) => {
-      const a = auth(ctx as Ctx);
+      const a = auth(ctx);
       const guests = await prisma.guest.findMany({
         where: { weddingId: a.weddingId, rsvpRespondedAt: { not: null } },
         orderBy: { rsvpRespondedAt: "desc" },
@@ -406,7 +383,7 @@ export function registerWeddingTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async (ctx) => {
-      const a = auth(ctx as Ctx);
+      const a = auth(ctx);
       const s = await getInvitationSettings(a.weddingId);
       return json({
         theme: s.theme,
@@ -433,6 +410,7 @@ export function registerWeddingTools(server: McpServer) {
         rsvpDeadline: s.rsvpDeadline?.toISOString().slice(0, 10) ?? null,
         showCountdown: s.showCountdown,
         whatsappTemplate: s.whatsappTemplate || "(predeterminada)",
+        defaultCountryCode: s.defaultCountryCode,
       });
     }
   );
@@ -489,11 +467,11 @@ export function registerWeddingTools(server: McpServer) {
         adultsOnly: z.boolean().optional(),
         recommendations: z.string().max(800).optional(),
         closingMessage: z.string().max(300).optional(),
+        defaultCountryCode: z.string().regex(/^\d{1,4}$/).optional().describe("Código de país para teléfonos sin él (Honduras = 504)"),
       }),
     },
     async (args, ctx) => {
-      const a = auth(ctx as Ctx);
-      requireEdit(a);
+      const a = editor(ctx);
       await getInvitationSettings(a.weddingId);
       const { ceremonyTime, receptionTime, rsvpDeadline, theme, galleryUrls, ...rest } = args;
       await prisma.invitationSettings.update({
@@ -509,6 +487,235 @@ export function registerWeddingTools(server: McpServer) {
       });
       await log(a, "invitation.design_update", "Actualizó el diseño de la invitación");
       return json({ ok: true, updatedFields: Object.keys(args) });
+    }
+  );
+
+  server.registerTool(
+    "update_wedding_details",
+    {
+      title: "Editar datos de la boda",
+      description: "Cambia los nombres de la pareja, la fecha (YYYY-MM-DD), el lugar, la dirección o la moneda (código ISO, ej. HNL, USD).",
+      inputSchema: z.object({
+        partner1: z.string().max(80).optional(),
+        partner2: z.string().max(80).optional(),
+        weddingDate: dateOnly.optional(),
+        venueName: z.string().max(120).optional(),
+        venueAddress: z.string().max(200).optional(),
+        currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+      }),
+    },
+    async (args, ctx) => {
+      const a = editor(ctx);
+      const { weddingDate, ...rest } = args;
+      const updated = await prisma.wedding.update({
+        where: { id: a.weddingId },
+        data: { ...rest, ...(weddingDate !== undefined ? { weddingDate: parseDateOnly(weddingDate) } : {}) },
+      });
+      // El nombre de la organización (boda) sigue a los nombres de la pareja.
+      const name = weddingDisplayName(updated);
+      await mongoDb.collection("organization").updateOne({ _id: toObjectId(a.weddingId) }, { $set: { name } });
+      await log(a, "wedding.update", `Actualizó los datos de la boda ${name}`, a.weddingId);
+      return json({
+        couple: name,
+        weddingDate: toDateOnlyValue(updated.weddingDate) || null,
+        venueName: updated.venueName,
+        venueAddress: updated.venueAddress,
+        currency: updated.currency,
+      });
+    }
+  );
+
+  server.registerTool(
+    "delete_guests",
+    {
+      title: "Eliminar invitados",
+      description: "Elimina invitados por id. No se puede deshacer: confirma con la persona antes de usarla.",
+      inputSchema: z.object({ guestIds: z.array(objectId).min(1).max(500) }),
+      annotations: { destructiveHint: true },
+    },
+    async ({ guestIds }, ctx) => {
+      const a = editor(ctx);
+      const guests = await prisma.guest.findMany({ where: { weddingId: a.weddingId, id: { in: guestIds } }, select: { id: true, fullName: true } });
+      const result = await prisma.guest.deleteMany({ where: { weddingId: a.weddingId, id: { in: guests.map((g) => g.id) } } });
+      await log(
+        a,
+        "guest.delete",
+        result.count === 1 ? `Eliminó al invitado "${guests[0].fullName}"` : `Eliminó ${result.count} invitados`,
+        result.count === 1 ? guests[0].id : undefined
+      );
+      return json({ deleted: guests.map((g) => g.fullName), notFound: guestIds.filter((id) => !guests.some((g) => g.id === id)) });
+    }
+  );
+
+  server.registerTool(
+    "bulk_update_guests",
+    {
+      title: "Editar varios invitados",
+      description: "Aplica el mismo cambio a varios invitados: lado, confirmación, grupo, agregar o quitar etiquetas (por nombre).",
+      inputSchema: z.object({
+        guestIds: z.array(objectId).min(1).max(1000),
+        side: sideSchema.optional(),
+        rsvpStatus: z.enum(["pending", "confirmed", "declined"]).optional(),
+        group: z.string().max(60).optional(),
+        addLabels: z.array(z.string()).optional(),
+        removeLabels: z.array(z.string()).optional(),
+      }),
+    },
+    async (args, ctx) => {
+      const a = editor(ctx);
+      const guests = await prisma.guest.findMany({ where: { weddingId: a.weddingId, id: { in: args.guestIds } } });
+      if (guests.length === 0) return json({ error: "Ningún invitado encontrado." });
+      const labels = await weddingLabels(a.weddingId);
+      const add = await resolveLabels(a.weddingId, args.addLabels ?? [], labels);
+      const remove = new Set(
+        (args.removeLabels ?? []).map((n) => labels.find((l) => nameKey(l.name) === nameKey(n))?.id).filter(Boolean)
+      );
+      const ids = guests.map((g) => g.id);
+      const simple = {
+        ...(args.side !== undefined ? { side: parseSide(args.side === "none" ? "" : args.side) } : {}),
+        ...(args.rsvpStatus !== undefined ? { rsvpStatus: args.rsvpStatus } : {}),
+        ...(args.group !== undefined ? { group: args.group } : {}),
+      };
+      if (Object.keys(simple).length > 0) {
+        await prisma.guest.updateMany({ where: { weddingId: a.weddingId, id: { in: ids } }, data: simple });
+      }
+      if (add.length > 0 || remove.size > 0) {
+        await Promise.all(
+          guests.map((g) =>
+            prisma.guest.update({
+              where: { id: g.id },
+              data: { labelIds: [...new Set([...g.labelIds, ...add])].filter((id) => !remove.has(id)) },
+            })
+          )
+        );
+      }
+      await log(a, "guest.bulk_update", `Editó ${guests.length} invitados a la vez`);
+      return json({ updated: guests.length });
+    }
+  );
+
+  server.registerTool(
+    "create_label",
+    {
+      title: "Crear etiqueta",
+      description: `Crea una etiqueta de invitados (si ya existe una con el mismo nombre, la devuelve). Colores: ${Object.keys(LABEL_COLORS).join(", ")}.`,
+      inputSchema: z.object({ name: z.string().min(1).max(CATALOG_NAME_MAX), color: z.enum(Object.keys(LABEL_COLORS) as [string, ...string[]]).optional() }),
+    },
+    async ({ name, color }, ctx) => {
+      const a = editor(ctx);
+      const labels = await weddingLabels(a.weddingId);
+      const existing = labels.find((l) => nameKey(l.name) === nameKey(name));
+      if (existing) return json({ created: false, label: { id: existing.id, name: existing.name, color: existing.color } });
+      const palette = Object.keys(LABEL_COLORS);
+      const label = await prisma.guestLabel.create({
+        data: { weddingId: a.weddingId, name: cleanName(name), color: isLabelColor(color) ? color : palette[labels.length % palette.length] },
+      });
+      await log(a, "guest_label.create", `Creó la etiqueta "${label.name}"`, label.id);
+      return json({ created: true, label: { id: label.id, name: label.name, color: label.color } });
+    }
+  );
+
+  server.registerTool(
+    "update_label",
+    {
+      title: "Editar etiqueta",
+      description: "Renombra una etiqueta o cambia su color. Se identifica por su nombre actual.",
+      inputSchema: z.object({
+        label: z.string().describe("Nombre actual"),
+        newName: z.string().min(1).max(CATALOG_NAME_MAX).optional(),
+        color: z.enum(Object.keys(LABEL_COLORS) as [string, ...string[]]).optional(),
+      }),
+    },
+    async (args, ctx) => {
+      const a = editor(ctx);
+      const labels = await weddingLabels(a.weddingId);
+      const label = labels.find((l) => nameKey(l.name) === nameKey(args.label));
+      if (!label) return json({ error: `No existe la etiqueta "${args.label}".`, labels: labels.map((l) => l.name) });
+      const newName = args.newName ? cleanName(args.newName) : label.name;
+      const clash = labels.find((l) => l.id !== label.id && nameKey(l.name) === nameKey(newName));
+      if (clash) return json({ error: `Ya existe la etiqueta "${clash.name}".` });
+      const updated = await prisma.guestLabel.update({
+        where: { id: label.id },
+        data: { name: newName, ...(isLabelColor(args.color) ? { color: args.color } : {}) },
+      });
+      await log(a, "guest_label.update", `Editó la etiqueta "${updated.name}"`, updated.id);
+      return json({ label: { id: updated.id, name: updated.name, color: updated.color } });
+    }
+  );
+
+  server.registerTool(
+    "delete_label",
+    {
+      title: "Eliminar etiqueta",
+      description: "Elimina una etiqueta (por nombre) y la quita de los invitados que la tenían.",
+      inputSchema: z.object({ label: z.string() }),
+      annotations: { destructiveHint: true },
+    },
+    async (args, ctx) => {
+      const a = editor(ctx);
+      const labels = await weddingLabels(a.weddingId);
+      const label = labels.find((l) => nameKey(l.name) === nameKey(args.label));
+      if (!label) return json({ error: `No existe la etiqueta "${args.label}".`, labels: labels.map((l) => l.name) });
+      await prisma.guestLabel.delete({ where: { id: label.id } });
+      const guests = await prisma.guest.findMany({ where: { weddingId: a.weddingId, labelIds: { has: label.id } }, select: { id: true, labelIds: true } });
+      await Promise.all(
+        guests.map((g) => prisma.guest.update({ where: { id: g.id }, data: { labelIds: g.labelIds.filter((l) => l !== label.id) } }))
+      );
+      await log(a, "guest_label.delete", `Eliminó la etiqueta "${label.name}"`, label.id);
+      return json({ deleted: label.name, removedFromGuests: guests.length });
+    }
+  );
+
+  server.registerTool(
+    "list_guest_groups",
+    {
+      title: "Listar grupos de invitados",
+      description: "Grupos de invitados del catálogo (ej. «Familia del novio»), con cuántos invitados tiene cada uno. El grupo de un invitado es texto libre; el catálogo solo sugiere nombres.",
+      annotations: { readOnlyHint: true },
+    },
+    async (ctx) => {
+      const a = auth(ctx);
+      const [groups, guests] = await Promise.all([
+        prisma.guestGroup.findMany({ where: { weddingId: a.weddingId }, orderBy: { name: "asc" } }),
+        prisma.guest.findMany({ where: { weddingId: a.weddingId }, select: { group: true } }),
+      ]);
+      return json(groups.map((g) => ({ id: g.id, name: g.name, guests: guests.filter((x) => nameKey(x.group) === nameKey(g.name)).length })));
+    }
+  );
+
+  server.registerTool(
+    "manage_guest_group",
+    {
+      title: "Crear, renombrar o eliminar un grupo",
+      description: "action=create (name), rename (groupId, name) o delete (groupId). Renombrar también actualiza a los invitados que tenían el nombre anterior.",
+      inputSchema: z.object({
+        action: z.enum(["create", "rename", "delete"]),
+        groupId: objectId.optional(),
+        name: z.string().max(CATALOG_NAME_MAX).optional(),
+      }),
+    },
+    async ({ action, groupId, name }, ctx) => {
+      const a = editor(ctx);
+      if (action === "create") {
+        const check = await checkCatalogName("group", a.weddingId, name);
+        if (!check.ok) return json(check.existing ? { created: false, group: check.existing } : { error: check.error });
+        const group = await prisma.guestGroup.create({ data: { weddingId: a.weddingId, name: check.name } });
+        await log(a, "guest_group.create", `Creó el grupo "${group.name}"`, group.id);
+        return json({ created: true, group: { id: group.id, name: group.name } });
+      }
+      const group = groupId ? await prisma.guestGroup.findFirst({ where: { id: groupId, weddingId: a.weddingId } }) : null;
+      if (!group) return json({ error: "Grupo no encontrado." });
+      if (action === "rename") {
+        const check = await checkCatalogName("group", a.weddingId, name, group.id);
+        if (!check.ok) return json({ error: check.error });
+        await prisma.guestGroup.update({ where: { id: group.id }, data: { name: check.name } });
+        const moved = await prisma.guest.updateMany({ where: { weddingId: a.weddingId, group: group.name }, data: { group: check.name } });
+        await log(a, "guest_group.update", `Editó el grupo "${check.name}"`, group.id);
+        return json({ group: { id: group.id, name: check.name }, guestsUpdated: moved.count });
+      }
+      await prisma.guestGroup.delete({ where: { id: group.id } });
+      await log(a, "guest_group.delete", `Eliminó el grupo "${group.name}"`, group.id);
+      return json({ deleted: group.name });
     }
   );
 }
