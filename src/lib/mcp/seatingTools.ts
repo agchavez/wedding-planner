@@ -4,7 +4,17 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { prisma } from "@/lib/prisma";
 import { clampCanvasSize, getOrCreateSeatingLayout, sanitizeElement, sanitizeRoomShape, VALID_ELEMENT_TYPES } from "@/lib/seatingLayout";
-import { ELEMENT_LABELS, getDefaultElementShape, getRoomShapePreset, isTableType, ROOM_SHAPE_PRESETS, type ElementType } from "@/lib/seatGeometry";
+import {
+  ELEMENT_LABELS,
+  getDefaultElementShape,
+  getElementFootprint,
+  getRoomShapePreset,
+  isTableType,
+  MAX_LAYOUT_ELEMENTS,
+  ROOM_SHAPE_PRESETS,
+  type ElementType,
+} from "@/lib/seatGeometry";
+import { boxFromPoints, findFreeSpot, shapeBox, type Box } from "@/lib/layoutGeometry";
 import { auth, editor, json, log, objectId } from "@/lib/mcp/shared";
 import { pxToMeters, resolvePxPerMeter, roundMeters } from "@/lib/layoutUnits";
 import type { Guest, LayoutElement } from "@/generated/prisma";
@@ -61,8 +71,25 @@ async function layoutFor(weddingId: string, eventId: string) {
   return { event, layout: await getOrCreateSeatingLayout(eventId, weddingId) };
 }
 
+/** Zona donde se pueden colocar elementos sin x/y: el contorno del local (si hay) o el lienzo. */
+function placementBounds(layout: { canvasWidth: number; canvasHeight: number; roomShape: { x: number; y: number }[] }): Box {
+  if (layout.roomShape.length >= 3) {
+    return layout.roomShape.reduce((box, p) => ({
+      minX: Math.min(box.minX, p.x),
+      minY: Math.min(box.minY, p.y),
+      maxX: Math.max(box.maxX, p.x),
+      maxY: Math.max(box.maxY, p.y),
+    }), boxFromPoints(layout.roomShape[0], layout.roomShape[0]));
+  }
+  return { minX: 0, minY: 0, maxX: layout.canvasWidth, maxY: layout.canvasHeight };
+}
+
 async function saveElements(layoutId: string, elements: LayoutElement[]) {
-  const sanitized = elements.map(sanitizeElement).filter((el): el is LayoutElement => el !== null);
+  // Mismo máximo que el editor (saveLayout): evita rebasar el tamaño del documento.
+  const sanitized = elements
+    .map(sanitizeElement)
+    .filter((el): el is LayoutElement => el !== null)
+    .slice(0, MAX_LAYOUT_ELEMENTS);
   await prisma.seatingLayout.update({ where: { id: layoutId }, data: { elements: sanitized } });
   return sanitized;
 }
@@ -143,22 +170,47 @@ export function registerSeatingTools(server: McpServer) {
       const found = await layoutFor(a.weddingId, eventId);
       if (!found) return json({ error: "Evento no encontrado." });
       const { layout } = found;
+      if (layout.elements.length + elements.length > MAX_LAYOUT_ELEMENTS) {
+        return json({
+          error: `La distribución admite hasta ${MAX_LAYOUT_ELEMENTS} elementos (hay ${layout.elements.length}).`,
+        });
+      }
       const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
       let nextNumber = Math.max(0, ...layout.elements.map((el) => el.tableNumber ?? 0));
+      // Sin x/y, cada elemento va al centro del lienzo o al hueco libre más cercano (no apilados),
+      // sin encimarse con paredes/columnas y sin salirse del local (o del lienzo).
+      const occupied = [
+        ...layout.elements.map((el) =>
+          shapeBox({ id: el.id, x: el.x, y: el.y, rotation: el.rotation, ...getElementFootprint(el, pxPerMeter) })
+        ),
+        ...(layout.roomFixtures ?? []).map((f) =>
+          shapeBox({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation, round: f.type === "column-round" })
+        ),
+      ];
+      const bounds = placementBounds(layout);
       const added: LayoutElement[] = elements.map((input, i) => {
         const shape = getDefaultElementShape(input.type, pxPerMeter);
         const isTable = isTableType(input.type);
         const tableNumber = isTable ? (input.tableNumber ?? ++nextNumber) : null;
         if (isTable && input.tableNumber) nextNumber = Math.max(nextNumber, input.tableNumber);
+        const width = input.width ?? shape.width;
+        const height = input.height ?? shape.height;
+        const footprint = getElementFootprint({ type: input.type, width, height, capacity: input.capacity ?? shape.capacity }, pxPerMeter);
+        const center = { x: input.x ?? (bounds.minX + bounds.maxX) / 2, y: input.y ?? (bounds.minY + bounds.maxY) / 2 };
+        const spot =
+          input.x === undefined && input.y === undefined
+            ? findFreeSpot(center, footprint.width, footprint.height, occupied, pxPerMeter * 0.3, bounds)
+            : center;
+        occupied.push(shapeBox({ id: "", x: spot.x, y: spot.y, rotation: input.rotation ?? 0, ...footprint }));
         return {
           id: randomUUID(),
           type: input.type,
           label: input.label ?? (isTable ? `Mesa ${tableNumber}` : ELEMENT_LABELS[input.type]),
           tableNumber,
-          x: input.x ?? layout.canvasWidth / 2,
-          y: input.y ?? layout.canvasHeight / 2,
-          width: input.width ?? shape.width,
-          height: input.height ?? shape.height,
+          x: spot.x,
+          y: spot.y,
+          width,
+          height,
           rotation: input.rotation ?? 0,
           capacity: input.capacity ?? shape.capacity,
           rows: input.rows ?? shape.rows,

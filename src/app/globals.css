@@ -166,6 +166,54 @@
   --sidebar-ring: #6d1f34;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Plano de distribución, estilo "Papel y lino". Konva los lee con        */
+/* getComputedStyle (ver distribucion/planPalette.ts). El acento y la     */
+/* tinta siguen el tema elegido; .dark los cambia si la app activa el     */
+/* modo oscuro.                                                           */
+/* ---------------------------------------------------------------------- */
+
+:root {
+  --plan-canvas: #efe4d6;
+  --plan-floor: #fdf8f1;
+  --plan-floor-garden: #eef2e2;
+  --plan-wall: #4a3524;
+  --plan-pista: #f0e1cc;
+  --plan-tarima: #ead6c3;
+  --plan-zone: #f6ede2;
+  --plan-zone-line: #d6bfa6;
+  --plan-table: #ffffff;
+  --plan-table-line: #d9c4b0;
+  --plan-chair: #f1e5d8;
+  --plan-ink: var(--foreground);
+  --plan-muted: var(--muted-foreground);
+  --plan-accent: var(--primary);
+  --plan-on-accent: var(--primary-foreground);
+}
+
+.dark {
+  --plan-canvas: #1d1719;
+  --plan-floor: #2a2124;
+  --plan-floor-garden: #232a20;
+  --plan-wall: #c9a876;
+  --plan-pista: #33281f;
+  --plan-tarima: #3a2c25;
+  --plan-zone: #2f2528;
+  --plan-zone-line: #5a4840;
+  --plan-table: #382c2f;
+  --plan-table-line: #6b5548;
+  --plan-chair: #4a3a35;
+  --plan-ink: #f2e6e3;
+  --plan-muted: #b29d98;
+}
+
+/* Fondo del lienzo: papel con un grano muy sutil. */
+.plan-paper {
+  background-color: var(--plan-canvas);
+  background-image: radial-gradient(color-mix(in oklab, var(--plan-wall) 6%, transparent) 1px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

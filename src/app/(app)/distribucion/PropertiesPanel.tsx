@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { AlignCenterVertical, Copy, Grid3x3, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/app/(app)/distribucion/canvasStore";
+import { AlignMenuItems, duplicateOrWarn, MatrixForm } from "@/app/(app)/distribucion/SelectionActionBar";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +20,9 @@ const ELEMENT_MIN_PX = 20;
 const ELEMENT_MAX_PX = 900;
 const FIXTURE_MIN_PX = 2;
 const FIXTURE_MAX_PX = 4000;
+// Posición: los mismos límites que sanitizeRoomFixture (x/y en el lienzo).
+const POSITION_MIN_PX = -2000;
+const POSITION_MAX_PX = 6000;
 const METERS_STEP = 0.05;
 
 /**
@@ -31,6 +38,7 @@ function MetersInput({
   minPx,
   maxPx,
   disabled,
+  allowNonPositive,
   onChange,
 }: {
   id: string;
@@ -40,6 +48,8 @@ function MetersInput({
   minPx: number;
   maxPx: number;
   disabled?: boolean;
+  /** Para posiciones: 0 y negativos son válidos (no así para medidas). */
+  allowNonPositive?: boolean;
   onChange: (px: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -59,7 +69,7 @@ function MetersInput({
         onChange={(e) => {
           setDraft(e.target.value);
           const meters = Number(e.target.value);
-          if (e.target.value === "" || !Number.isFinite(meters) || meters <= 0) return;
+          if (e.target.value === "" || !Number.isFinite(meters) || (!allowNonPositive && meters <= 0)) return;
           const { px: next, clamped } = clampMetersToPx(meters, pxPerMeter, minPx, maxPx);
           if (clamped) setDraft(String(roundMeters(pxToMeters(next, pxPerMeter))));
           onChange(next);
@@ -77,20 +87,23 @@ export function PropertiesPanel() {
 
 function ElementPropertiesPanel() {
   const elements = useCanvasStore((s) => s.elements);
-  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
   const updateElement = useCanvasStore((s) => s.updateElement);
   const removeElement = useCanvasStore((s) => s.removeElement);
-  const selectElement = useCanvasStore((s) => s.selectElement);
+  const select = useCanvasStore((s) => s.select);
   const pxPerMeter = resolvePxPerMeter(useCanvasStore((s) => s.pxPerMeter));
 
-  const selected = elements.find((el) => el.id === selectedId);
+  if (selectedIds.length > 1) return <MultiSelectionPanel count={selectedIds.length} />;
+  const selected = elements.find((el) => el.id === selectedIds[0]);
 
   if (!selected) {
     return (
       <Card>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Selecciona un elemento del canvas para ver y editar sus propiedades.
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>Selecciona un elemento del plano para ver y editar sus propiedades.</p>
+          <p className="text-xs">
+            Shift + clic o arrastrar en vacío selecciona varios · flechas para mover (Shift = 50 cm) · Ctrl+D
+            duplica · Supr elimina · Ctrl+Z deshace.
           </p>
         </CardContent>
       </Card>
@@ -103,9 +116,14 @@ function ElementPropertiesPanel() {
   return (
     <Card>
       <CardContent className="space-y-3">
-        <h3 className="font-heading text-base font-medium text-foreground">
-          {ELEMENT_LABELS[selected.type as ElementType]}
-        </h3>
+        <header>
+          <p className="text-[10.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+            {ELEMENT_LABELS[selected.type as ElementType]}
+          </p>
+          <h3 className="font-heading text-xl font-semibold text-foreground italic">
+            {selected.label || ELEMENT_LABELS[selected.type as ElementType]}
+          </h3>
+        </header>
 
         <div>
           <Label htmlFor="prop-label">Etiqueta</Label>
@@ -177,6 +195,26 @@ function ElementPropertiesPanel() {
         {/* key: al cambiar de elemento se descarta el texto a medio escribir del anterior. */}
         <div key={selected.id} className="grid grid-cols-2 gap-2">
           <MetersInput
+            id="prop-x"
+            label="X (m)"
+            px={selected.x}
+            pxPerMeter={pxPerMeter}
+            minPx={POSITION_MIN_PX}
+            maxPx={POSITION_MAX_PX}
+            allowNonPositive
+            onChange={(x) => updateElement(selected.id, { x })}
+          />
+          <MetersInput
+            id="prop-y"
+            label="Y (m)"
+            px={selected.y}
+            pxPerMeter={pxPerMeter}
+            minPx={POSITION_MIN_PX}
+            maxPx={POSITION_MAX_PX}
+            allowNonPositive
+            onChange={(y) => updateElement(selected.id, { y })}
+          />
+          <MetersInput
             id="prop-width"
             label={selected.type === "table-round" ? "Diámetro (m)" : "Ancho (m)"}
             px={selected.width}
@@ -218,7 +256,7 @@ function ElementPropertiesPanel() {
             description="Se quitará del plano de este salón."
             onConfirm={() => removeElement(selected.id)}
           />
-          <Button variant="outline" size="sm" onClick={() => selectElement(null)}>
+          <Button variant="outline" size="sm" onClick={() => select(null)}>
             Deseleccionar
           </Button>
         </div>
@@ -230,20 +268,21 @@ function ElementPropertiesPanel() {
 /** Panel del modo "Editar salón": propiedades del elemento fijo seleccionado (pared, columna...). */
 function FixturePropertiesPanel() {
   const roomFixtures = useCanvasStore((s) => s.roomFixtures);
-  const selectedFixtureId = useCanvasStore((s) => s.selectedFixtureId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
   const updateFixture = useCanvasStore((s) => s.updateFixture);
   const removeFixture = useCanvasStore((s) => s.removeFixture);
-  const selectFixture = useCanvasStore((s) => s.selectFixture);
+  const select = useCanvasStore((s) => s.select);
   const pxPerMeter = resolvePxPerMeter(useCanvasStore((s) => s.pxPerMeter));
 
-  const selected = roomFixtures.find((f) => f.id === selectedFixtureId);
+  if (selectedIds.length > 1) return <MultiSelectionPanel count={selectedIds.length} />;
+  const selected = roomFixtures.find((f) => f.id === selectedIds[0]);
 
   if (!selected) {
     return (
       <Card>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Editando el salón. Agrega paredes, columnas, puertas o salidas desde &quot;Elementos fijos&quot; y
+            Editando el salón. Agrega paredes, columnas, puertas o salidas desde la barra de abajo y
             selecciónalas para ajustar sus medidas. Las mesas de la boda quedan bloqueadas hasta terminar.
           </p>
         </CardContent>
@@ -259,7 +298,12 @@ function FixturePropertiesPanel() {
   return (
     <Card>
       <CardContent className="space-y-3">
-        <h3 className="font-heading text-base font-medium text-foreground">{FIXTURE_LABELS[type]}</h3>
+        <header>
+          <p className="text-[10.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">Salón</p>
+          <h3 className="font-heading text-xl font-semibold text-foreground italic">
+            {selected.label || FIXTURE_LABELS[type]}
+          </h3>
+        </header>
 
         <div>
           <Label htmlFor="fixture-label">Etiqueta (opcional)</Label>
@@ -273,6 +317,26 @@ function FixturePropertiesPanel() {
         </div>
 
         <div key={selected.id} className="grid grid-cols-2 gap-2">
+          <MetersInput
+            id="fixture-x"
+            label="X (m)"
+            px={selected.x}
+            pxPerMeter={pxPerMeter}
+            minPx={POSITION_MIN_PX}
+            maxPx={POSITION_MAX_PX}
+            allowNonPositive
+            onChange={(x) => updateFixture(selected.id, { x })}
+          />
+          <MetersInput
+            id="fixture-y"
+            label="Y (m)"
+            px={selected.y}
+            pxPerMeter={pxPerMeter}
+            minPx={POSITION_MIN_PX}
+            maxPx={POSITION_MAX_PX}
+            allowNonPositive
+            onChange={(y) => updateFixture(selected.id, { y })}
+          />
           <MetersInput
             id="fixture-width"
             label={isRound ? "Diámetro (m)" : isSegment ? "Largo (m)" : "Ancho (m)"}
@@ -309,7 +373,61 @@ function FixturePropertiesPanel() {
           <Button variant="destructive" size="sm" onClick={() => removeFixture(selected.id)}>
             Eliminar
           </Button>
-          <Button variant="outline" size="sm" onClick={() => selectFixture(null)}>
+          <Button variant="outline" size="sm" onClick={() => select(null)}>
+            Deseleccionar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Varios elementos seleccionados: acciones en grupo (las mismas de la barra contextual). */
+function MultiSelectionPanel({ count }: { count: number }) {
+  const requestDeleteSelection = useCanvasStore((s) => s.requestDeleteSelection);
+  const select = useCanvasStore((s) => s.select);
+  const [matrixOpen, setMatrixOpen] = useState(false);
+
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <header>
+          <p className="text-[10.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">Selección</p>
+          <h3 className="font-heading text-xl font-semibold text-foreground italic">{count} elementos</h3>
+        </header>
+        <p className="text-xs text-muted-foreground">
+          Arrástralos juntos, muévelos con las flechas o usa las acciones de abajo. Shift + clic quita o agrega uno.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" size="sm" onClick={duplicateOrWarn}>
+            <Copy className="size-3.5" />
+            Duplicar
+          </Button>
+          <Popover open={matrixOpen} onOpenChange={setMatrixOpen}>
+            <PopoverTrigger render={<Button variant="outline" size="sm" />}>
+              <Grid3x3 className="size-3.5" />
+              Matriz
+            </PopoverTrigger>
+            <PopoverContent align="end">
+              <MatrixForm onDone={() => setMatrixOpen(false)} />
+            </PopoverContent>
+          </Popover>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="col-span-2" />}>
+              <AlignCenterVertical className="size-3.5" />
+              Alinear y distribuir
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-60">
+              <AlignMenuItems count={count} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <Button variant="destructive" size="sm" onClick={requestDeleteSelection}>
+            <Trash2 className="size-3.5" />
+            Eliminar {count}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => select(null)}>
             Deseleccionar
           </Button>
         </div>
