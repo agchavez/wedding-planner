@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDefaultElementShape, TOOL_GROUPS } from "./seatGeometry";
+import { computeSeatPositions, getChairMetrics, getDefaultElementShape, getElementFootprint, TOOL_GROUPS } from "./seatGeometry";
 import { DEFAULT_PX_PER_METER, pxToMeters, roundMeters } from "./layoutUnits";
 
 describe("getDefaultElementShape", () => {
@@ -25,5 +25,35 @@ describe("getDefaultElementShape", () => {
         expect(shown(shape.height, pxPerMeter)).toBe(roundMeters(meters.height));
       }
     }
+  });
+});
+
+describe("sillas a escala real", () => {
+  it("miden ≈0.45 m según la escala del layout", () => {
+    const def = getChairMetrics();
+    expect(def.radius * 2).toBeCloseTo(0.45 * DEFAULT_PX_PER_METER);
+    // Con la escala por defecto la silla queda a los mismos 20 px del borde de siempre.
+    expect(def.offset).toBeCloseTo(20);
+    expect(getChairMetrics(100).radius).toBeCloseTo(22.5);
+  });
+
+  it("la huella de una mesa incluye sus sillas", () => {
+    const { radius, offset } = getChairMetrics(100);
+    expect(getElementFootprint({ type: "table-round", width: 150, height: 150, capacity: 8 }, 100)).toEqual({
+      width: 150 + 2 * (offset + radius),
+      height: 150 + 2 * (offset + radius),
+      round: true,
+    });
+    expect(getElementFootprint({ type: "table-rectangular", width: 180, height: 75, capacity: 8 }, 100).width).toBe(180);
+    expect(getElementFootprint({ type: "dance-floor", width: 500, height: 400, capacity: null }, 100)).toEqual({
+      width: 500,
+      height: 400,
+      round: false,
+    });
+  });
+
+  it("las sillas se colocan con la separación indicada", () => {
+    const [first] = computeSeatPositions("table-round", 100, 100, 4, 30);
+    expect(first).toMatchObject({ x: expect.closeTo(0), y: expect.closeTo(-80) });
   });
 });
