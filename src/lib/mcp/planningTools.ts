@@ -144,7 +144,7 @@ export function registerPlanningTools(server: McpServer) {
       if (layout) {
         await prisma.guest.updateMany({
           where: { weddingId: a.weddingId, tableElementId: { in: layout.elements.map((el) => el.id) } },
-          data: { tableElementId: null },
+          data: { tableElementId: null, seatIndex: null },
         });
         await prisma.seatingLayout.delete({ where: { id: layout.id } });
       }

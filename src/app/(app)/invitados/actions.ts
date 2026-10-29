@@ -69,9 +69,11 @@ export async function deleteGuest(id: string) {
 
 export async function assignGuestTable(id: string, tableElementId: string | null) {
   const weddingId = await getEditableWeddingId();
+  const current = await prisma.guest.findFirstOrThrow({ where: { id, weddingId }, select: { tableElementId: true } });
   const guest = await prisma.guest.update({
     where: { id, weddingId },
-    data: { tableElementId },
+    // Al cambiar de mesa, la silla anterior ya no aplica: el plano lo sienta en la primera libre.
+    data: current.tableElementId === tableElementId ? { tableElementId } : { tableElementId, seatIndex: null },
   });
   await audit("guest.assign_table", tableElementId ? `Asignó mesa a "${guest.fullName}"` : `Quitó la mesa de "${guest.fullName}"`, { weddingId, targetId: id });
   revalidatePath("/invitados");

@@ -23,6 +23,17 @@ export type PlanPalette = {
   muted: string;
   accent: string;
   onAccent: string;
+  /** Colores de las sillas ocupadas: g1…g6 por lado/grupo, gNone sin lado ni grupo. */
+  g1: string;
+  g2: string;
+  g3: string;
+  g4: string;
+  g5: string;
+  g6: string;
+  gNone: string;
+  onSeat: string;
+  /** Avisos (mesa pasada de capacidad, no cabe al soltar). */
+  bad: string;
   displayFont: string;
   bodyFont: string;
 };
@@ -44,6 +55,15 @@ const FALLBACK: PlanPalette = {
   muted: "#8a746d",
   accent: "#a8415c",
   onAccent: "#fff8f5",
+  g1: "#a8415c",
+  g2: "#5c7863",
+  g3: "#8a6a2f",
+  g4: "#5f6a94",
+  g5: "#a5573b",
+  g6: "#7d5a86",
+  gNone: "#7a6b62",
+  onSeat: "#ffffff",
+  bad: "#c0392b",
   displayFont: "Georgia, serif",
   bodyFont: "system-ui, sans-serif",
 };
@@ -64,6 +84,15 @@ const TOKENS: Record<keyof PlanPalette, string> = {
   muted: "--plan-muted",
   accent: "--plan-accent",
   onAccent: "--plan-on-accent",
+  g1: "--plan-g1",
+  g2: "--plan-g2",
+  g3: "--plan-g3",
+  g4: "--plan-g4",
+  g5: "--plan-g5",
+  g6: "--plan-g6",
+  gNone: "--plan-g-none",
+  onSeat: "--plan-on-seat",
+  bad: "--destructive",
   displayFont: "--font-playfair",
   bodyFont: "--font-sans",
 };
@@ -77,6 +106,17 @@ function readPalette(): PlanPalette {
     if (value) palette[key] = value;
   }
   return palette;
+}
+
+/** Color de silla ocupada para un índice de seatColorSlot (null = sin lado ni grupo). */
+export function seatColor(palette: PlanPalette, slot: number | null): string {
+  if (slot === null) return palette.gNone;
+  return [palette.g1, palette.g2, palette.g3, palette.g4, palette.g5, palette.g6][slot] ?? palette.gNone;
+}
+
+/** El mismo color como variable CSS, para el panel de invitados (HTML). */
+export function seatColorVar(slot: number | null): string {
+  return slot === null ? "var(--plan-g-none)" : `var(--plan-g${slot + 1})`;
 }
 
 /** Paleta del plano; se actualiza al cambiar el tema, los colores propios o la clase .dark. */

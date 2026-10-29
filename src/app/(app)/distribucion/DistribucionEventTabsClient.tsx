@@ -9,7 +9,9 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Background } from "@/app/(app)/distribucion/canvasStore";
-import type { RoomPoint } from "@/lib/seatGeometry";
+import { isTableType, type RoomPoint } from "@/lib/seatGeometry";
+import type { SeatingGuest } from "@/lib/guestSeating";
+import type { LabelOption } from "@/lib/guestLabels";
 import type { LayoutElement, RoomFixture, WeddingEvent } from "@/generated/prisma";
 
 export type LayoutData = {
@@ -25,9 +27,13 @@ export type LayoutData = {
 export function DistribucionEventTabsClient({
   events,
   layoutByEvent,
+  guests,
+  labels,
 }: {
   events: WeddingEvent[];
   layoutByEvent: Record<string, LayoutData>;
+  guests: SeatingGuest[];
+  labels: LabelOption[];
 }) {
   const [activeId, setActiveId] = useState(events[0]?.id ?? "");
 
@@ -61,6 +67,10 @@ export function DistribucionEventTabsClient({
     roomFixtures: [],
     pxPerMeter: null,
   };
+  // Mesas de los demás eventos: sus invitados ya tienen lugar (no salen como "sin asignar").
+  const otherTableIds = Object.entries(layoutByEvent)
+    .filter(([eventId]) => eventId !== activeEvent.id)
+    .flatMap(([, layout]) => layout.elements.filter((el) => isTableType(el.type)).map((el) => el.id));
 
   return (
     <Tabs value={activeEvent.id} onValueChange={(v) => v && setActiveId(v)}>
@@ -113,6 +123,9 @@ export function DistribucionEventTabsClient({
         initialRoomShape={activeLayout.roomShape}
         initialRoomFixtures={activeLayout.roomFixtures}
         pxPerMeter={activeLayout.pxPerMeter}
+        guests={guests}
+        labels={labels}
+        otherTableIds={otherTableIds}
       />
     </Tabs>
   );

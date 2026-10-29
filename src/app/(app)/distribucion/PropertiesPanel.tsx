@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlignCenterVertical, Copy, Grid3x3, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/app/(app)/distribucion/canvasStore";
+import { useGuestSeatingStore } from "@/app/(app)/distribucion/guestSeatingStore";
+import { seatColorVar } from "@/app/(app)/distribucion/planPalette";
+import { buildTableSeatView, useGuestColorSlot } from "@/app/(app)/distribucion/seatingView";
 import { AlignMenuItems, duplicateOrWarn, MatrixForm } from "@/app/(app)/distribucion/SelectionActionBar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -13,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ELEMENT_LABELS, isChairBlock, isTableType, type ElementType } from "@/lib/seatGeometry";
 import { FIXTURE_LABELS, type FixtureType } from "@/lib/roomFixtures";
+import { cn } from "@/lib/utils";
 import { clampMetersToPx, pxToMeters, resolvePxPerMeter, roundMeters, stepAlignedBounds } from "@/lib/layoutUnits";
 
 // Límites en píxeles del lienzo (los mismos que sanitizeElement en lib/seatingLayout.ts).
@@ -76,6 +80,58 @@ function MetersInput({
         }}
         onBlur={() => setDraft(null)}
       />
+    </div>
+  );
+}
+
+/**
+ * Quién está en cada silla de la mesa seleccionada. Tocar una silla abre la hoja para sentar a
+ * alguien ahí (o ver/quitar a quien la ocupa).
+ */
+function TableGuestsSection({ tableId, capacity }: { tableId: string; capacity: number | null }) {
+  const guests = useGuestSeatingStore((s) => s.guests);
+  const openSheet = useGuestSeatingStore((s) => s.openSheet);
+  const slotOf = useGuestColorSlot();
+  const view = useMemo(() => {
+    const seated = guests.filter((g) => g.tableElementId === tableId);
+    const byId = new Map(seated.map((g) => [g.id, g]));
+    return {
+      ...buildTableSeatView(capacity, seated, (g) => seatColorVar(slotOf(g))),
+      names: byId,
+    };
+  }, [guests, tableId, capacity, slotOf]);
+  const over = view.occupied > view.capacity;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+        Sillas · <span className={cn("tabular-nums", over && "text-destructive")}>{view.occupied} de {view.capacity}</span> ocupadas
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {view.seats.map((seat, i) => {
+          const name = seat ? view.names.get(seat.guestId)?.fullName : undefined;
+          const title = seat ? (seat.companion === 0 ? name : `Acompañante de ${name}`) : `Silla ${i + 1} libre`;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => openSheet({ tableId, seatIndex: i })}
+              title={title}
+              aria-label={`Silla ${i + 1}: ${title}`}
+              className={cn(
+                "grid size-7 place-items-center rounded-full text-[9.5px] font-semibold",
+                seat ? "text-white" : "border-[1.5px] border-dashed border-muted-foreground/60 text-muted-foreground hover:border-primary hover:text-primary"
+              )}
+              style={seat ? { background: seat.color } : undefined}
+            >
+              {seat ? seat.label : "+"}
+            </button>
+          );
+        })}
+      </div>
+      {over && (
+        <p className="text-xs text-destructive">Hay más personas que sillas: sube la capacidad o cambia a alguien de mesa.</p>
+      )}
     </div>
   );
 }
@@ -160,6 +216,7 @@ function ElementPropertiesPanel() {
                 onChange={(e) => updateElement(selected.id, { capacity: Number(e.target.value) })}
               />
             </div>
+            <TableGuestsSection tableId={selected.id} capacity={selected.capacity} />
           </>
         )}
 

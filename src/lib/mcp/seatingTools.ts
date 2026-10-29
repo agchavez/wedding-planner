@@ -41,6 +41,14 @@ const elementFields = {
   columns: z.number().int().min(1).max(20).optional().describe("Solo chair-row"),
 };
 
+/**
+ * Ids de las mesas de todos los salones de la boda. Un invitado cuya mesa ya no existe (se
+ * borró en el editor) cuenta como sin mesa, igual que en el plano y en /invitados.
+ */
+function weddingTableIds(layouts: { elements: LayoutElement[] }[]) {
+  return new Set(layouts.flatMap((l) => l.elements).filter((el) => isTableType(el.type)).map((el) => el.id));
+}
+
 function describeElement(el: LayoutElement, guests: Guest[]) {
   const seated = isTableType(el.type) ? guests.filter((g) => g.tableElementId === el.id) : [];
   return {
@@ -53,7 +61,8 @@ function describeElement(el: LayoutElement, guests: Guest[]) {
           capacity: el.capacity,
           // Cada invitado ocupa 1 + sus acompañantes.
           seatsTaken: seated.reduce((n, g) => n + 1 + g.plusOnes, 0),
-          guests: seated.map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes })),
+          // seatIndex: primera silla del grupo (null = el plano lo acomoda en la primera libre).
+          guests: seated.map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes, seatIndex: g.seatIndex ?? null })),
         }
       : {}),
     ...(el.type === "chair-row" ? { rows: el.rows, columns: el.columns } : {}),
@@ -112,6 +121,7 @@ export function registerSeatingTools(server: McpServer) {
           prisma.weddingEvent.findMany({ where: { weddingId: a.weddingId }, orderBy: { sortOrder: "asc" } }),
           prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId } }),
         ]);
+        const tableIds = weddingTableIds(layouts);
         return json({
           elementTypes: ELEMENT_LABELS,
           events: events.map((e) => {
@@ -124,13 +134,14 @@ export function registerSeatingTools(server: McpServer) {
               seatsTaken: guests.filter((g) => tables.some((t) => t.id === g.tableElementId)).reduce((n, g) => n + 1 + g.plusOnes, 0),
             };
           }),
-          guestsWithoutTable: guests.filter((g) => !g.tableElementId).length,
+          guestsWithoutTable: guests.filter((g) => !g.tableElementId || !tableIds.has(g.tableElementId)).length,
         });
       }
       const found = await layoutFor(a.weddingId, eventId);
       if (!found) return json({ error: "Evento no encontrado." });
       const { layout, event } = found;
       const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
+      const tableIds = weddingTableIds(await prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId }, select: { elements: true } }));
       return json({
         event: event.name,
         canvas: {
@@ -148,7 +159,7 @@ export function registerSeatingTools(server: McpServer) {
         },
         elements: layout.elements.map((el) => describeElement(el, guests)),
         guestsWithoutTable: guests
-          .filter((g) => !g.tableElementId && g.rsvpStatus !== "declined")
+          .filter((g) => (!g.tableElementId || !tableIds.has(g.tableElementId)) && g.rsvpStatus !== "declined")
           .map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes, group: g.group || null, side: g.side || null })),
       });
     }
@@ -266,7 +277,7 @@ export function registerSeatingTools(server: McpServer) {
       await saveElements(layout.id, layout.elements.filter((el) => !remove.has(el.id)));
       const unseated = await prisma.guest.updateMany({
         where: { weddingId: a.weddingId, tableElementId: { in: elementIds } },
-        data: { tableElementId: null },
+        data: { tableElementId: null, seatIndex: null },
       });
       await log(a, "layout.save", `Quitó ${remove.size} elementos de la distribución del salón`, eventId);
       return json({ removed: layout.elements.filter((el) => remove.has(el.id)).length, guestsUnseated: unseated.count });
@@ -332,7 +343,20 @@ export function registerSeatingTools(server: McpServer) {
         table = layouts.flatMap((l) => l.elements).find((el) => el.id === tableElementId && isTableType(el.type));
         if (!table) return json({ error: "Mesa no encontrada." });
       }
-      const result = await prisma.guest.updateMany({ where: { weddingId: a.weddingId, id: { in: guestIds } }, data: { tableElementId } });
+      const current = await prisma.guest.findMany({
+        where: { weddingId: a.weddingId, id: { in: guestIds } },
+        select: { id: true, tableElementId: true },
+      });
+      // Solo cambian los que van a otra mesa; su silla anterior ya no aplica (el plano los sienta
+      // en la primera libre). Los que ya estaban en esa mesa conservan su silla.
+      const changing = current.filter((g) => g.tableElementId !== tableElementId).map((g) => g.id);
+      if (changing.length > 0) {
+        await prisma.guest.updateMany({
+          where: { weddingId: a.weddingId, id: { in: changing } },
+          data: { tableElementId, seatIndex: null },
+        });
+      }
+      const result = { count: current.length };
       await log(a, "guest.assign_table", table ? `Asignó ${result.count} invitados a "${table.label}"` : `Quitó la mesa de ${result.count} invitados`);
       if (!table) return json({ updated: result.count });
       const seated = await prisma.guest.findMany({ where: { weddingId: a.weddingId, tableElementId } });
