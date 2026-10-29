@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { isChairBlock, isTableType, type ElementType, type RoomPoint } from "@/lib/seatGeometry";
+import { partySize } from "@/lib/guestSeating";
 import type { LayoutElement } from "@/generated/prisma";
 
 export const VALID_ELEMENT_TYPES: ElementType[] = [
@@ -94,15 +95,16 @@ export async function getTableOptionsWithOccupancy(): Promise<TableOption[]> {
   const [layouts, events, guests] = await Promise.all([
     prisma.seatingLayout.findMany({ where: { weddingId } }),
     prisma.weddingEvent.findMany({ where: { weddingId } }),
-    prisma.guest.findMany({ where: { weddingId }, select: { tableElementId: true } }),
+    prisma.guest.findMany({ where: { weddingId }, select: { tableElementId: true, plusOnes: true } }),
   ]);
 
   const eventNameById = new Map(events.map((e) => [e.id, e.name]));
 
+  // Personas sentadas por mesa (invitado + acompañantes), igual que el plano y el MCP.
   const occupancyByTable = new Map<string, number>();
   for (const guest of guests) {
     if (!guest.tableElementId) continue;
-    occupancyByTable.set(guest.tableElementId, (occupancyByTable.get(guest.tableElementId) ?? 0) + 1);
+    occupancyByTable.set(guest.tableElementId, (occupancyByTable.get(guest.tableElementId) ?? 0) + partySize(guest));
   }
 
   const options: TableOption[] = [];

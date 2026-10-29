@@ -31,7 +31,8 @@ type SaveJob = ReturnType<typeof takeSaveJob>;
  * si se pide otro mientras hay uno en curso, se guarda después el estado más reciente, así una
  * respuesta lenta no pisa un cambio más nuevo. Solo se marca "Guardado" si no hubo cambios
  * mientras tanto (revisión del store). Si falla, queda en "error" con los cambios pendientes.
- * Devuelve `save` para guardar ya (Ctrl+S, botón, reintentar).
+ * Devuelve `save` para guardar ya (Ctrl+S, botón, reintentar); su promesa termina cuando ya no
+ * queda nada en vuelo (sirve para guardar el plano antes de sentar a alguien en una mesa nueva).
  */
 export function useLayoutAutosave(eventId: string, enabled: boolean) {
   const dirty = useCanvasStore((s) => s.dirty);
@@ -39,6 +40,7 @@ export function useLayoutAutosave(eventId: string, enabled: boolean) {
   const mounted = useRef(true);
   const inFlight = useRef(false);
   const queued = useRef<SaveJob | null>(null);
+  const running = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     mounted.current = true;
@@ -92,19 +94,21 @@ export function useLayoutAutosave(eventId: string, enabled: boolean) {
     [eventId]
   );
 
-  const save = useCallback(() => {
+  const save = useCallback((): Promise<void> => {
     const job = takeSaveJob();
     if (inFlight.current) {
+      // El guardado en curso toma este estado al terminar (mismo bucle, misma promesa).
       queued.current = job;
-      return;
+      return running.current;
     }
-    void run(job);
+    running.current = run(job);
+    return running.current;
   }, [run]);
 
   // Cada cambio (nueva revisión) reprograma el guardado.
   useEffect(() => {
     if (!enabled || !dirty) return;
-    const timeout = setTimeout(save, AUTOSAVE_DELAY_MS);
+    const timeout = setTimeout(() => void save(), AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timeout);
   }, [enabled, dirty, revision, save]);
 
@@ -116,7 +120,7 @@ export function useLayoutAutosave(eventId: string, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     return () => {
-      if (useCanvasStore.getState().dirty) saveRef.current();
+      if (useCanvasStore.getState().dirty) void saveRef.current();
     };
   }, [enabled]);
 

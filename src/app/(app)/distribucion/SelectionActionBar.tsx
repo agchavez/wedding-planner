@@ -17,9 +17,12 @@ import {
   Grid3x3,
   RotateCw,
   Trash2,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { activeLayerLimit, canAddToActiveLayer, selectionBounds, useCanvasStore } from "@/app/(app)/distribucion/canvasStore";
+import { useGuestSeatingStore } from "@/app/(app)/distribucion/guestSeatingStore";
+import { isTableType } from "@/lib/seatGeometry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,7 +44,7 @@ const ROTATE_STEP = 15;
 const BAR_OFFSET = 44;
 const BAR_OFFSET_TOUCH = 92;
 // Media barra (aprox.) para que no se salga por los lados del lienzo.
-const BAR_HALF_WIDTH = 190;
+const BAR_HALF_WIDTH = 230;
 
 const ALIGN_OPTIONS: { mode: AlignMode; label: string; icon: LucideIcon }[] = [
   { mode: "left", label: "Alinear a la izquierda", icon: AlignStartVertical },
@@ -194,6 +197,13 @@ export function SelectionActionBar({ viewportWidth, coarsePointer = false }: { v
   const rotateSelection = useCanvasStore((s) => s.rotateSelection);
   const requestDeleteSelection = useCanvasStore((s) => s.requestDeleteSelection);
   const [matrixOpen, setMatrixOpen] = useState(false);
+  // Una sola mesa seleccionada: "Sentar aquí" abre la hoja para elegir invitados.
+  const singleTableId = useCanvasStore((s) => {
+    if (s.roomEditMode || s.selectedIds.length !== 1) return null;
+    const el = s.elements.find((e) => e.id === s.selectedIds[0]);
+    return el && isTableType(el.type) ? el.id : null;
+  });
+  const openSheet = useGuestSeatingStore((s) => s.openSheet);
 
   if (!bounds || count === 0 || interacting) return null;
 
@@ -245,6 +255,15 @@ export function SelectionActionBar({ viewportWidth, coarsePointer = false }: { v
           <AlignMenuItems count={count} />
         </DropdownMenuContent>
       </DropdownMenu>
+      {singleTableId && (
+        <>
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-background/20" aria-hidden />
+          <BarButton onClick={() => openSheet({ tableId: singleTableId, seatIndex: null })} title="Elegir invitados para esta mesa">
+            <Users />
+            <span className="hidden sm:inline">Sentar aquí</span>
+          </BarButton>
+        </>
+      )}
       <span className="mx-0.5 h-5 w-px shrink-0 bg-background/20" aria-hidden />
       <BarButton onClick={requestDeleteSelection} title="Eliminar (Supr)" className="text-red-300 hover:text-red-200">
         <Trash2 />

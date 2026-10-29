@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import type { Background } from "@/app/(app)/distribucion/canvasStore";
 import type { RoomPoint } from "@/lib/seatGeometry";
+import type { SeatingGuest } from "@/lib/guestSeating";
+import type { LabelOption } from "@/lib/guestLabels";
 import type { LayoutElement, RoomFixture } from "@/generated/prisma";
 
 const SeatingEditor = dynamic(
@@ -26,6 +28,9 @@ export function SeatingEditorLoader(props: {
   initialRoomShape: RoomPoint[];
   initialRoomFixtures: RoomFixture[];
   pxPerMeter: number | null;
+  guests: SeatingGuest[];
+  labels: LabelOption[];
+  otherTableIds: string[];
 }) {
   return <SeatingEditor {...props} />;
 }

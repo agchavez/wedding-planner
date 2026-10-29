@@ -77,7 +77,9 @@ export function computeSeatPositions(
   for (let i = 0; i < topCount; i++) {
     points.push({ x: -width / 2 + (width * (i + 1)) / (topCount + 1), y: topY, rotation: 180 });
   }
-  for (let i = 0; i < bottomCount; i++) {
+  // El lado de abajo va de derecha a izquierda: los índices dan la vuelta a la mesa en el
+  // sentido del reloj, así sillas consecutivas (un invitado con acompañantes) quedan juntas.
+  for (let i = bottomCount - 1; i >= 0; i--) {
     points.push({ x: -width / 2 + (width * (i + 1)) / (bottomCount + 1), y: bottomY, rotation: 0 });
   }
   return points;
