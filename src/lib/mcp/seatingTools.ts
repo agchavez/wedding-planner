@@ -6,12 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { clampCanvasSize, getOrCreateSeatingLayout, sanitizeElement, sanitizeRoomShape, VALID_ELEMENT_TYPES } from "@/lib/seatingLayout";
 import { ELEMENT_LABELS, getDefaultElementShape, getRoomShapePreset, isTableType, ROOM_SHAPE_PRESETS, type ElementType } from "@/lib/seatGeometry";
 import { auth, editor, json, log, objectId } from "@/lib/mcp/shared";
+import { pxToMeters, resolvePxPerMeter, roundMeters } from "@/lib/layoutUnits";
 import type { Guest, LayoutElement } from "@/generated/prisma";
 
 /**
  * Herramientas MCP de la distribución del salón (una por evento): mesas, zonas y bloques de
  * sillas, y la asignación de invitados a mesas. Coordenadas en el lienzo (0,0 arriba a la
- * izquierda; por defecto 2000×1400); x/y son el centro del elemento.
+ * izquierda; por defecto 2000×1400); x/y son el centro del elemento. La escala real va en
+ * canvas.pxPerMeter (por defecto ≈66.67 px/m: la mesa redonda de 100 px mide 1.5 m).
  */
 
 const elementType = z.enum(VALID_ELEMENT_TYPES as [ElementType, ...ElementType[]]);
@@ -101,9 +103,22 @@ export function registerSeatingTools(server: McpServer) {
       const found = await layoutFor(a.weddingId, eventId);
       if (!found) return json({ error: "Evento no encontrado." });
       const { layout, event } = found;
+      const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
       return json({
         event: event.name,
-        canvas: { width: layout.canvasWidth, height: layout.canvasHeight, background: layout.background, roomShape: layout.roomShape },
+        canvas: {
+          width: layout.canvasWidth,
+          height: layout.canvasHeight,
+          background: layout.background,
+          roomShape: layout.roomShape,
+          // Campos agregados con la escala en metros y la capa salón (solo lectura por ahora).
+          pxPerMeter,
+          sizeMeters: {
+            width: roundMeters(pxToMeters(layout.canvasWidth, pxPerMeter)),
+            height: roundMeters(pxToMeters(layout.canvasHeight, pxPerMeter)),
+          },
+          roomFixtures: layout.roomFixtures ?? [],
+        },
         elements: layout.elements.map((el) => describeElement(el, guests)),
         guestsWithoutTable: guests
           .filter((g) => !g.tableElementId && g.rsvpStatus !== "declined")
@@ -117,7 +132,7 @@ export function registerSeatingTools(server: McpServer) {
     {
       title: "Agregar mesas o zonas al salón",
       description:
-        "Agrega elementos a la distribución de un evento. Tipos: table-round, table-rectangular, table-sweetheart (novios), table-cake, chair-row (bloque de sillas de ceremonia), stage, dance-floor, photo-area, altar, aisle, entrance, restroom, hallway. Sin tamaño o capacidad usa los de la app (mesa redonda: 100×100, 8 personas). Las mesas sin número se numeran después de la última.",
+        "Agrega elementos a la distribución de un evento. Tipos: table-round, table-rectangular, table-sweetheart (novios), table-cake, chair-row (bloque de sillas de ceremonia), stage, dance-floor, photo-area, altar, aisle, entrance, restroom, hallway. Sin tamaño o capacidad usa los de la app (mesa redonda: 1.5 m = 100×100 px con la escala por defecto, 8 personas). Las mesas sin número se numeran después de la última.",
       inputSchema: z.object({
         eventId: objectId,
         elements: z.array(z.object({ type: elementType, ...elementFields })).min(1).max(100),
@@ -128,9 +143,10 @@ export function registerSeatingTools(server: McpServer) {
       const found = await layoutFor(a.weddingId, eventId);
       if (!found) return json({ error: "Evento no encontrado." });
       const { layout } = found;
+      const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
       let nextNumber = Math.max(0, ...layout.elements.map((el) => el.tableNumber ?? 0));
       const added: LayoutElement[] = elements.map((input, i) => {
-        const shape = getDefaultElementShape(input.type);
+        const shape = getDefaultElementShape(input.type, pxPerMeter);
         const isTable = isTableType(input.type);
         const tableNumber = isTable ? (input.tableNumber ?? ++nextNumber) : null;
         if (isTable && input.tableNumber) nextNumber = Math.max(nextNumber, input.tableNumber);

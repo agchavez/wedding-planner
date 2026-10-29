@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { LayoutElement } from "@/generated/prisma";
+import type { LayoutElement, RoomFixture } from "@/generated/prisma";
 import {
   ELEMENT_LABELS,
   getDefaultElementShape,
@@ -9,6 +9,8 @@ import {
   type RoomPoint,
   type RoomShapePreset,
 } from "@/lib/seatGeometry";
+import { getDefaultFixtureSize, type FixtureType } from "@/lib/roomFixtures";
+import { resolvePxPerMeter } from "@/lib/layoutUnits";
 
 type SaveStatus = "idle" | "saving" | "saved";
 export type Background = "indoor" | "garden";
@@ -25,17 +27,27 @@ type CanvasState = {
   zoom: number;
   stageX: number;
   stageY: number;
-  // Contorno del local (polígono). Vacío = sin definir (se ve un rectángulo simple).
+  // Escala guardada (px por metro). null = layout sin escala: se usa DEFAULT_PX_PER_METER y no se
+  // escribe nada al guardar. Usar resolvePxPerMeter(pxPerMeter) para la escala efectiva.
+  pxPerMeter: number | null;
+  // Capa salón: contorno del local (polígono; vacío = sin definir) + elementos fijos (paredes,
+  // columnas, puertas...). Bloqueada salvo en el modo "Editar salón" (roomEditMode).
   roomShape: RoomPoint[];
+  roomFixtures: RoomFixture[];
+  selectedFixtureId: string | null;
   roomEditMode: boolean;
   // Modo "dibujar a mano libre": el Stage deja de hacer pan y captura el trazo del mouse.
   roomDrawMode: boolean;
   setElements: (
     elements: LayoutElement[],
-    canvasWidth?: number,
-    canvasHeight?: number,
-    background?: Background,
-    roomShape?: RoomPoint[]
+    layout?: {
+      canvasWidth?: number;
+      canvasHeight?: number;
+      background?: Background;
+      roomShape?: RoomPoint[];
+      roomFixtures?: RoomFixture[];
+      pxPerMeter?: number | null;
+    }
   ) => void;
   /** Centro de la zona visible del lienzo: ahí aparecen los elementos nuevos. */
   viewCenter: { x: number; y: number } | null;
@@ -58,6 +70,10 @@ type CanvasState = {
   rotateRoomShape: (deltaDegrees: number) => void;
   setRoomDrawMode: (active: boolean) => void;
   setRoomShapeFromPoints: (points: RoomPoint[]) => void;
+  addFixture: (type: FixtureType) => void;
+  updateFixture: (id: string, patch: Partial<RoomFixture>) => void;
+  removeFixture: (id: string) => void;
+  selectFixture: (id: string | null) => void;
 };
 
 export const MIN_ZOOM = 0.25;
@@ -76,14 +92,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   zoom: 1,
   stageX: 0,
   stageY: 0,
+  pxPerMeter: null,
   roomShape: [],
+  roomFixtures: [],
+  selectedFixtureId: null,
   roomEditMode: false,
   roomDrawMode: false,
   viewCenter: null,
 
   setViewCenter: (center) => set({ viewCenter: center }),
 
-  setElements: (elements, canvasWidth, canvasHeight, background, roomShape) => {
+  setElements: (elements, layout = {}) => {
+    const { canvasWidth, canvasHeight, background, roomShape } = layout;
     nextTableNumberCounter = elements.reduce(
       (max, el) => Math.max(max, el.tableNumber ?? 0),
       0
@@ -91,9 +111,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       elements,
       selectedId: null,
+      selectedFixtureId: null,
       dirty: false,
       saveStatus: "idle",
       roomEditMode: false,
+      roomDrawMode: false,
+      // El store es compartido entre pestañas de eventos: siempre se reemplazan (no heredar del anterior).
+      roomFixtures: layout.roomFixtures ?? [],
+      pxPerMeter: layout.pxPerMeter ?? null,
       ...(canvasWidth ? { canvasWidth } : {}),
       ...(canvasHeight ? { canvasHeight } : {}),
       ...(background ? { background } : {}),
@@ -102,7 +127,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   addElement: (type) => {
-    const shape = getDefaultElementShape(type);
+    const shape = getDefaultElementShape(type, resolvePxPerMeter(get().pxPerMeter));
     const isTable = isTableType(type);
     if (isTable) nextTableNumberCounter += 1;
 
@@ -159,16 +184,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ roomShape: getRoomShapePreset(preset, canvasWidth, canvasHeight), dirty: true });
   },
   toggleRoomEditMode: () => {
-    set((state) => {
-      if (!state.roomEditMode && state.roomShape.length === 0) {
-        return {
-          roomEditMode: true,
-          roomShape: getRoomShapePreset("rectangle", state.canvasWidth, state.canvasHeight),
-          dirty: true,
-        };
-      }
-      return { roomEditMode: !state.roomEditMode };
-    });
+    // Al entrar o salir del modo "Editar salón" se suelta la selección de la otra capa. Entrar
+    // no crea un contorno ni marca cambios: el contorno solo se define con una forma explícita
+    // ("Forma del local") para no guardar uno que el layout nunca tuvo.
+    set((state) => ({ selectedId: null, selectedFixtureId: null, roomEditMode: !state.roomEditMode }));
   },
   updateRoomPoint: (index, point) => {
     set((state) => ({
@@ -210,7 +229,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return { roomShape: rotated, dirty: true };
     });
   },
-  setRoomDrawMode: (active) => set({ roomDrawMode: active, roomEditMode: active ? false : get().roomEditMode }),
+  setRoomDrawMode: (active) =>
+    set({
+      roomDrawMode: active,
+      roomEditMode: active ? false : get().roomEditMode,
+      ...(active ? { selectedId: null, selectedFixtureId: null } : {}),
+    }),
   setRoomShapeFromPoints: (points) => {
     if (points.length < 3) {
       set({ roomDrawMode: false });
@@ -218,4 +242,33 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }
     set({ roomShape: points, roomDrawMode: false, roomEditMode: true, dirty: true });
   },
+
+  addFixture: (type) => {
+    const size = getDefaultFixtureSize(type, resolvePxPerMeter(get().pxPerMeter));
+    const fixture: RoomFixture = {
+      id: crypto.randomUUID(),
+      type,
+      label: "",
+      x: get().viewCenter?.x ?? get().canvasWidth / 2,
+      y: get().viewCenter?.y ?? get().canvasHeight / 2,
+      width: size.width,
+      height: size.height,
+      rotation: 0,
+    };
+    set((state) => ({ roomFixtures: [...state.roomFixtures, fixture], selectedFixtureId: fixture.id, dirty: true }));
+  },
+  updateFixture: (id, patch) => {
+    set((state) => ({
+      roomFixtures: state.roomFixtures.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+      dirty: true,
+    }));
+  },
+  removeFixture: (id) => {
+    set((state) => ({
+      roomFixtures: state.roomFixtures.filter((f) => f.id !== id),
+      selectedFixtureId: state.selectedFixtureId === id ? null : state.selectedFixtureId,
+      dirty: true,
+    }));
+  },
+  selectFixture: (id) => set({ selectedFixtureId: id }),
 }));

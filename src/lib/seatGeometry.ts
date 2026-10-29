@@ -13,6 +13,7 @@ import {
   RectangleHorizontal,
   type LucideIcon,
 } from "lucide-react";
+import { DEFAULT_PX_PER_METER, metersToPx } from "@/lib/layoutUnits";
 
 export type ElementType =
   | "table-round"
@@ -181,35 +182,37 @@ type DefaultElementShape = {
   columns: number | null;
 };
 
-export function getDefaultElementShape(type: ElementType): DefaultElementShape {
-  switch (type) {
-    case "table-round":
-      return { width: 100, height: 100, capacity: 8, rows: null, columns: null };
-    case "table-rectangular":
-      return { width: 160, height: 80, capacity: 8, rows: null, columns: null };
-    case "table-sweetheart":
-      return { width: 120, height: 60, capacity: 2, rows: null, columns: null };
-    case "table-cake":
-      return { width: 70, height: 70, capacity: null, rows: null, columns: null };
-    case "chair-row":
-      return { width: 240, height: 150, capacity: 24, rows: 4, columns: 6 };
-    case "stage":
-      return { width: 220, height: 120, capacity: null, rows: null, columns: null };
-    case "dance-floor":
-      return { width: 200, height: 200, capacity: null, rows: null, columns: null };
-    case "photo-area":
-      return { width: 140, height: 140, capacity: null, rows: null, columns: null };
-    case "altar":
-      return { width: 100, height: 60, capacity: null, rows: null, columns: null };
-    case "aisle":
-      return { width: 80, height: 260, capacity: null, rows: null, columns: null };
-    case "entrance":
-      return { width: 80, height: 50, capacity: null, rows: null, columns: null };
-    case "restroom":
-      return { width: 70, height: 70, capacity: null, rows: null, columns: null };
-    case "hallway":
-      return { width: 260, height: 70, capacity: null, rows: null, columns: null };
-  }
+// Medidas por defecto en metros (ancho × alto); se convierten a píxeles con la escala del layout.
+const DEFAULT_ELEMENT_METERS: Record<ElementType, { width: number; height: number; capacity: number | null; rows?: number; columns?: number }> = {
+  "table-round": { width: 1.5, height: 1.5, capacity: 8 },
+  "table-rectangular": { width: 1.8, height: 0.75, capacity: 8 },
+  "table-sweetheart": { width: 1.2, height: 0.75, capacity: 2 },
+  "table-cake": { width: 1, height: 1, capacity: null },
+  // 6 sillas de ~0.55 m de ancho por fila y 0.9 m entre filas.
+  "chair-row": { width: 2.75, height: 2.7, capacity: 24, rows: 4, columns: 6 },
+  stage: { width: 4, height: 2.4, capacity: null },
+  "dance-floor": { width: 5, height: 5, capacity: null },
+  "photo-area": { width: 2.5, height: 2.5, capacity: null },
+  altar: { width: 1.5, height: 0.9, capacity: null },
+  aisle: { width: 1.5, height: 6, capacity: null },
+  entrance: { width: 1.8, height: 0.75, capacity: null },
+  restroom: { width: 1.2, height: 1.2, capacity: null },
+  hallway: { width: 4, height: 1.2, capacity: null },
+};
+
+/**
+ * Tamaño por defecto de un elemento nuevo, en píxeles del lienzo según la escala del layout.
+ * Sin redondear a píxel entero (width/height son Float) para que vuelva a los mismos metros.
+ */
+export function getDefaultElementShape(type: ElementType, pxPerMeter = DEFAULT_PX_PER_METER): DefaultElementShape {
+  const m = DEFAULT_ELEMENT_METERS[type];
+  return {
+    width: metersToPx(m.width, pxPerMeter),
+    height: metersToPx(m.height, pxPerMeter),
+    capacity: m.capacity,
+    rows: m.rows ?? null,
+    columns: m.columns ?? null,
+  };
 }
 
 export type RoomPoint = { x: number; y: number };

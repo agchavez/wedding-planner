@@ -10,14 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Background } from "@/app/(app)/distribucion/canvasStore";
 import type { RoomPoint } from "@/lib/seatGeometry";
-import type { LayoutElement, WeddingEvent } from "@/generated/prisma";
+import type { LayoutElement, RoomFixture, WeddingEvent } from "@/generated/prisma";
 
-type LayoutData = {
+export type LayoutData = {
   elements: LayoutElement[];
   canvasWidth: number;
   canvasHeight: number;
   background: Background;
   roomShape: RoomPoint[];
+  roomFixtures: RoomFixture[];
+  pxPerMeter: number | null;
 };
 
 export function DistribucionEventTabsClient({
@@ -50,12 +52,14 @@ export function DistribucionEventTabsClient({
   }
 
   const activeEvent = events.find((e) => e.id === activeId) ?? events[0];
-  const activeLayout = layoutByEvent[activeEvent.id] ?? {
+  const activeLayout: LayoutData = layoutByEvent[activeEvent.id] ?? {
     elements: [],
     canvasWidth: 2000,
     canvasHeight: 1400,
     background: "indoor" as Background,
     roomShape: [],
+    roomFixtures: [],
+    pxPerMeter: null,
   };
 
   return (
@@ -107,6 +111,8 @@ export function DistribucionEventTabsClient({
         canvasHeight={activeLayout.canvasHeight}
         initialBackground={activeLayout.background}
         initialRoomShape={activeLayout.roomShape}
+        initialRoomFixtures={activeLayout.roomFixtures}
+        pxPerMeter={activeLayout.pxPerMeter}
       />
     </Tabs>
   );
