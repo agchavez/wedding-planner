@@ -4,6 +4,7 @@ import { DistribucionEventTabsClient } from "@/app/(app)/distribucion/Distribuci
 import type { LayoutData } from "@/app/(app)/distribucion/DistribucionEventTabsClient";
 import type { RoomPoint } from "@/lib/seatGeometry";
 import { SEATING_GUEST_ORDER, type SeatingGuest } from "@/lib/guestSeating";
+import { baseRoomInfos } from "@/lib/venueRooms";
 import type { LayoutElement } from "@/generated/prisma";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -35,6 +36,8 @@ export default async function DistribucionPage() {
   ]);
   // Invitados anteriores no tienen seatIndex: null = el plano los acomoda en la primera silla libre.
   const seatingGuests: SeatingGuest[] = guests.map((g) => ({ ...g, seatIndex: g.seatIndex ?? null }));
+  // Salón de la biblioteca en que se basa cada layout (y si hay una versión más nueva).
+  const baseRooms = await baseRoomInfos(layouts.flatMap((l) => (l.baseRoomVersionId ? [l.baseRoomVersionId] : [])));
 
   const layoutByEvent: Record<string, LayoutData> = {};
   for (const layout of layouts) {
@@ -48,6 +51,9 @@ export default async function DistribucionPage() {
       // Layouts anteriores no tienen estos campos: sin elementos fijos y escala por defecto.
       roomFixtures: layout.roomFixtures ?? [],
       pxPerMeter: layout.pxPerMeter ?? null,
+      backgroundImage: layout.backgroundImage ?? null,
+      baseRoomVersionId: layout.baseRoomVersionId ?? null,
+      baseRoom: (layout.baseRoomVersionId && baseRooms.get(layout.baseRoomVersionId)) || null,
     };
   }
 

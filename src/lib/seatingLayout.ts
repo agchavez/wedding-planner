@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { isChairBlock, isTableType, type ElementType, type RoomPoint } from "@/lib/seatGeometry";
 import { partySize } from "@/lib/guestSeating";
+import { MAX_ROOM_COORD, MIN_ROOM_COORD } from "@/lib/layoutUnits";
 import type { LayoutElement } from "@/generated/prisma";
 
 export const VALID_ELEMENT_TYPES: ElementType[] = [
@@ -56,12 +57,11 @@ export function sanitizeRoomShape(points: RoomPoint[]): RoomPoint[] {
   if (!Array.isArray(points) || points.length < 3) return [];
   return points
     .filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y))
-    .map((p) => ({ x: clamp(p.x, -2000, 6000), y: clamp(p.y, -2000, 6000) }));
+    .map((p) => ({ x: clamp(p.x, MIN_ROOM_COORD, MAX_ROOM_COORD), y: clamp(p.y, MIN_ROOM_COORD, MAX_ROOM_COORD) }));
 }
 
-export function clampCanvasSize(value: number) {
-  return clamp(value, 800, 4000);
-}
+// Vive en lib/layoutUnits.ts (puro, sin Prisma) para usarlo también en la biblioteca de salones.
+export { clampCanvasSize } from "@/lib/layoutUnits";
 
 /**
  * Una distribución por evento de la boda (WeddingEvent). El SeatingLayout comparte el
