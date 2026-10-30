@@ -17,6 +17,8 @@ import {
 import { boxFromPoints, findFreeSpot, shapeBox, type Box } from "@/lib/layoutGeometry";
 import { auth, editor, json, log, objectId } from "@/lib/mcp/shared";
 import { pxToMeters, resolvePxPerMeter, roundMeters } from "@/lib/layoutUnits";
+import { baseRoomInfos, listVisibleRooms } from "@/lib/venueRooms";
+import { banquetCapacityStatus, seatedPeople } from "@/lib/venueLibrary";
 import type { Guest, LayoutElement } from "@/generated/prisma";
 
 /**
@@ -109,7 +111,7 @@ export function registerSeatingTools(server: McpServer) {
     {
       title: "Ver distribución del salón",
       description:
-        "Distribución de un evento: tamaño y estilo del salón, mesas (con capacidad, asientos ocupados e invitados sentados), zonas y bloques de sillas, más los invitados sin mesa. Sin eventId devuelve un resumen de todos los eventos.",
+        "Distribución de un evento: tamaño y estilo del salón, mesas (con capacidad, asientos ocupados e invitados sentados), zonas y bloques de sillas, más los invitados sin mesa. Incluye el salón de la biblioteca en que se basa (baseRoomVersionId, si hay versión nueva y aviso de aforo). Sin eventId devuelve un resumen de todos los eventos.",
       inputSchema: z.object({ eventId: objectId.optional() }),
       annotations: { readOnlyHint: true },
     },
@@ -129,6 +131,7 @@ export function registerSeatingTools(server: McpServer) {
             return {
               eventId: e.id,
               name: e.name,
+              baseRoomVersionId: layouts.find((l) => l.id === e.id)?.baseRoomVersionId ?? null,
               tables: tables.length,
               capacity: tables.reduce((n, t) => n + (t.capacity ?? 0), 0),
               seatsTaken: guests.filter((g) => tables.some((t) => t.id === g.tableElementId)).reduce((n, g) => n + 1 + g.plusOnes, 0),
@@ -142,6 +145,8 @@ export function registerSeatingTools(server: McpServer) {
       const { layout, event } = found;
       const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
       const tableIds = weddingTableIds(await prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId }, select: { elements: true } }));
+      const baseRoom = layout.baseRoomVersionId ? (await baseRoomInfos([layout.baseRoomVersionId])).get(layout.baseRoomVersionId) : undefined;
+      const capacity = banquetCapacityStatus(baseRoom?.banquetCapacity, seatedPeople(layout.elements, guests));
       return json({
         event: event.name,
         canvas: {
@@ -156,11 +161,56 @@ export function registerSeatingTools(server: McpServer) {
             height: roundMeters(pxToMeters(layout.canvasHeight, pxPerMeter)),
           },
           roomFixtures: layout.roomFixtures ?? [],
+          backgroundImage: layout.backgroundImage ?? null,
         },
+        // Salón de la biblioteca del que se copió la capa salón (null = salón propio).
+        baseRoomVersionId: layout.baseRoomVersionId ?? null,
+        baseRoom: baseRoom
+          ? {
+              venue: baseRoom.venueName,
+              room: baseRoom.roomName,
+              version: baseRoom.version,
+              latestVersion: baseRoom.latestVersion,
+              updateAvailable: baseRoom.latestVersionId !== baseRoom.versionId,
+              banquetCapacity: baseRoom.banquetCapacity,
+            }
+          : null,
+        ...(capacity?.over ? { capacityWarning: capacity.message } : {}),
         elements: layout.elements.map((el) => describeElement(el, guests)),
         guestsWithoutTable: guests
           .filter((g) => (!g.tableElementId || !tableIds.has(g.tableElementId)) && g.rsvpStatus !== "declined")
           .map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes, group: g.group || null, side: g.side || null })),
+      });
+    }
+  );
+
+  server.registerTool(
+    "list_venue_rooms",
+    {
+      title: "Ver la biblioteca de salones",
+      description:
+        "Salones reutilizables disponibles para esta boda (los guardados desde la boda o por quien creó el token, y los publicados para toda la plataforma): lugar, ciudad, capacidad por montaje (banquete, cóctel, auditorio), medidas y última versión. Solo lectura: copiar un salón al plano se hace desde el editor.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    async (_input, ctx) => {
+      const a = auth(ctx);
+      const rooms = await listVisibleRooms({ userId: a.userId, weddingId: a.weddingId });
+      return json({
+        rooms: rooms.map((r) => ({
+          roomId: r.id,
+          room: r.name,
+          venue: r.venue.name,
+          city: r.venue.city || null,
+          address: r.venue.address || null,
+          visibility: r.venue.visibility,
+          capacity: { banquet: r.banquetCapacity, cocktail: r.cocktailCapacity, theater: r.theaterCapacity },
+          latestVersionId: r.latest?.id ?? null,
+          latestVersion: r.latest?.version ?? null,
+          sizeMeters: r.sizeMeters && { width: roundMeters(r.sizeMeters.width), height: roundMeters(r.sizeMeters.height) },
+          fixtures: r.latest?.roomFixtures.length ?? 0,
+          hasFloorPlan: !!r.latest?.backgroundImage,
+        })),
       });
     }
   );

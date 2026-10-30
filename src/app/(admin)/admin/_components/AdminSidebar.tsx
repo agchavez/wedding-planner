@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { usePathname } from "next/navigation";
-import { Activity, ArrowLeft, Gauge, Heart, MonitorSmartphone, Users } from "lucide-react";
+import { Activity, ArrowLeft, Gauge, Heart, Library, MonitorSmartphone, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +22,7 @@ const LINKS = [
   { href: "/admin", label: "Resumen", icon: Gauge },
   { href: "/admin/bodas", label: "Bodas", icon: Heart },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { href: "/admin/salones", label: "Salones", icon: Library },
   { href: "/admin/actividad", label: "Actividad y auditoría", icon: Activity },
   { href: "/admin/sesiones", label: "Sesiones activas", icon: MonitorSmartphone },
 ];

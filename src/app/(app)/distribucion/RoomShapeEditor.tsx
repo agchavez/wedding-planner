@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef } from "react";
-import { Circle, Layer, Line, Rect, Text, Transformer } from "react-konva";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Circle, Image as KonvaImage, Layer, Line, Rect, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import { useCanvasStore } from "@/app/(app)/distribucion/canvasStore";
 import { usePlanTheme } from "@/app/(app)/distribucion/planPalette";
@@ -9,6 +9,7 @@ import { commitTransform, transformerHandleProps, useSelectionDrag } from "@/app
 import { RoomFixtureShape } from "@/app/(app)/distribucion/shapes/RoomFixtureShape";
 import { formatMeters, metersToPx, pxToMeters, resolvePxPerMeter } from "@/lib/layoutUnits";
 import type { RoomPoint } from "@/lib/seatGeometry";
+import { isAllowedPlanUrl } from "@/lib/venueLibrary";
 
 const VERTEX_RADIUS = 7;
 const MIDPOINT_RADIUS = 6;
@@ -23,6 +24,21 @@ function toFlatPoints(points: RoomPoint[]): number[] {
   return points.flatMap((p) => [p.x, p.y]);
 }
 
+/** Imagen cargada para Konva (null mientras carga o si falla). */
+function useHtmlImage(url: string | undefined) {
+  const [loaded, setLoaded] = useState<{ url: string; image: HTMLImageElement } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    const image = new window.Image();
+    image.onload = () => setLoaded({ url, image });
+    image.src = url;
+    return () => {
+      image.onload = null;
+    };
+  }, [url]);
+  return loaded && loaded.url === url ? loaded.image : null;
+}
+
 /**
  * Capa salón: piso de lino, contorno del local con paredes gruesas y elementos fijos (paredes,
  * columnas, puertas...). Se dibuja debajo de los elementos de la boda y está bloqueada (no
@@ -32,6 +48,9 @@ function toFlatPoints(points: RoomPoint[]): number[] {
 export function RoomShapeEditor({ panning = false, coarsePointer = false }: { panning?: boolean; coarsePointer?: boolean }) {
   const roomShape = useCanvasStore((s) => s.roomShape);
   const roomFixtures = useCanvasStore((s) => s.roomFixtures);
+  const backgroundImage = useCanvasStore((s) => s.backgroundImage);
+  // Solo planos subidos a la app (nunca se pide la imagen a un host externo).
+  const planImage = useHtmlImage(isAllowedPlanUrl(backgroundImage?.url) ? backgroundImage?.url : undefined);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const roomEditMode = useCanvasStore((s) => s.roomEditMode);
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
@@ -79,7 +98,8 @@ export function RoomShapeEditor({ panning = false, coarsePointer = false }: { pa
           fill={linen ? undefined : palette.floor}
           fillPatternImage={linen ?? undefined}
           fillPatternRepeat="repeat"
-          stroke={palette.wall}
+          // Con plano de fondo las paredes se dibujan encima de la imagen (ver más abajo).
+          stroke={planImage ? undefined : palette.wall}
           strokeWidth={metersToPx(WALL_THICKNESS_METERS, pxPerMeter)}
           lineJoin="miter"
           listening={false}
@@ -94,6 +114,28 @@ export function RoomShapeEditor({ panning = false, coarsePointer = false }: { pa
           fillPatternRepeat="repeat"
           stroke={palette.zoneLine}
           strokeWidth={1}
+          listening={false}
+        />
+      )}
+      {/* Plano importado: encima del piso y debajo de paredes y elementos fijos, para calcarlo. */}
+      {backgroundImage && planImage && (
+        <KonvaImage
+          image={planImage}
+          x={backgroundImage.x}
+          y={backgroundImage.y}
+          width={backgroundImage.width}
+          height={backgroundImage.height}
+          opacity={backgroundImage.opacity}
+          listening={false}
+        />
+      )}
+      {hasShape && planImage && (
+        <Line
+          points={toFlatPoints(roomShape)}
+          closed
+          stroke={palette.wall}
+          strokeWidth={metersToPx(WALL_THICKNESS_METERS, pxPerMeter)}
+          lineJoin="miter"
           listening={false}
         />
       )}

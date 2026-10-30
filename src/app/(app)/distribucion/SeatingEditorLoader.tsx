@@ -5,7 +5,8 @@ import type { Background } from "@/app/(app)/distribucion/canvasStore";
 import type { RoomPoint } from "@/lib/seatGeometry";
 import type { SeatingGuest } from "@/lib/guestSeating";
 import type { LabelOption } from "@/lib/guestLabels";
-import type { LayoutElement, RoomFixture } from "@/generated/prisma";
+import type { BaseRoomInfo } from "@/lib/venueLibrary";
+import type { LayoutElement, PlanImage, RoomFixture } from "@/generated/prisma";
 
 const SeatingEditor = dynamic(
   () => import("@/app/(app)/distribucion/SeatingEditor").then((mod) => mod.SeatingEditor),
@@ -28,6 +29,9 @@ export function SeatingEditorLoader(props: {
   initialRoomShape: RoomPoint[];
   initialRoomFixtures: RoomFixture[];
   pxPerMeter: number | null;
+  initialBackgroundImage: PlanImage | null;
+  initialBaseRoomVersionId: string | null;
+  baseRoom: BaseRoomInfo | null;
   guests: SeatingGuest[];
   labels: LabelOption[];
   otherTableIds: string[];

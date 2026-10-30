@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
-import { Layer, Line, Rect, Stage, Transformer } from "react-konva";
+import { Circle, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import {
   AlertTriangle,
@@ -53,6 +53,9 @@ import {
   useSelectionDrag,
 } from "@/app/(app)/distribucion/useSelectionDrag";
 import { useLayoutAutosave } from "@/app/(app)/distribucion/useLayoutAutosave";
+import { RoomLibraryDialogs, RoomLibraryMenu, RoomLibraryStatus } from "@/app/(app)/distribucion/RoomLibrary";
+import { CalibrationOverlay } from "@/app/(app)/distribucion/CalibrationOverlay";
+import { useRoomLibraryStore } from "@/app/(app)/distribucion/roomLibraryStore";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -68,11 +71,12 @@ import { useWeddingAccess } from "@/components/WeddingAccess";
 import { cn } from "@/lib/utils";
 import { simplifyFreehandShape, type RoomPoint } from "@/lib/seatGeometry";
 import { boxFromPoints, boxesIntersect, shapeBox } from "@/lib/layoutGeometry";
-import { formatMeters, metersToPx, pickScaleBarMeters, resolvePxPerMeter } from "@/lib/layoutUnits";
+import { formatMeters, metersToPx, pickScaleBarMeters, pxToMeters, resolvePxPerMeter } from "@/lib/layoutUnits";
 import { getChairMetrics, isTableType } from "@/lib/seatGeometry";
 import { findSeatAt, type SeatingGuest } from "@/lib/guestSeating";
 import type { LabelOption } from "@/lib/guestLabels";
-import type { LayoutElement, RoomFixture } from "@/generated/prisma";
+import type { BaseRoomInfo } from "@/lib/venueLibrary";
+import type { LayoutElement, PlanImage, RoomFixture } from "@/generated/prisma";
 
 const ZOOM_STEP = 1.2;
 const STAGE_VIEW_HEIGHT = "clamp(380px, 70vh, 680px)";
@@ -82,6 +86,9 @@ const NUDGE_METERS = 0.05;
 const NUDGE_METERS_LARGE = 0.5;
 // Arrastre mínimo (en píxeles de pantalla) para que cuente como rectángulo de selección.
 const MARQUEE_MIN_SCREEN_PX = 4;
+// Movimiento máximo (px de pantalla) de un toque o clic que marca un punto de calibración; más
+// es arrastrar el plano.
+const CALIBRATION_TAP_SLOP_PX = 6;
 const CORNER_ANCHORS = ["top-left", "top-right", "bottom-left", "bottom-right"];
 const ALL_ANCHORS = [...CORNER_ANCHORS, "top-center", "bottom-center", "middle-left", "middle-right"];
 
@@ -161,6 +168,9 @@ export function SeatingEditor({
   initialRoomShape,
   initialRoomFixtures,
   pxPerMeter: initialPxPerMeter,
+  initialBackgroundImage,
+  initialBaseRoomVersionId,
+  baseRoom,
   guests,
   labels,
   otherTableIds,
@@ -173,6 +183,10 @@ export function SeatingEditor({
   initialRoomShape: RoomPoint[];
   initialRoomFixtures: RoomFixture[];
   pxPerMeter: number | null;
+  initialBackgroundImage: PlanImage | null;
+  initialBaseRoomVersionId: string | null;
+  /** Salón de la biblioteca en que se basa el plano (y si hay versión nueva). */
+  baseRoom: BaseRoomInfo | null;
   /** Invitados de la boda (en el orden de SEATING_GUEST_ORDER) para sentarlos en las mesas. */
   guests: SeatingGuest[];
   labels: LabelOption[];
@@ -190,6 +204,8 @@ export function SeatingEditor({
   const pxPerMeterRaw = useCanvasStore((s) => s.pxPerMeter);
   const roomEditMode = useCanvasStore((s) => s.roomEditMode);
   const roomDrawMode = useCanvasStore((s) => s.roomDrawMode);
+  const calibrationPoints = useCanvasStore((s) => s.calibrationPoints);
+  const calibrating = calibrationPoints !== null;
   const tool = useCanvasStore((s) => s.tool);
   const zoom = useCanvasStore((s) => s.zoom);
   const stageX = useCanvasStore((s) => s.stageX);
@@ -224,6 +240,9 @@ export function SeatingEditor({
   const marqueeRef = useRef<Konva.Rect>(null);
   const marqueeStartRef = useRef<{ point: RoomPoint; additive: boolean } | null>(null);
   const pinchRef = useRef<{ dist: number; center: { x: number; y: number } } | null>(null);
+  // Calibración: punto que se marcará al soltar, si el toque o clic no se movió (no fue arrastre
+  // ni pellizco).
+  const calibrationTapRef = useRef<{ pointerId: number; clientX: number; clientY: number; point: RoomPoint } | null>(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 560 });
   const [spaceDown, setSpaceDown] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -271,7 +290,10 @@ export function SeatingEditor({
       roomShape: initialRoomShape,
       roomFixtures: initialRoomFixtures,
       pxPerMeter: initialPxPerMeter,
+      backgroundImage: initialBackgroundImage,
+      baseRoomVersionId: initialBaseRoomVersionId,
     });
+    if (baseRoom) useRoomLibraryStore.getState().remember(baseRoom);
     // En pantallas táctiles, arrastrar con un dedo mueve el plano (la selección es con toques).
     if (coarsePointer) setTool("pan");
     // Solo se usa el valor inicial cargado del servidor; después el store es la fuente de verdad.
@@ -404,6 +426,7 @@ export function SeatingEditor({
         return;
       } else if (e.key === "Escape") {
         if (store.roomDrawMode) store.setRoomDrawMode(false);
+        if (store.calibrationPoints) store.cancelCalibration();
         store.select(null);
         return;
       }
@@ -491,6 +514,13 @@ export function SeatingEditor({
     (e: Konva.KonvaEventObject<PointerEvent>) => {
       const stage = e.target.getStage();
       if (!stage) return;
+      // Calibración: un clic o toque sin moverse marca un punto (se agrega al soltar, ver
+      // handlePointerUp). Solo el botón principal; un segundo dedo (pellizco) lo cancela.
+      if (calibrating) {
+        const point = e.evt.isPrimary && e.evt.button === 0 ? stageToWorld(stage, zoom, stageX, stageY) : null;
+        calibrationTapRef.current = point && { pointerId: e.evt.pointerId, clientX: e.evt.clientX, clientY: e.evt.clientY, point };
+        return;
+      }
       if (roomDrawMode) {
         const point = stageToWorld(stage, zoom, stageX, stageY);
         if (point) {
@@ -506,7 +536,7 @@ export function SeatingEditor({
       const point = stageToWorld(stage, zoom, stageX, stageY);
       if (point) marqueeStartRef.current = { point, additive: e.evt.shiftKey || e.evt.metaKey || e.evt.ctrlKey };
     },
-    [roomDrawMode, panning, zoom, stageX, stageY]
+    [roomDrawMode, calibrating, panning, zoom, stageX, stageY]
   );
 
   const handlePointerMove = useCallback(
@@ -536,6 +566,13 @@ export function SeatingEditor({
 
   const handlePointerUp = useCallback(
     (e: Konva.KonvaEventObject<PointerEvent>) => {
+      if (calibrating) {
+        const tap = calibrationTapRef.current;
+        calibrationTapRef.current = null;
+        const still = tap && Math.hypot(e.evt.clientX - tap.clientX, e.evt.clientY - tap.clientY) <= CALIBRATION_TAP_SLOP_PX;
+        if (tap && still && tap.pointerId === e.evt.pointerId) useCanvasStore.getState().addCalibrationPoint(tap.point);
+        return;
+      }
       if (roomDrawMode) {
         if (!isDrawingRef.current) return;
         isDrawingRef.current = false;
@@ -563,7 +600,7 @@ export function SeatingEditor({
       const hits = active.filter((shape) => boxesIntersect(shapeBox(shape), box)).map((shape) => shape.id);
       setSelection(start.additive ? [...new Set([...useCanvasStore.getState().selectedIds, ...hits])] : hits);
     },
-    [roomDrawMode, zoom, stageX, stageY, clearMarquee, select, setSelection, setRoomShapeFromPoints]
+    [roomDrawMode, calibrating, zoom, stageX, stageY, clearMarquee, select, setSelection, setRoomShapeFromPoints]
   );
 
   // Pellizco con dos dedos: zoom alrededor del punto medio (y arrastre del plano a la vez).
@@ -575,6 +612,8 @@ export function SeatingEditor({
       const stage = e.target.getStage();
       if (!stage) return;
       if (stage.isDragging()) stage.stopDrag();
+      // Un pellizco nunca marca un punto de calibración.
+      calibrationTapRef.current = null;
       // Si el primer dedo había empezado a arrastrar una mesa, ese arrastre se descarta.
       cancelSelectionDrag(stage);
       clearMarquee();
@@ -641,6 +680,7 @@ export function SeatingEditor({
               <CanvasSizeControl />
               <AmbienteControl />
               <RoomShapeControl />
+              <RoomLibraryMenu />
             </div>
             <div className="flex items-center gap-1">
               <SaveIndicator status={saveStatus} dirty={dirty} onSave={performSave} />
@@ -657,6 +697,8 @@ export function SeatingEditor({
           </div>
         )}
 
+        <RoomLibraryStatus canEdit={canEdit} />
+
         <div
           ref={viewportRef}
           // Enfocable: al hacer clic en el plano, los atajos (Supr, flechas, Espacio) vuelven a ser del plano.
@@ -665,7 +707,7 @@ export function SeatingEditor({
           className={cn(
             "plan-paper relative touch-none overflow-hidden rounded-xl border border-border select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             panning && "cursor-grab active:cursor-grabbing",
-            roomDrawMode && "cursor-crosshair"
+            (roomDrawMode || calibrating) && "cursor-crosshair"
           )}
           style={{ height: STAGE_VIEW_HEIGHT }}
           // Soltar un invitado del panel sobre una mesa (primera silla libre) o sobre una silla.
@@ -699,7 +741,9 @@ export function SeatingEditor({
             scaleY={zoom}
             x={stageX}
             y={stageY}
-            draggable={!roomDrawMode && panning}
+            // Al calibrar el plano también se arrastra (con un dedo en móvil): el punto se marca con
+            // un toque o clic sin mover.
+            draggable={!roomDrawMode && (panning || calibrating)}
             onWheel={handleWheel}
             onDragStart={(e) => {
               if (e.target === e.target.getStage()) setInteracting(true);
@@ -727,7 +771,7 @@ export function SeatingEditor({
             <PlanThemeContext.Provider value={{ palette, patterns }}>
               <RoomShapeEditor panning={panning} coarsePointer={coarsePointer} />
               {/* Capa de la boda. En modo "Editar salón" se atenúa y deja pasar los clics a la capa salón. */}
-              <Layer listening={!roomEditMode} opacity={roomEditMode ? 0.45 : 1}>
+              <Layer listening={!roomEditMode && !calibrating} opacity={roomEditMode ? 0.45 : 1}>
                 {elements.map((el) => (
                   <CanvasElement
                     key={el.id}
@@ -782,6 +826,9 @@ export function SeatingEditor({
                   <Line ref={drawLineRef} points={[]} stroke={palette.accent} strokeWidth={2 / zoom} dash={[6, 4]} lineCap="round" lineJoin="round" />
                 )}
                 <DropHighlight pxPerMeter={pxPerMeter} />
+                {calibrationPoints && calibrationPoints.length > 0 && (
+                  <CalibrationMarks points={calibrationPoints} zoom={zoom} pxPerMeter={pxPerMeter} color={palette.accent} font={palette.bodyFont} />
+                )}
                 <Rect
                   ref={marqueeRef}
                   visible={false}
@@ -873,6 +920,7 @@ export function SeatingEditor({
           </div>
 
           {draggingGuestId && <DragHint guestId={draggingGuestId} />}
+          {canEdit && <CalibrationOverlay />}
 
           <div className="pointer-events-none absolute bottom-3 left-3 hidden rounded-md bg-card/85 px-2 py-1 text-[11px] text-muted-foreground shadow-sm sm:block">
             <div className="h-1.5 border-x-2 border-b-2 border-foreground/60" style={{ width: scaleBarMeters * screenPxPerMeter }} />
@@ -890,6 +938,7 @@ export function SeatingEditor({
       </div>
 
       {canEdit && <DeleteSelectionDialog />}
+      {canEdit && <RoomLibraryDialogs />}
       <SeatSheet canEdit={canEdit} otherTableIds={otherTableIds} />
 
       {canEdit && (
@@ -914,6 +963,41 @@ export function SeatingEditor({
         </div>
       )}
     </div>
+  );
+}
+
+/** Puntos y línea de la calibración de escala, con la medida actual (a tamaño fijo en pantalla). */
+function CalibrationMarks({
+  points,
+  zoom,
+  pxPerMeter,
+  color,
+  font,
+}: {
+  points: RoomPoint[];
+  zoom: number;
+  pxPerMeter: number;
+  color: string;
+  font: string;
+}) {
+  const [a, b] = points;
+  return (
+    <>
+      {b && <Line points={[a.x, a.y, b.x, b.y]} stroke={color} strokeWidth={2 / zoom} dash={[6 / zoom, 4 / zoom]} />}
+      {points.map((p, i) => (
+        <Circle key={i} x={p.x} y={p.y} radius={6 / zoom} fill={color} stroke="white" strokeWidth={2 / zoom} />
+      ))}
+      {b && (
+        <Text
+          x={(a.x + b.x) / 2 + 8 / zoom}
+          y={(a.y + b.y) / 2 + 8 / zoom}
+          text={formatMeters(pxToMeters(Math.hypot(b.x - a.x, b.y - a.y), pxPerMeter))}
+          fontSize={12 / zoom}
+          fontFamily={font}
+          fill={color}
+        />
+      )}
+    </>
   );
 }
 

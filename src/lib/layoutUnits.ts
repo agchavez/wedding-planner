@@ -12,6 +12,18 @@ export const DEFAULT_PX_PER_METER = 100 / 1.5;
 export const MIN_PX_PER_METER = 10;
 export const MAX_PX_PER_METER = 500;
 
+// Tamaño del lienzo en píxeles (mínimo y máximo que acepta el servidor).
+export const MIN_CANVAS_SIZE = 800;
+export const MAX_CANVAS_SIZE = 4000;
+
+// Coordenadas (px) que acepta el servidor para el contorno, los elementos fijos y el plano.
+export const MIN_ROOM_COORD = -2000;
+export const MAX_ROOM_COORD = 6000;
+
+export function clampCanvasSize(value: number) {
+  return Math.min(MAX_CANVAS_SIZE, Math.max(MIN_CANVAS_SIZE, value));
+}
+
 // Versión del formato de SeatingLayout. null/1 = solo píxeles; 2 = escala + capa salón (roomFixtures).
 export const LAYOUT_SCHEMA_VERSION = 2;
 
