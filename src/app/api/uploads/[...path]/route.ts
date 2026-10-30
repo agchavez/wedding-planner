@@ -5,7 +5,7 @@ import { mongoDb } from "@/lib/mongo";
 import { prisma } from "@/lib/prisma";
 import { idMatch } from "@/lib/ids";
 import { getSession } from "@/lib/session";
-import { UPLOADS_ROOT } from "@/lib/uploads";
+import { isSafeUploadPath, UPLOADS_ROOT } from "@/lib/uploads";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -70,6 +70,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/uploads/[...
   if (!session) return new NextResponse("No autorizado", { status: 401 });
 
   const segments = (await ctx.params).path;
+  // El permiso se decide con los segmentos: no se aceptan "..", "." ni separadores escondidos
+  // que hagan que el archivo leído sea otro distinto del autorizado.
+  if (!isSafeUploadPath(segments)) return new NextResponse("No encontrado", { status: 404 });
   const url = `/api/uploads/${segments.join("/")}`;
   const filePath = path.resolve(/*turbopackIgnore: true*/ UPLOADS_ROOT, ...segments);
   if (!filePath.startsWith(path.resolve(UPLOADS_ROOT) + path.sep)) return new NextResponse("No encontrado", { status: 404 });
