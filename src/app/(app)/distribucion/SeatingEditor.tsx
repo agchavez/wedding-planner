@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { toast } from "sonner";
 import { Layer, Line, Rect, Stage, Transformer } from "react-konva";
 import type Konva from "konva";
 import {
@@ -16,6 +17,7 @@ import {
   RotateCw,
   SlidersHorizontal,
   Undo2,
+  Users,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -36,7 +38,14 @@ import { SnapGuidesLayer } from "@/app/(app)/distribucion/SnapGuidesLayer";
 import { duplicateOrWarn, SelectionActionBar } from "@/app/(app)/distribucion/SelectionActionBar";
 import { EditorDock } from "@/app/(app)/distribucion/Toolbar";
 import { PropertiesPanel } from "@/app/(app)/distribucion/PropertiesPanel";
-import { PlanThemeContext, usePlanPalette, usePlanPatterns } from "@/app/(app)/distribucion/planPalette";
+import { PlanThemeContext, seatColor, usePlanPalette, usePlanPatterns } from "@/app/(app)/distribucion/planPalette";
+import { GUEST_DRAG_TYPE, UNSEAT_ZONE_ATTR, useGuestSeatingStore, type SeatTarget } from "@/app/(app)/distribucion/guestSeatingStore";
+import { GuestSeatingPanel } from "@/app/(app)/distribucion/GuestSeatingPanel";
+import { SeatSheet } from "@/app/(app)/distribucion/SeatSheet";
+import { registerLayoutFlush, seatGuestAt, unseatGuestById } from "@/app/(app)/distribucion/seatGuestClient";
+import { guestsByTable, useGuestColorSlot } from "@/app/(app)/distribucion/seatingView";
+import { DropHighlight } from "@/app/(app)/distribucion/shapes/DropHighlight";
+import type { SeatHandlers } from "@/app/(app)/distribucion/shapes/TableSeats";
 import {
   cancelSelectionDrag,
   commitTransform,
@@ -60,7 +69,9 @@ import { cn } from "@/lib/utils";
 import { simplifyFreehandShape, type RoomPoint } from "@/lib/seatGeometry";
 import { boxFromPoints, boxesIntersect, shapeBox } from "@/lib/layoutGeometry";
 import { formatMeters, metersToPx, pickScaleBarMeters, resolvePxPerMeter } from "@/lib/layoutUnits";
-import { isTableType } from "@/lib/seatGeometry";
+import { getChairMetrics, isTableType } from "@/lib/seatGeometry";
+import { findSeatAt, type SeatingGuest } from "@/lib/guestSeating";
+import type { LabelOption } from "@/lib/guestLabels";
 import type { LayoutElement, RoomFixture } from "@/generated/prisma";
 
 const ZOOM_STEP = 1.2;
@@ -101,6 +112,46 @@ function isInteractiveTarget(target: EventTarget | null) {
 
 const isRoundType = (type: string) => type === "table-round" || type === "table-cake";
 
+// Radio mínimo de una silla en pantalla (px) para dibujar iniciales; con menos, solo "6/8".
+const SEAT_DETAIL_MIN_SCREEN_RADIUS = 7;
+const NO_GUESTS: SeatingGuest[] = [];
+
+/** Mesa/silla del plano bajo un punto del lienzo, con el estado actual del editor. */
+function seatTargetAt(point: RoomPoint | null): SeatTarget | null {
+  if (!point) return null;
+  const { elements, pxPerMeter } = useCanvasStore.getState();
+  return findSeatAt(elements, point, resolvePxPerMeter(pxPerMeter));
+}
+
+/** El puntero de Konva está dentro de la zona visible del plano (no fuera del lienzo). */
+function pointerInStage(stage: Konva.Stage | null) {
+  const p = stage?.getPointerPosition();
+  return !!stage && !!p && p.x >= 0 && p.y >= 0 && p.x <= stage.width() && p.y <= stage.height();
+}
+
+/** Punto de pantalla (clientX/Y) de un evento nativo de ratón, puntero o toque. */
+function clientPointOf(evt: Event | undefined): { x: number; y: number } | null {
+  if (!evt) return null;
+  if ("changedTouches" in evt) {
+    const touch = (evt as TouchEvent).changedTouches[0];
+    return touch ? { x: touch.clientX, y: touch.clientY } : null;
+  }
+  return "clientX" in evt ? { x: (evt as MouseEvent).clientX, y: (evt as MouseEvent).clientY } : null;
+}
+
+/** El punto de pantalla cae sobre la zona "Quitar de la mesa" del panel de invitados. */
+function overUnseatZone(evt: Event | undefined) {
+  const point = clientPointOf(evt);
+  return !!point && !!document.elementFromPoint(point.x, point.y)?.closest(`[${UNSEAT_ZONE_ATTR}]`);
+}
+
+/** Punto del lienzo bajo el puntero actual de Konva. */
+function stagePointerToWorld(stage: Konva.Stage | null): RoomPoint | null {
+  if (!stage) return null;
+  const { zoom, stageX, stageY } = useCanvasStore.getState();
+  return stageToWorld(stage, zoom, stageX, stageY);
+}
+
 export function SeatingEditor({
   eventId,
   initialElements,
@@ -110,6 +161,9 @@ export function SeatingEditor({
   initialRoomShape,
   initialRoomFixtures,
   pxPerMeter: initialPxPerMeter,
+  guests,
+  labels,
+  otherTableIds,
 }: {
   eventId: string;
   initialElements: LayoutElement[];
@@ -119,6 +173,11 @@ export function SeatingEditor({
   initialRoomShape: RoomPoint[];
   initialRoomFixtures: RoomFixture[];
   pxPerMeter: number | null;
+  /** Invitados de la boda (en el orden de SEATING_GUEST_ORDER) para sentarlos en las mesas. */
+  guests: SeatingGuest[];
+  labels: LabelOption[];
+  /** Mesas de los otros eventos de la boda. */
+  otherTableIds: string[];
 }) {
   const elements = useCanvasStore((s) => s.elements);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -168,6 +227,8 @@ export function SeatingEditor({
   const [stageSize, setStageSize] = useState({ width: 800, height: 560 });
   const [spaceDown, setSpaceDown] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [guestPanelOpen, setGuestPanelOpen] = useState(false);
+  const stageRef = useRef<Konva.Stage>(null);
   // Pantalla táctil: manijas del Transformer más grandes y el plano se mueve con un dedo.
   const [coarsePointer] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches);
   const drag = useSelectionDrag(nodeRefs);
@@ -236,6 +297,78 @@ export function SeatingEditor({
   }, [selectedIds, elements, roomEditMode]);
 
   const performSave = useLayoutAutosave(eventId, canEdit);
+
+  // Invitados: el servidor manda la lista fresca tras cada cambio (revalidatePath); mientras
+  // haya un cambio en vuelo se conserva el estado optimista.
+  const seatGuests = useGuestSeatingStore((s) => s.guests);
+  const draggingGuestId = useGuestSeatingStore((s) => s.draggingGuestId);
+  const setDropTarget = useGuestSeatingStore((s) => s.setDropTarget);
+  useEffect(() => {
+    const store = useGuestSeatingStore.getState();
+    if (store.pending === 0) store.setGuests(guests);
+  }, [guests]);
+
+  // Antes de sentar a alguien se guarda el plano: la mesa puede ser nueva o haber cambiado de capacidad.
+  useEffect(() => {
+    if (!canEdit) return;
+    return registerLayoutFlush(async () => {
+      const s = useCanvasStore.getState();
+      if (s.dirty || s.saveStatus === "saving") await performSave();
+      return useCanvasStore.getState().saveStatus !== "error";
+    });
+  }, [canEdit, performSave]);
+
+  const slotOf = useGuestColorSlot();
+  const seatColorOf = useMemo(() => (guest: SeatingGuest) => seatColor(palette, slotOf(guest)), [palette, slotOf]);
+  const seatedByTable = useMemo(() => guestsByTable(seatGuests), [seatGuests]);
+  const seatDetail = getChairMetrics(pxPerMeter).radius * zoom >= SEAT_DETAIL_MIN_SCREEN_RADIUS;
+
+  // Tocar una silla abre la hoja para sentar a alguien; arrastrar una ocupada lo cambia de mesa.
+  const seatHandlers = useMemo<SeatHandlers>(
+    () => ({
+      onSeatClick: (tableId, seatIndex) => {
+        if (useCanvasStore.getState().roomEditMode) return;
+        useGuestSeatingStore.getState().openSheet({ tableId, seatIndex });
+      },
+      onGuestDragStart: (guestId) => {
+        useGuestSeatingStore.getState().setDraggingGuest(guestId);
+        useCanvasStore.getState().setInteracting(true);
+      },
+      onGuestDragMove: (stage, evt) => {
+        // Fuera del plano no hay mesa destino (Konva sigue el puntero aunque salga del lienzo).
+        const store = useGuestSeatingStore.getState();
+        const inStage = pointerInStage(stage);
+        store.setDropTarget(inStage ? seatTargetAt(stagePointerToWorld(stage)) : null);
+        store.setOverUnseatZone(!inStage && overUnseatZone(evt));
+      },
+      onGuestDragEnd: (guestId, stage, evt) => {
+        const store = useGuestSeatingStore.getState();
+        store.setDropTarget(null);
+        store.setDraggingGuest(null);
+        store.setOverUnseatZone(false);
+        useCanvasStore.getState().setInteracting(false);
+        // Sin evento nativo, Konva cortó el arrastre sin que se soltara el botón: no se asigna nada.
+        if (!evt) return;
+        if (pointerInStage(stage)) {
+          const target = seatTargetAt(stagePointerToWorld(stage));
+          if (target) void seatGuestAt(guestId, target.tableId, target.seatIndex);
+          else toast.info("Suelta al invitado sobre una mesa o una silla.");
+        } else if (overUnseatZone(evt)) {
+          void unseatGuestById(guestId);
+        }
+        // Fuera del plano y de la zona "Quitar de la mesa": se cancela sin cambios.
+      },
+    }),
+    []
+  );
+
+  /** Punto del lienzo bajo el cursor durante un arrastre HTML (desde el panel de invitados). */
+  const clientToWorld = useCallback((e: DragEvent) => {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    stage.setPointersPositions(e.nativeEvent);
+    return stagePointerToWorld(stage);
+  }, []);
 
   // Atajos de teclado (solo para quien puede editar).
   useEffect(() => {
@@ -470,7 +603,37 @@ export function SeatingEditor({
   const scaleBarMeters = pickScaleBarMeters(screenPxPerMeter);
 
   return (
-    <div className={cn("grid min-w-0 grid-cols-1 gap-4", canEdit && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
+    <div
+      className={cn(
+        "grid min-w-0 grid-cols-1 gap-4",
+        canEdit && "lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[16rem_minmax(0,1fr)_18rem]"
+      )}
+    >
+      {/* Invitados por sentar: a la izquierda en pantallas anchas; en las demás, debajo y plegable. */}
+      <div className="order-last min-w-0 xl:order-first">
+        <button
+          type="button"
+          className="mb-2 flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium xl:hidden"
+          onClick={() => setGuestPanelOpen((open) => !open)}
+          aria-expanded={guestPanelOpen}
+        >
+          <span className="flex items-center gap-2">
+            <Users className="size-4" />
+            Invitados por sentar
+          </span>
+          <ChevronDown className={cn("size-4 transition-transform", guestPanelOpen && "rotate-180")} />
+        </button>
+        <div className={cn(!guestPanelOpen && "hidden", "xl:block")}>
+          <GuestSeatingPanel
+            canEdit={canEdit}
+            otherTableIds={otherTableIds}
+            labels={labels}
+            className="h-[30rem] xl:h-(--guest-panel-h)"
+            style={{ "--guest-panel-h": `calc(${STAGE_VIEW_HEIGHT} + 2.75rem)` } as CSSProperties}
+          />
+        </div>
+      </div>
+
       <div className="min-w-0 space-y-3">
         {canEdit && (
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -505,8 +668,31 @@ export function SeatingEditor({
             roomDrawMode && "cursor-crosshair"
           )}
           style={{ height: STAGE_VIEW_HEIGHT }}
+          // Soltar un invitado del panel sobre una mesa (primera silla libre) o sobre una silla.
+          onDragOver={(e) => {
+            if (!canEdit || !e.dataTransfer.types.includes(GUEST_DRAG_TYPE)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = roomEditMode ? "none" : "move";
+            setDropTarget(roomEditMode ? null : seatTargetAt(clientToWorld(e)));
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null);
+          }}
+          onDrop={(e) => {
+            const guestId = e.dataTransfer.getData(GUEST_DRAG_TYPE);
+            if (!canEdit || !guestId) return;
+            e.preventDefault();
+            const target = roomEditMode ? null : seatTargetAt(clientToWorld(e));
+            const store = useGuestSeatingStore.getState();
+            store.setDropTarget(null);
+            store.setDraggingGuest(null);
+            if (roomEditMode) toast.info("Termina de editar el salón para sentar invitados.");
+            else if (target) void seatGuestAt(guestId, target.tableId, target.seatIndex);
+            else toast.info("Suelta al invitado sobre una mesa o una silla.");
+          }}
         >
           <Stage
+            ref={stageRef}
             width={stageSize.width}
             height={stageSize.height}
             scaleX={zoom}
@@ -553,6 +739,10 @@ export function SeatingEditor({
                     onSelect={select}
                     drag={drag}
                     registerRef={registerRef}
+                    seatedGuests={isTableType(el.type) ? (seatedByTable.get(el.id) ?? NO_GUESTS) : undefined}
+                    seatColorOf={seatColorOf}
+                    seatHandlers={seatHandlers}
+                    seatDetail={seatDetail}
                   />
                 ))}
                 <Transformer
@@ -591,6 +781,7 @@ export function SeatingEditor({
                 {roomDrawMode && (
                   <Line ref={drawLineRef} points={[]} stroke={palette.accent} strokeWidth={2 / zoom} dash={[6, 4]} lineCap="round" lineJoin="round" />
                 )}
+                <DropHighlight pxPerMeter={pxPerMeter} />
                 <Rect
                   ref={marqueeRef}
                   visible={false}
@@ -681,6 +872,8 @@ export function SeatingEditor({
             </button>
           </div>
 
+          {draggingGuestId && <DragHint guestId={draggingGuestId} />}
+
           <div className="pointer-events-none absolute bottom-3 left-3 hidden rounded-md bg-card/85 px-2 py-1 text-[11px] text-muted-foreground shadow-sm sm:block">
             <div className="h-1.5 border-x-2 border-b-2 border-foreground/60" style={{ width: scaleBarMeters * screenPxPerMeter }} />
             <span className="tabular-nums">{formatMeters(scaleBarMeters, scaleBarMeters < 1 ? 1 : 0)}</span>
@@ -697,6 +890,7 @@ export function SeatingEditor({
       </div>
 
       {canEdit && <DeleteSelectionDialog />}
+      <SeatSheet canEdit={canEdit} otherTableIds={otherTableIds} />
 
       {canEdit && (
         <div className="min-w-0">
@@ -719,6 +913,22 @@ export function SeatingEditor({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Ayuda sobre el plano mientras se arrastra a un invitado. */
+function DragHint({ guestId }: { guestId: string }) {
+  const name = useGuestSeatingStore((s) => s.guests.find((g) => g.id === guestId)?.fullName);
+  if (!name) return null;
+  return (
+    <div className="pointer-events-none absolute bottom-20 left-3 z-10 flex max-w-72 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs shadow-md">
+      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+        <Users className="size-3.5" />
+      </span>
+      <span>
+        Suelta a <b>{name}</b> en una silla, o sobre la mesa para usar la siguiente libre.
+      </span>
     </div>
   );
 }
@@ -746,7 +956,7 @@ function DeleteSelectionDialog() {
           </AlertDialogTitle>
           <AlertDialogDescription>
             {tables > 0
-              ? `Incluye ${tables === 1 ? "una mesa" : `${tables} mesas`}: los invitados sentados ahí dejarán de verse en el plano. `
+              ? `Incluye ${tables === 1 ? "una mesa" : `${tables} mesas`}: los invitados sentados ahí volverán a «Sin asignar». `
               : ""}
             Puedes deshacerlo con Ctrl+Z mientras sigas en esta página.
           </AlertDialogDescription>

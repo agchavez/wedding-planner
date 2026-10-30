@@ -75,6 +75,10 @@ model Guest {
   notes               String    @default("")
   // Referencia suelta al id de un LayoutElement embebido en SeatingLayout.elements.
   tableElementId      String?
+  // Silla (índice 0..capacidad-1) dentro de la mesa de tableElementId donde empieza el grupo:
+  // el invitado y sus acompañantes ocupan sillas consecutivas desde aquí. null = sin silla fija
+  // (el plano lo acomoda en la primera libre). Se limpia cada vez que cambia tableElementId.
+  seatIndex           Int?
   // De qué lado viene el invitado: bride | groom | both | "" (sin definir).
   side                String    @default("")
   // Referencias sueltas a GuestLabel.id (etiquetas libres para filtrar: "Trabajo", "VIP"…).

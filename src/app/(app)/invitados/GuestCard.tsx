@@ -131,7 +131,11 @@ export function GuestCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-          <Select value={guest.tableElementId ?? NO_TABLE} onValueChange={handleTableChange}>
+          {/* Si su mesa se borró del plano, el id ya no está en ninguna distribución: "Sin mesa". */}
+          <Select
+            value={guest.tableElementId && tableOptions.some((t) => t.id === guest.tableElementId) ? guest.tableElementId : NO_TABLE}
+            onValueChange={handleTableChange}
+          >
             <SelectTrigger className="w-full min-w-[10rem] sm:w-auto">
               <SelectValue>
                 {(value: string) => {

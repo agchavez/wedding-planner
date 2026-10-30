@@ -62,6 +62,7 @@ function describeGuest(g: Guest, labels: GuestLabel[], url?: string) {
     dietaryRestrictions: g.dietaryRestrictions || null,
     notes: g.notes || null,
     tableElementId: g.tableElementId || null,
+    seatIndex: g.seatIndex ?? null,
     ...(url ? { invitationUrl: url } : {}),
   };
 }

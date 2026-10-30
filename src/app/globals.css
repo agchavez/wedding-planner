@@ -189,6 +189,16 @@
   --plan-muted: var(--muted-foreground);
   --plan-accent: var(--primary);
   --plan-on-accent: var(--primary-foreground);
+  /* Sillas ocupadas, coloreadas por lado o grupo del invitado (ver lib/guestSeating.ts).
+     Lo bastante oscuros para que las iniciales en --plan-on-seat lleguen a 4.5:1 (WCAG AA). */
+  --plan-g1: var(--primary);
+  --plan-g2: #5c7863;
+  --plan-g3: #8a6a2f;
+  --plan-g4: #5f6a94;
+  --plan-g5: #a5573b;
+  --plan-g6: #7d5a86;
+  --plan-g-none: #7a6b62;
+  --plan-on-seat: #ffffff;
 }
 
 .dark {
@@ -205,6 +215,12 @@
   --plan-chair: #4a3a35;
   --plan-ink: #f2e6e3;
   --plan-muted: #b29d98;
+  --plan-g2: #5f7c66;
+  --plan-g3: #8f6d33;
+  --plan-g4: #646f99;
+  --plan-g5: #a8593d;
+  --plan-g6: #84638f;
+  --plan-g-none: #7a6a64;
 }
 
 /* Fondo del lienzo: papel con un grano muy sutil. */

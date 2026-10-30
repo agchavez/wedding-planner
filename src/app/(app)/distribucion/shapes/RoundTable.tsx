@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Circle, Text } from "react-konva";
-import { computeSeatPositions, getChairMetrics } from "@/lib/seatGeometry";
-import { ChairIcon } from "@/app/(app)/distribucion/shapes/ChairIcon";
+import { tableSeatLayout } from "@/lib/guestSeating";
+import { TableOccupancy, TableSeats, type SeatOptions } from "@/app/(app)/distribucion/shapes/TableSeats";
 import { usePlanTheme } from "@/app/(app)/distribucion/planPalette";
 
 export const RoundTable = memo(function RoundTable({
@@ -11,6 +11,7 @@ export const RoundTable = memo(function RoundTable({
   label,
   fill,
   pxPerMeter,
+  seating,
 }: {
   width: number;
   height: number;
@@ -18,17 +19,17 @@ export const RoundTable = memo(function RoundTable({
   label: string;
   fill: string | null;
   pxPerMeter: number;
+  seating?: SeatOptions;
 }) {
   const { palette } = usePlanTheme();
   const radius = width / 2;
-  const chair = getChairMetrics(pxPerMeter);
-  const seats = computeSeatPositions("table-round", width, height, capacity ?? 0, chair.offset);
+  const { points, chairRadius } = tableSeatLayout({ type: "table-round", width, height, capacity }, pxPerMeter);
+  // Con "6/8" debajo, el nombre sube un poco.
+  const labelShift = seating?.view && seating.view.capacity > 0 ? 7 : 0;
 
   return (
     <>
-      {seats.map((seat, i) => (
-        <ChairIcon key={i} x={seat.x} y={seat.y} radius={chair.radius} />
-      ))}
+      <TableSeats points={points} radius={chairRadius} options={seating} />
       <Circle
         radius={radius}
         fill={fill ?? palette.table}
@@ -44,7 +45,7 @@ export const RoundTable = memo(function RoundTable({
         width={width}
         height={height}
         offsetX={width / 2}
-        offsetY={height / 2}
+        offsetY={height / 2 + labelShift}
         padding={4}
         align="center"
         verticalAlign="middle"
@@ -54,6 +55,7 @@ export const RoundTable = memo(function RoundTable({
         fill={palette.ink}
         listening={false}
       />
+      <TableOccupancy view={seating?.view} detail={seating?.detail ?? true} round width={width} height={height} />
     </>
   );
 });

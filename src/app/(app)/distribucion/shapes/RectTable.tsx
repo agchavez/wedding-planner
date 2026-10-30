@@ -1,8 +1,8 @@
 import { memo } from "react";
 import { Rect, Text } from "react-konva";
-import { computeSeatPositions, getChairMetrics } from "@/lib/seatGeometry";
-import { ChairIcon } from "@/app/(app)/distribucion/shapes/ChairIcon";
+import { tableSeatLayout } from "@/lib/guestSeating";
 import { LucideVectorIcon } from "@/app/(app)/distribucion/shapes/LucideVectorIcon";
+import { TableOccupancy, TableSeats, type SeatOptions } from "@/app/(app)/distribucion/shapes/TableSeats";
 import { usePlanTheme } from "@/app/(app)/distribucion/planPalette";
 
 export const RectTable = memo(function RectTable({
@@ -13,6 +13,7 @@ export const RectTable = memo(function RectTable({
   fill,
   isSweetheart,
   pxPerMeter,
+  seating,
 }: {
   width: number;
   height: number;
@@ -21,19 +22,16 @@ export const RectTable = memo(function RectTable({
   fill: string | null;
   isSweetheart?: boolean;
   pxPerMeter: number;
+  seating?: SeatOptions;
 }) {
   const { palette } = usePlanTheme();
-  const chair = getChairMetrics(pxPerMeter);
-  const seats = computeSeatPositions("table-rectangular", width, height, capacity ?? 0, chair.offset);
-  // En mesas largas con muchas sillas, que no se encimen entre sí.
-  const perSide = Math.ceil((capacity ?? 0) / 2);
-  const chairRadius = perSide > 0 ? Math.min(chair.radius, (width / (perSide + 1)) * 0.46) : chair.radius;
+  const { points, chairRadius } = tableSeatLayout({ type: "table-rectangular", width, height, capacity }, pxPerMeter);
+  // Con "6/8" debajo, el nombre sube un poco (si la mesa es lo bastante alta).
+  const labelShift = seating?.view && seating.view.capacity > 0 && height >= 40 ? 6 : 0;
 
   return (
     <>
-      {seats.map((seat, i) => (
-        <ChairIcon key={i} x={seat.x} y={seat.y} radius={chairRadius} stroke={isSweetheart ? palette.accent : undefined} />
-      ))}
+      <TableSeats points={points} radius={chairRadius} stroke={isSweetheart ? palette.accent : undefined} options={seating} />
       <Rect
         x={-width / 2}
         y={-height / 2}
@@ -56,7 +54,7 @@ export const RectTable = memo(function RectTable({
         width={width}
         height={height}
         offsetX={width / 2}
-        offsetY={height / 2}
+        offsetY={height / 2 + labelShift}
         padding={4}
         align="center"
         verticalAlign="middle"
@@ -66,6 +64,9 @@ export const RectTable = memo(function RectTable({
         fill={isSweetheart ? palette.accent : palette.ink}
         listening={false}
       />
+      {height >= 40 && (
+        <TableOccupancy view={seating?.view} detail={seating?.detail ?? true} round={false} width={width} height={height} />
+      )}
     </>
   );
 });
