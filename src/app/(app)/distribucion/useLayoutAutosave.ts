@@ -21,6 +21,8 @@ function takeSaveJob() {
     roomShape: s.roomShape,
     roomFixtures: s.roomFixtures,
     pxPerMeter: s.pxPerMeter,
+    backgroundImage: s.backgroundImage,
+    baseRoomVersionId: s.baseRoomVersionId,
   };
 }
 
@@ -66,7 +68,8 @@ export function useLayoutAutosave(eventId: string, enabled: boolean) {
             job.background,
             job.roomShape,
             job.roomFixtures,
-            job.pxPerMeter
+            job.pxPerMeter,
+            { backgroundImage: job.backgroundImage, baseRoomVersionId: job.baseRoomVersionId }
           );
           store()?.markClean(job.revision);
           if (result?.droppedElements) {

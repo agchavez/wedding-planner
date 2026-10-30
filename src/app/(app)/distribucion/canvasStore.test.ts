@@ -346,3 +346,111 @@ describe("arreglos del editor moderno", () => {
     expect(state()).toMatchObject({ pendingDelete: false, elements: [] });
   });
 });
+
+describe("biblioteca de salones y calibración", () => {
+  const state = () => useCanvasStore.getState();
+  const plan = { url: "https://ejemplo.test/plano.png", x: 0, y: 0, width: 2000, height: 1400, opacity: 0.5 };
+
+  beforeEach(() => {
+    state().setElements([], { roomFixtures: [], roomShape: [], pxPerMeter: 100, backgroundImage: null, baseRoomVersionId: null });
+    useCanvasStore.setState({ viewCenter: { x: 1000, y: 700 } });
+  });
+
+  it("carga el plano y el salón base del layout, y los reinicia al cambiar de evento", () => {
+    state().setElements([], { backgroundImage: plan, baseRoomVersionId: "a".repeat(24) });
+    expect(state()).toMatchObject({ backgroundImage: plan, baseRoomVersionId: "a".repeat(24), calibrationPoints: null });
+    state().setElements([], {});
+    expect(state()).toMatchObject({ backgroundImage: null, baseRoomVersionId: null });
+  });
+
+  it("usar un salón de la biblioteca reemplaza la capa salón sin tocar las mesas, y se puede deshacer", () => {
+    state().addElement("table-round");
+    const before = state().elements;
+    const shape = [
+      { x: 0, y: 0 },
+      { x: 1500, y: 0 },
+      { x: 1500, y: 900 },
+    ];
+    const fixture: RoomFixture = { id: "col", type: "column", label: "", x: 10, y: 10, width: 50, height: 50, rotation: 0 };
+    state().applyRoomLayer(
+      { roomShape: shape, roomFixtures: [fixture], pxPerMeter: 100, canvasWidth: 1600, canvasHeight: 1000, background: "garden", backgroundImage: plan },
+      "b".repeat(24)
+    );
+    expect(state()).toMatchObject({
+      roomShape: shape,
+      roomFixtures: [fixture],
+      canvasWidth: 1600,
+      background: "garden",
+      backgroundImage: plan,
+      baseRoomVersionId: "b".repeat(24),
+      dirty: true,
+    });
+    expect(state().elements).toBe(before);
+    state().undo();
+    expect(state()).toMatchObject({ roomShape: [], roomFixtures: [], backgroundImage: null, baseRoomVersionId: null });
+  });
+
+  it("vincular a una versión recién guardada marca para guardar sin pasar por el historial", () => {
+    state().linkBaseRoomVersion("c".repeat(24));
+    expect(state()).toMatchObject({ baseRoomVersionId: "c".repeat(24), dirty: true });
+    expect(state().history.past).toHaveLength(0);
+  });
+
+  it("deshacer un cambio anterior al guardar en la biblioteca no pierde el vínculo recién guardado", () => {
+    state().addElement("table-round");
+    state().linkBaseRoomVersion("c".repeat(24));
+    state().undo();
+    expect(state()).toMatchObject({ elements: [], baseRoomVersionId: "c".repeat(24) });
+    state().redo();
+    expect(state()).toMatchObject({ baseRoomVersionId: "c".repeat(24) });
+    expect(state().elements).toHaveLength(1);
+  });
+
+  it("deshacer el uso de un salón vuelve al vínculo anterior aunque luego se guarde una versión nueva", () => {
+    state().applyRoomLayer(
+      { roomShape: [], roomFixtures: [], pxPerMeter: 100, canvasWidth: 1600, canvasHeight: 1000, background: "indoor", backgroundImage: plan },
+      "b".repeat(24)
+    );
+    state().addElement("table-round");
+    state().linkBaseRoomVersion("d".repeat(24));
+    state().undo();
+    expect(state()).toMatchObject({ elements: [], baseRoomVersionId: "d".repeat(24) });
+    state().undo();
+    expect(state()).toMatchObject({ backgroundImage: null, baseRoomVersionId: null });
+  });
+
+  it("calibrar: dos puntos, nueva escala y las mesas conservan su tamaño real", () => {
+    state().addElement("table-round");
+    const width = state().elements[0].width; // 1.5 m a 100 px/m
+    state().startCalibration();
+    state().addCalibrationPoint({ x: 0, y: 0 });
+    state().addCalibrationPoint({ x: 500, y: 0 });
+    state().addCalibrationPoint({ x: 900, y: 0 });
+    expect(state().calibrationPoints).toHaveLength(2);
+    state().applyCalibration(50);
+    expect(state()).toMatchObject({ pxPerMeter: 50, calibrationPoints: null });
+    expect(state().elements[0].width).toBe(width / 2);
+    state().undo();
+    expect(state()).toMatchObject({ pxPerMeter: 100 });
+    expect(state().elements[0].width).toBe(width);
+  });
+
+  it("deshacer una calibración en un layout sin escala guardada vuelve a la escala por defecto explícita", () => {
+    state().setElements([], { pxPerMeter: null });
+    state().startCalibration();
+    state().applyCalibration(40);
+    state().undo();
+    // No null: el guardado debe escribir la escala para no dejar la calibrada en la base de datos.
+    expect(state().pxPerMeter).toBe(DEFAULT_PX_PER_METER);
+  });
+
+  it("el plano de fondo se puede cambiar y quitar (con deshacer)", () => {
+    state().setBackgroundImage(plan);
+    state().setBackgroundImage({ ...plan, opacity: 0.8 }, "plan-opacity");
+    state().setBackgroundImage({ ...plan, opacity: 0.9 }, "plan-opacity");
+    state().setBackgroundImage(null);
+    expect(state().backgroundImage).toBeNull();
+    state().undo();
+    expect(state().backgroundImage?.opacity).toBe(0.9);
+  });
+});

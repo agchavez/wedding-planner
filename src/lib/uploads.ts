@@ -10,6 +10,19 @@ import path from "node:path";
 export const UPLOADS_ROOT = process.env.UPLOADS_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads");
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+/**
+ * Ruta pedida a /api/uploads/… segura para decidir permisos con sus segmentos: sin "..", "." ni
+ * separadores escondidos, y un plano es exactamente floorplans/<boda>/<archivo>.
+ */
+export function isSafeUploadPath(segments: string[]): boolean {
+  if (segments.length === 0) return false;
+  for (const s of segments) {
+    if (!s || s === "." || s === ".." || /[/\\\0]/.test(s)) return false;
+  }
+  if (segments[0] === "floorplans") return segments.length === 3 && /^[a-f0-9]{24}$/i.test(segments[1]);
+  return true;
+}
+
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "archivo";
 }

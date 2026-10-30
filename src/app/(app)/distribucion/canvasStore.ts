@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { LayoutElement, RoomFixture } from "@/generated/prisma";
+import type { LayoutElement, PlanImage, RoomFixture } from "@/generated/prisma";
 import {
   ELEMENT_LABELS,
   getDefaultElementShape,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/seatGeometry";
 import { getDefaultFixtureSize, MAX_ROOM_FIXTURES, type FixtureType } from "@/lib/roomFixtures";
 import { metersToPx, resolvePxPerMeter } from "@/lib/layoutUnits";
+import { rescaleElementSizes, type RoomLayer } from "@/lib/venueLibrary";
 import {
   alignShapes,
   distributeShapes,
@@ -52,6 +53,9 @@ type LayoutSnapshot = {
   canvasWidth: number;
   canvasHeight: number;
   background: Background;
+  pxPerMeter: number | null;
+  backgroundImage: PlanImage | null;
+  baseRoomVersionId: string | null;
 };
 
 /** Elemento de cualquiera de las dos capas (boda o salón): ambos están centrados en (x, y). */
@@ -83,6 +87,12 @@ type CanvasState = {
   roomShape: RoomPoint[];
   roomFixtures: RoomFixture[];
   roomEditMode: boolean;
+  // Plano importado como fondo de la capa salón (null = sin plano).
+  backgroundImage: PlanImage | null;
+  // Versión de la biblioteca de salones de la que salió la capa salón (null = salón propio).
+  baseRoomVersionId: string | null;
+  // Calibración por dos puntos en curso: los puntos marcados (0 a 2). null = no se está calibrando.
+  calibrationPoints: RoomPoint[] | null;
   // Modo "dibujar a mano libre": el Stage deja de hacer pan y captura el trazo del mouse.
   roomDrawMode: boolean;
   tool: CanvasTool;
@@ -101,6 +111,8 @@ type CanvasState = {
       roomShape?: RoomPoint[];
       roomFixtures?: RoomFixture[];
       pxPerMeter?: number | null;
+      backgroundImage?: PlanImage | null;
+      baseRoomVersionId?: string | null;
     }
   ) => void;
   /** Centro de la zona visible del lienzo: ahí aparecen los elementos nuevos. */
@@ -149,6 +161,17 @@ type CanvasState = {
   addFixture: (type: FixtureType) => boolean;
   updateFixture: (id: string, patch: Partial<RoomFixture>) => void;
   removeFixture: (id: string) => void;
+  /** Pone, cambia (opacidad, posición) o quita el plano de fondo. */
+  setBackgroundImage: (image: PlanImage | null, historyKey?: string) => void;
+  /** Reemplaza la capa salón por la de la biblioteca (ya en la escala del layout); las mesas no se tocan. */
+  applyRoomLayer: (layer: RoomLayer, versionId: string) => void;
+  /** Vincula el layout a una versión recién guardada en la biblioteca (la capa salón no cambia). */
+  linkBaseRoomVersion: (versionId: string) => void;
+  startCalibration: () => void;
+  addCalibrationPoint: (point: RoomPoint) => void;
+  cancelCalibration: () => void;
+  /** Fija la escala calibrada: las mesas conservan su tamaño real (ver rescaleElementSizes). */
+  applyCalibration: (pxPerMeter: number) => void;
 };
 
 // Bajo para que "Ver todo el salón" quepa completo también en un teléfono (~360 px de ancho).
@@ -172,8 +195,8 @@ export function fixtureShape(f: RoomFixture): PlacedShape {
 }
 
 function snapshotOf(state: CanvasState): LayoutSnapshot {
-  const { elements, roomShape, roomFixtures, canvasWidth, canvasHeight, background } = state;
-  return { elements, roomShape, roomFixtures, canvasWidth, canvasHeight, background };
+  const { elements, roomShape, roomFixtures, canvasWidth, canvasHeight, background, pxPerMeter, backgroundImage, baseRoomVersionId } = state;
+  return { elements, roomShape, roomFixtures, canvasWidth, canvasHeight, background, pxPerMeter, backgroundImage, baseRoomVersionId };
 }
 
 /** Cambio que se puede deshacer: guarda el estado anterior en el historial y marca para guardar. */
@@ -313,6 +336,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   roomShape: [],
   roomFixtures: [],
   roomEditMode: false,
+  backgroundImage: null,
+  baseRoomVersionId: null,
+  calibrationPoints: null,
   roomDrawMode: false,
   tool: "select",
   history: emptyHistory(),
@@ -346,6 +372,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       // El store es compartido entre pestañas de eventos: siempre se reemplazan (no heredar del anterior).
       roomFixtures: layout.roomFixtures ?? [],
       pxPerMeter: layout.pxPerMeter ?? null,
+      backgroundImage: layout.backgroundImage ?? null,
+      baseRoomVersionId: layout.baseRoomVersionId ?? null,
+      calibrationPoints: null,
       ...(canvasWidth ? { canvasWidth } : {}),
       ...(canvasHeight ? { canvasHeight } : {}),
       ...(background ? { background } : {}),
@@ -586,7 +615,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // Al entrar o salir del modo "Editar salón" se suelta la selección (cambia de capa). Entrar
     // no crea un contorno ni marca cambios: el contorno solo se define con una forma explícita
     // ("Forma del local") para no guardar uno que el layout nunca tuvo.
-    set((state) => ({ selectedIds: [], roomEditMode: !state.roomEditMode }));
+    set((state) => ({ selectedIds: [], roomEditMode: !state.roomEditMode, calibrationPoints: null }));
   },
   updateRoomPoint: (index, point) => {
     // Se llama en cada movimiento del arrastre: todo el arrastre es un solo paso.
@@ -633,7 +662,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       roomDrawMode: active,
       roomEditMode: active ? false : get().roomEditMode,
-      ...(active ? { selectedIds: [] } : {}),
+      ...(active ? { selectedIds: [], calibrationPoints: null } : {}),
     }),
   setRoomShapeFromPoints: (points) => {
     if (points.length < 3) {
@@ -688,6 +717,56 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ...track(state),
     }));
   },
+
+  setBackgroundImage: (backgroundImage, historyKey) => set((state) => ({ backgroundImage, ...track(state, historyKey) })),
+  applyRoomLayer: (layer, versionId) =>
+    set((state) => ({
+      roomShape: layer.roomShape,
+      roomFixtures: layer.roomFixtures,
+      canvasWidth: layer.canvasWidth,
+      canvasHeight: layer.canvasHeight,
+      background: layer.background,
+      backgroundImage: layer.backgroundImage,
+      pxPerMeter: layer.pxPerMeter,
+      baseRoomVersionId: versionId,
+      selectedIds: [],
+      roomEditMode: false,
+      roomDrawMode: false,
+      calibrationPoints: null,
+      ...track(state),
+    })),
+  // Sin paso propio en el historial: deshacer no debe "desguardar" el salón de la biblioteca. Los
+  // pasos guardados con el mismo salón base que el actual pasan al nuevo; así deshacer un cambio
+  // anterior no devuelve el vínculo viejo. Los de antes de aplicar otro salón (applyRoomLayer)
+  // conservan el suyo: al deshacer eso vuelve también su vínculo.
+  linkBaseRoomVersion: (baseRoomVersionId) =>
+    set((state) => {
+      const previous = state.baseRoomVersionId;
+      const relink = (s: LayoutSnapshot) => (s.baseRoomVersionId === previous ? { ...s, baseRoomVersionId } : s);
+      return {
+        baseRoomVersionId,
+        history: { ...state.history, past: state.history.past.map(relink), future: state.history.future.map(relink) },
+        dirty: true,
+        revision: state.revision + 1,
+      };
+    }),
+
+  startCalibration: () => set({ calibrationPoints: [], roomDrawMode: false, roomEditMode: false, selectedIds: [] }),
+  addCalibrationPoint: (point) =>
+    set((state) => (state.calibrationPoints && state.calibrationPoints.length < 2 ? { calibrationPoints: [...state.calibrationPoints, point] } : {})),
+  cancelCalibration: () => set({ calibrationPoints: null }),
+  applyCalibration: (pxPerMeter) =>
+    set((state) => {
+      // El historial guarda la escala efectiva (no null): al deshacer, el guardado la escribe y no
+      // se queda en la base de datos la escala calibrada (null = "no tocar" al guardar).
+      const before = { ...state, pxPerMeter: resolvePxPerMeter(state.pxPerMeter) };
+      return {
+        elements: rescaleElementSizes(state.elements, before.pxPerMeter, pxPerMeter),
+        pxPerMeter,
+        calibrationPoints: null,
+        ...track(before),
+      };
+    }),
 }));
 
 /** Caja (en el lienzo) de la selección actual, o null si no hay nada seleccionado. */

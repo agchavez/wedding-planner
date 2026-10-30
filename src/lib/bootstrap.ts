@@ -58,6 +58,11 @@ async function ensureAuthIndexes() {
     mongoDb.collection("session").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     mongoDb.collection("account").createIndex({ userId: 1 }),
     mongoDb.collection("verification").createIndex({ identifier: 1 }),
+    // Biblioteca de salones: el índice único evita dos versiones con el mismo número.
+    mongoDb.collection("VenueRoomVersion").createIndex({ roomId: 1, version: 1 }, { unique: true }),
+    mongoDb.collection("VenueRoom").createIndex({ venueId: 1 }),
+    mongoDb.collection("Venue").createIndex({ weddingId: 1 }),
+    mongoDb.collection("Venue").createIndex({ visibility: 1 }),
   ]);
 }
 
