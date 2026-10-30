@@ -3,21 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Layer, Line, Stage, Transformer } from "react-konva";
 import type Konva from "konva";
-import { Maximize, RotateCcw, RotateCw, ZoomIn, ZoomOut } from "lucide-react";
+import { Lock, LockOpen, Maximize, RotateCcw, RotateCw, ZoomIn, ZoomOut } from "lucide-react";
 import { MAX_ZOOM, MIN_ZOOM, useCanvasStore, type Background } from "@/app/(app)/distribucion/canvasStore";
 import { AmbienteControl } from "@/app/(app)/distribucion/AmbienteControl";
 import { CanvasElement } from "@/app/(app)/distribucion/CanvasElement";
 import { CanvasSizeControl } from "@/app/(app)/distribucion/CanvasSizeControl";
 import { RoomShapeControl } from "@/app/(app)/distribucion/RoomShapeControl";
 import { RoomShapeEditor } from "@/app/(app)/distribucion/RoomShapeEditor";
-import { Toolbar } from "@/app/(app)/distribucion/Toolbar";
+import { RoomFixtureToolbar, Toolbar } from "@/app/(app)/distribucion/Toolbar";
 import { PropertiesPanel } from "@/app/(app)/distribucion/PropertiesPanel";
 import { saveLayout } from "@/app/(app)/distribucion/actions";
 import { Button } from "@/components/ui/button";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { cn } from "@/lib/utils";
 import { simplifyFreehandShape, type RoomPoint } from "@/lib/seatGeometry";
-import type { LayoutElement } from "@/generated/prisma";
+import { formatMeters, pickScaleBarMeters, resolvePxPerMeter } from "@/lib/layoutUnits";
+import type { LayoutElement, RoomFixture } from "@/generated/prisma";
 
 const AUTOSAVE_DELAY_MS = 800;
 const ZOOM_STEP = 1.2;
@@ -41,6 +42,8 @@ export function SeatingEditor({
   canvasHeight: initialCanvasHeight,
   initialBackground,
   initialRoomShape,
+  initialRoomFixtures,
+  pxPerMeter: initialPxPerMeter,
 }: {
   eventId: string;
   initialElements: LayoutElement[];
@@ -48,6 +51,8 @@ export function SeatingEditor({
   canvasHeight: number;
   initialBackground: Background;
   initialRoomShape: RoomPoint[];
+  initialRoomFixtures: RoomFixture[];
+  pxPerMeter: number | null;
 }) {
   const elements = useCanvasStore((s) => s.elements);
   const selectedId = useCanvasStore((s) => s.selectedId);
@@ -57,6 +62,8 @@ export function SeatingEditor({
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const background = useCanvasStore((s) => s.background);
   const roomShape = useCanvasStore((s) => s.roomShape);
+  const roomFixtures = useCanvasStore((s) => s.roomFixtures);
+  const pxPerMeter = useCanvasStore((s) => s.pxPerMeter);
   const roomEditMode = useCanvasStore((s) => s.roomEditMode);
   const roomDrawMode = useCanvasStore((s) => s.roomDrawMode);
   const zoom = useCanvasStore((s) => s.zoom);
@@ -65,6 +72,8 @@ export function SeatingEditor({
   const setElements = useCanvasStore((s) => s.setElements);
   const updateElement = useCanvasStore((s) => s.updateElement);
   const selectElement = useCanvasStore((s) => s.selectElement);
+  const selectFixture = useCanvasStore((s) => s.selectFixture);
+  const toggleRoomEditMode = useCanvasStore((s) => s.toggleRoomEditMode);
   const setSaveStatus = useCanvasStore((s) => s.setSaveStatus);
   const markClean = useCanvasStore((s) => s.markClean);
   const setView = useCanvasStore((s) => s.setView);
@@ -110,7 +119,14 @@ export function SeatingEditor({
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
-    setElements(initialElements, initialCanvasWidth, initialCanvasHeight, initialBackground, initialRoomShape);
+    setElements(initialElements, {
+      canvasWidth: initialCanvasWidth,
+      canvasHeight: initialCanvasHeight,
+      background: initialBackground,
+      roomShape: initialRoomShape,
+      roomFixtures: initialRoomFixtures,
+      pxPerMeter: initialPxPerMeter,
+    });
     // Solo se usa el valor inicial cargado del servidor; después el store es la fuente de verdad.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,9 +151,9 @@ export function SeatingEditor({
 
   const performSave = useCallback(async () => {
     setSaveStatus("saving");
-    await saveLayout(eventId, elements, canvasWidth, canvasHeight, background, roomShape);
+    await saveLayout(eventId, elements, canvasWidth, canvasHeight, background, roomShape, roomFixtures, pxPerMeter);
     markClean();
-  }, [eventId, elements, canvasWidth, canvasHeight, background, roomShape, setSaveStatus, markClean]);
+  }, [eventId, elements, canvasWidth, canvasHeight, background, roomShape, roomFixtures, pxPerMeter, setSaveStatus, markClean]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -146,7 +162,7 @@ export function SeatingEditor({
     }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty, elements, canvasWidth, canvasHeight, background, roomShape]);
+  }, [dirty, elements, canvasWidth, canvasHeight, background, roomShape, roomFixtures]);
 
   const handleWheel = useCallback(
     (e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -191,9 +207,12 @@ export function SeatingEditor({
         }
         return;
       }
-      if (e.target === e.target.getStage()) selectElement(null);
+      if (e.target === e.target.getStage()) {
+        selectElement(null);
+        selectFixture(null);
+      }
     },
-    [roomDrawMode, zoom, stageX, stageY, selectElement]
+    [roomDrawMode, zoom, stageX, stageY, selectElement, selectFixture]
   );
 
   const handleStageMouseMove = useCallback(
@@ -222,13 +241,22 @@ export function SeatingEditor({
   const selected = elements.find((el) => el.id === selectedId);
   const isRoundSelected = selected?.type === "table-round";
 
+  // Barra de escala: un largo "redondo" en metros según la escala del layout y el zoom actual.
+  const screenPxPerMeter = resolvePxPerMeter(pxPerMeter) * zoom;
+  const scaleBarMeters = pickScaleBarMeters(screenPxPerMeter);
+
   return (
     <div className={cn("grid min-w-0 grid-cols-1 gap-4", canEdit && "lg:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0 space-y-3">
         {canEdit && (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Toolbar />
+              <Button variant={roomEditMode ? "default" : "outline"} size="sm" onClick={toggleRoomEditMode}>
+                {roomEditMode ? <LockOpen className="size-3.5" /> : <Lock className="size-3.5" />}
+                {roomEditMode ? "Terminar de editar salón" : "Editar salón"}
+              </Button>
+              {/* Mesas y zonas de la boda en modo normal; paredes, columnas y puertas en modo "Editar salón". */}
+              {roomEditMode ? <RoomFixtureToolbar /> : <Toolbar />}
               <CanvasSizeControl />
               <AmbienteControl />
               <RoomShapeControl />
@@ -266,8 +294,9 @@ export function SeatingEditor({
                 <span className="sr-only">Rotar forma a la derecha</span>
               </Button>
               <span className="ml-2 text-xs text-muted-foreground">
-                Arrastra los vértices · clic en el + de un borde para agregar una esquina · clic derecho en un vértice
-                para quitarlo · rota con los botones
+                {roomShape.length < 3 && "Sin contorno: elige una forma en «Forma del local» · "}
+                Editando el salón: arrastra los vértices · clic en el + de un borde para agregar una esquina · clic
+                derecho en un vértice para quitarlo · agrega paredes, columnas y puertas · las mesas quedan bloqueadas
               </span>
             </>
           )}
@@ -280,7 +309,7 @@ export function SeatingEditor({
 
         <div
           ref={viewportRef}
-          className={cn("overflow-hidden rounded-lg border border-border", BACKGROUND_CLASSES[background])}
+          className={cn("relative overflow-hidden rounded-lg border border-border", BACKGROUND_CLASSES[background])}
           style={{ height: STAGE_VIEW_HEIGHT }}
         >
           <Stage
@@ -300,13 +329,14 @@ export function SeatingEditor({
             onMouseUp={handleStageMouseUp}
           >
             <RoomShapeEditor />
-            <Layer>
+            {/* Capa de la boda. En modo "Editar salón" se atenúa y deja pasar los clics a la capa salón. */}
+            <Layer listening={!roomEditMode} opacity={roomEditMode ? 0.45 : 1}>
               {elements.map((el) => (
                 <CanvasElement
                   key={el.id}
                   element={el}
                   isSelected={canEdit && el.id === selectedId}
-                  editable={canEdit}
+                  editable={canEdit && !roomEditMode}
                   onSelect={selectElement}
                   onChange={updateElement}
                   registerRef={registerRef}
@@ -329,6 +359,13 @@ export function SeatingEditor({
               </Layer>
             )}
           </Stage>
+          <div className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-background/85 px-2 py-1 text-[11px] text-muted-foreground shadow-sm">
+            <div
+              className="h-1.5 border-x-2 border-b-2 border-foreground/60"
+              style={{ width: scaleBarMeters * screenPxPerMeter }}
+            />
+            <span>{formatMeters(scaleBarMeters, scaleBarMeters < 1 ? 1 : 0)}</span>
+          </div>
         </div>
       </div>
 

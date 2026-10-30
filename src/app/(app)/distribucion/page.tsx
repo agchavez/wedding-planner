@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { DistribucionEventTabsClient } from "@/app/(app)/distribucion/DistribucionEventTabsClient";
-import type { Background } from "@/app/(app)/distribucion/canvasStore";
+import type { LayoutData } from "@/app/(app)/distribucion/DistribucionEventTabsClient";
 import type { RoomPoint } from "@/lib/seatGeometry";
 import type { LayoutElement } from "@/generated/prisma";
 import { PageHeader } from "@/components/PageHeader";
@@ -15,10 +15,7 @@ export default async function DistribucionPage() {
     prisma.seatingLayout.findMany({ where: { weddingId } }),
   ]);
 
-  const layoutByEvent: Record<
-    string,
-    { elements: LayoutElement[]; canvasWidth: number; canvasHeight: number; background: Background; roomShape: RoomPoint[] }
-  > = {};
+  const layoutByEvent: Record<string, LayoutData> = {};
   for (const layout of layouts) {
     if (!layout.eventId) continue;
     layoutByEvent[layout.eventId] = {
@@ -27,6 +24,9 @@ export default async function DistribucionPage() {
       canvasHeight: layout.canvasHeight,
       background: layout.background === "garden" ? "garden" : "indoor",
       roomShape: layout.roomShape as RoomPoint[],
+      // Layouts anteriores no tienen estos campos: sin elementos fijos y escala por defecto.
+      roomFixtures: layout.roomFixtures ?? [],
+      pxPerMeter: layout.pxPerMeter ?? null,
     };
   }
 

@@ -345,21 +345,44 @@ type RoomPoint {
   y Float
 }
 
+// Elemento fijo del salón (capa base, ver SeatingLayout.roomFixtures): pared, columna, puerta,
+// ventana, salida de emergencia o bar fijo. Mismas coordenadas que LayoutElement (píxeles del
+// lienzo, x/y = centro). Una pared es un segmento: width = largo, height = grosor, rotation = ángulo.
+type RoomFixture {
+  id       String
+  // wall | column | column-round | door | window | emergency-exit | bar
+  type     String
+  label    String @default("")
+  x        Float
+  y        Float
+  width    Float
+  height   Float
+  rotation Float  @default(0)
+}
+
 // Distribución visual de un evento de la boda (una por WeddingEvent — comparten el mismo id
 // que su WeddingEvent, ver getOrCreateSeatingLayout en lib/seatingLayout.ts).
 model SeatingLayout {
-  id           String          @id @map("_id") @db.ObjectId
-  weddingId    String?         @db.ObjectId
-  eventId      String?         @db.ObjectId
-  canvasWidth  Int             @default(2000)
-  canvasHeight Int             @default(1400)
+  id            String          @id @map("_id") @db.ObjectId
+  weddingId     String?         @db.ObjectId
+  eventId       String?         @db.ObjectId
+  canvasWidth   Int             @default(2000)
+  canvasHeight  Int             @default(1400)
   // indoor | garden — estilo visual del salón (interior o ceremonia al aire libre).
-  background   String          @default("indoor")
+  background    String          @default("indoor")
   // Contorno del local (polígono). Vacío = sin definir, se muestra un rectángulo simple.
-  roomShape    RoomPoint[]
-  elements     LayoutElement[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  roomShape     RoomPoint[]
+  // Elementos fijos del salón. Con roomShape forman la "capa salón": se dibuja debajo de los
+  // elementos de la boda y solo se edita en el modo "Editar salón".
+  roomFixtures  RoomFixture[]
+  // Escala real: píxeles del lienzo por metro. null = DEFAULT_PX_PER_METER (lib/layoutUnits.ts);
+  // los layouts anteriores no se reescriben, la conversión se hace al leer.
+  pxPerMeter    Float?
+  // Versión del formato del documento (null = 1, anterior a escala y capa salón).
+  schemaVersion Int?
+  elements      LayoutElement[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 // Registro de auditoría: inicios de sesión, cambios en los datos de cada boda y acciones
