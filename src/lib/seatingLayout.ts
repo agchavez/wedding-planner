@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { isChairBlock, isTableType, type ElementType, type RoomPoint } from "@/lib/seatGeometry";
+import { partySize } from "@/lib/guestSeating";
+import { MAX_ROOM_COORD, MIN_ROOM_COORD } from "@/lib/layoutUnits";
 import type { LayoutElement } from "@/generated/prisma";
 
 export const VALID_ELEMENT_TYPES: ElementType[] = [
@@ -55,12 +57,11 @@ export function sanitizeRoomShape(points: RoomPoint[]): RoomPoint[] {
   if (!Array.isArray(points) || points.length < 3) return [];
   return points
     .filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y))
-    .map((p) => ({ x: clamp(p.x, -2000, 6000), y: clamp(p.y, -2000, 6000) }));
+    .map((p) => ({ x: clamp(p.x, MIN_ROOM_COORD, MAX_ROOM_COORD), y: clamp(p.y, MIN_ROOM_COORD, MAX_ROOM_COORD) }));
 }
 
-export function clampCanvasSize(value: number) {
-  return clamp(value, 800, 4000);
-}
+// Vive en lib/layoutUnits.ts (puro, sin Prisma) para usarlo también en la biblioteca de salones.
+export { clampCanvasSize } from "@/lib/layoutUnits";
 
 /**
  * Una distribución por evento de la boda (WeddingEvent). El SeatingLayout comparte el
@@ -94,15 +95,16 @@ export async function getTableOptionsWithOccupancy(): Promise<TableOption[]> {
   const [layouts, events, guests] = await Promise.all([
     prisma.seatingLayout.findMany({ where: { weddingId } }),
     prisma.weddingEvent.findMany({ where: { weddingId } }),
-    prisma.guest.findMany({ where: { weddingId }, select: { tableElementId: true } }),
+    prisma.guest.findMany({ where: { weddingId }, select: { tableElementId: true, plusOnes: true } }),
   ]);
 
   const eventNameById = new Map(events.map((e) => [e.id, e.name]));
 
+  // Personas sentadas por mesa (invitado + acompañantes), igual que el plano y el MCP.
   const occupancyByTable = new Map<string, number>();
   for (const guest of guests) {
     if (!guest.tableElementId) continue;
-    occupancyByTable.set(guest.tableElementId, (occupancyByTable.get(guest.tableElementId) ?? 0) + 1);
+    occupancyByTable.set(guest.tableElementId, (occupancyByTable.get(guest.tableElementId) ?? 0) + partySize(guest));
   }
 
   const options: TableOption[] = [];

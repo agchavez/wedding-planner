@@ -166,6 +166,70 @@
   --sidebar-ring: #6d1f34;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Plano de distribución, estilo "Papel y lino". Konva los lee con        */
+/* getComputedStyle (ver distribucion/planPalette.ts). El acento y la     */
+/* tinta siguen el tema elegido; .dark los cambia si la app activa el     */
+/* modo oscuro.                                                           */
+/* ---------------------------------------------------------------------- */
+
+:root {
+  --plan-canvas: #efe4d6;
+  --plan-floor: #fdf8f1;
+  --plan-floor-garden: #eef2e2;
+  --plan-wall: #4a3524;
+  --plan-pista: #f0e1cc;
+  --plan-tarima: #ead6c3;
+  --plan-zone: #f6ede2;
+  --plan-zone-line: #d6bfa6;
+  --plan-table: #ffffff;
+  --plan-table-line: #d9c4b0;
+  --plan-chair: #f1e5d8;
+  --plan-ink: var(--foreground);
+  --plan-muted: var(--muted-foreground);
+  --plan-accent: var(--primary);
+  --plan-on-accent: var(--primary-foreground);
+  /* Sillas ocupadas, coloreadas por lado o grupo del invitado (ver lib/guestSeating.ts).
+     Lo bastante oscuros para que las iniciales en --plan-on-seat lleguen a 4.5:1 (WCAG AA). */
+  --plan-g1: var(--primary);
+  --plan-g2: #5c7863;
+  --plan-g3: #8a6a2f;
+  --plan-g4: #5f6a94;
+  --plan-g5: #a5573b;
+  --plan-g6: #7d5a86;
+  --plan-g-none: #7a6b62;
+  --plan-on-seat: #ffffff;
+}
+
+.dark {
+  --plan-canvas: #1d1719;
+  --plan-floor: #2a2124;
+  --plan-floor-garden: #232a20;
+  --plan-wall: #c9a876;
+  --plan-pista: #33281f;
+  --plan-tarima: #3a2c25;
+  --plan-zone: #2f2528;
+  --plan-zone-line: #5a4840;
+  --plan-table: #382c2f;
+  --plan-table-line: #6b5548;
+  --plan-chair: #4a3a35;
+  --plan-ink: #f2e6e3;
+  --plan-muted: #b29d98;
+  --plan-g2: #5f7c66;
+  --plan-g3: #8f6d33;
+  --plan-g4: #646f99;
+  --plan-g5: #a8593d;
+  --plan-g6: #84638f;
+  --plan-g-none: #7a6a64;
+}
+
+/* Fondo del lienzo: papel con un grano muy sutil. */
+.plan-paper {
+  background-color: var(--plan-canvas);
+  background-image: radial-gradient(color-mix(in oklab, var(--plan-wall) 6%, transparent) 1px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

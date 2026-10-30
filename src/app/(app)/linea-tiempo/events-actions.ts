@@ -39,7 +39,15 @@ export async function deleteWeddingEvent(id: string) {
   const weddingId = await getEditableWeddingId();
   await prisma.weddingEvent.findFirstOrThrow({ where: { id, weddingId }, select: { id: true } });
   await prisma.timelineEvent.deleteMany({ where: { eventId: id, weddingId } });
-  // SeatingLayout comparte el mismo id que su WeddingEvent (ver lib/seatingLayout.ts).
+  // SeatingLayout comparte el mismo id que su WeddingEvent (ver lib/seatingLayout.ts). Sus mesas
+  // dejan de existir: los invitados sentados ahí quedan sin mesa (igual que en el MCP).
+  const layout = await prisma.seatingLayout.findFirst({ where: { id, weddingId }, select: { elements: true } });
+  if (layout) {
+    await prisma.guest.updateMany({
+      where: { weddingId, tableElementId: { in: layout.elements.map((el) => el.id) } },
+      data: { tableElementId: null, seatIndex: null },
+    });
+  }
   await prisma.seatingLayout.deleteMany({ where: { id, weddingId } });
   const event = await prisma.weddingEvent.delete({ where: { id, weddingId } });
   await audit("event.delete", `Eliminó el evento "${event.name}" con su línea de tiempo y salón`, { weddingId, targetId: id });
@@ -47,4 +55,5 @@ export async function deleteWeddingEvent(id: string) {
 
   revalidatePath("/linea-tiempo");
   revalidatePath("/distribucion");
+  revalidatePath("/invitados");
 }

@@ -1,5 +1,5 @@
 import type { RoomFixture } from "@/generated/prisma";
-import { DEFAULT_PX_PER_METER, metersToPx } from "@/lib/layoutUnits";
+import { DEFAULT_PX_PER_METER, MAX_ROOM_COORD, metersToPx, MIN_ROOM_COORD } from "@/lib/layoutUnits";
 
 /**
  * Elementos fijos del salón (capa base, SeatingLayout.roomFixtures): no pertenecen a la boda
@@ -47,7 +47,7 @@ export const MAX_ROOM_FIXTURES = 200;
 // Límites en píxeles del lienzo: una pared puede ser tan larga como el lienzo (máx. 4000)
 // y tan delgada como unos centímetros.
 const MIN_FIXTURE_SIZE = 2;
-const MAX_FIXTURE_SIZE = 4000;
+export const MAX_FIXTURE_SIZE = 4000;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -66,8 +66,8 @@ export function sanitizeRoomFixture(raw: unknown): RoomFixture | null {
     id: f.id,
     type: f.type,
     label: String(f.label ?? "").slice(0, 60),
-    x: clamp(finiteOr(f.x, 0), -2000, 6000),
-    y: clamp(finiteOr(f.y, 0), -2000, 6000),
+    x: clamp(finiteOr(f.x, 0), MIN_ROOM_COORD, MAX_ROOM_COORD),
+    y: clamp(finiteOr(f.y, 0), MIN_ROOM_COORD, MAX_ROOM_COORD),
     width: clamp(finiteOr(f.width, MIN_FIXTURE_SIZE), MIN_FIXTURE_SIZE, MAX_FIXTURE_SIZE),
     height: clamp(finiteOr(f.height, MIN_FIXTURE_SIZE), MIN_FIXTURE_SIZE, MAX_FIXTURE_SIZE),
     rotation: finiteOr(f.rotation, 0) % 360,

@@ -34,17 +34,31 @@ export type SeatPoint = { x: number; y: number; rotation: number };
 
 const SEAT_OFFSET = 20;
 
+// Silla a escala real: ~0.45 m de diámetro, con el centro a 0.30 m del borde de la mesa
+// (con la escala por defecto son los mismos 20 px de siempre).
+export const CHAIR_DIAMETER_METERS = 0.45;
+export const CHAIR_OFFSET_METERS = 0.3;
+
+/** Radio y separación del borde de la mesa de una silla, en píxeles del lienzo. */
+export function getChairMetrics(pxPerMeter = DEFAULT_PX_PER_METER) {
+  return {
+    radius: metersToPx(CHAIR_DIAMETER_METERS / 2, pxPerMeter),
+    offset: metersToPx(CHAIR_OFFSET_METERS, pxPerMeter),
+  };
+}
+
 /** Puntos de silla alrededor de una mesa, relativos al centro del elemento (0,0). */
 export function computeSeatPositions(
   type: "table-round" | "table-rectangular" | "table-sweetheart",
   width: number,
   height: number,
-  capacity: number
+  capacity: number,
+  seatOffset = SEAT_OFFSET
 ): SeatPoint[] {
   if (capacity <= 0) return [];
 
   if (type === "table-round") {
-    const radius = width / 2 + SEAT_OFFSET;
+    const radius = width / 2 + seatOffset;
     return Array.from({ length: capacity }, (_, i) => {
       const angle = (2 * Math.PI * i) / capacity - Math.PI / 2;
       return {
@@ -57,13 +71,15 @@ export function computeSeatPositions(
 
   const topCount = Math.ceil(capacity / 2);
   const bottomCount = Math.floor(capacity / 2);
-  const topY = -height / 2 - SEAT_OFFSET;
-  const bottomY = height / 2 + SEAT_OFFSET;
+  const topY = -height / 2 - seatOffset;
+  const bottomY = height / 2 + seatOffset;
   const points: SeatPoint[] = [];
   for (let i = 0; i < topCount; i++) {
     points.push({ x: -width / 2 + (width * (i + 1)) / (topCount + 1), y: topY, rotation: 180 });
   }
-  for (let i = 0; i < bottomCount; i++) {
+  // El lado de abajo va de derecha a izquierda: los índices dan la vuelta a la mesa en el
+  // sentido del reloj, así sillas consecutivas (un invitado con acompañantes) quedan juntas.
+  for (let i = bottomCount - 1; i >= 0; i--) {
     points.push({ x: -width / 2 + (width * (i + 1)) / (bottomCount + 1), y: bottomY, rotation: 0 });
   }
   return points;
@@ -162,6 +178,13 @@ const ZONE_TYPES: ElementType[] = [
   "hallway",
 ];
 
+/**
+ * Máximo de elementos (mesas, zonas, sillas) por distribución. Una boda grande usa ~100; el
+ * límite evita que una matriz enorme rebase el documento de Mongo. El editor no deja pasarlo y
+ * el servidor descarta (y avisa) lo que sobre.
+ */
+export const MAX_LAYOUT_ELEMENTS = 500;
+
 export function isTableType(type: ElementType | string): boolean {
   return TABLE_TYPES.includes(type as ElementType);
 }
@@ -213,6 +236,33 @@ export function getDefaultElementShape(type: ElementType, pxPerMeter = DEFAULT_P
     rows: m.rows ?? null,
     columns: m.columns ?? null,
   };
+}
+
+/**
+ * Huella real de un elemento (sin rotar): la mesa más sus sillas. Es lo que usan las guías
+ * inteligentes, las distancias y la colocación de elementos nuevos.
+ */
+export function getElementFootprint(
+  element: { type: string; width: number; height: number; capacity: number | null },
+  pxPerMeter = DEFAULT_PX_PER_METER
+): { width: number; height: number; round: boolean } {
+  const { radius, offset } = getChairMetrics(pxPerMeter);
+  const chairs = (element.capacity ?? 0) > 0;
+  switch (element.type) {
+    case "table-round": {
+      const extra = chairs ? 2 * (offset + radius) : 0;
+      return { width: element.width + extra, height: element.width + extra, round: true };
+    }
+    case "table-cake":
+      return { width: element.width, height: element.width, round: true };
+    case "table-rectangular":
+    case "table-sweetheart":
+      return { width: element.width, height: element.height + (chairs ? 2 * (offset + radius) : 0), round: false };
+    case "chair-row":
+      return { width: element.width + 2 * radius, height: element.height + 2 * radius, round: false };
+    default:
+      return { width: element.width, height: element.height, round: false };
+  }
 }
 
 export type RoomPoint = { x: number; y: number };

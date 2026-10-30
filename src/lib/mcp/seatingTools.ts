@@ -4,9 +4,21 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { prisma } from "@/lib/prisma";
 import { clampCanvasSize, getOrCreateSeatingLayout, sanitizeElement, sanitizeRoomShape, VALID_ELEMENT_TYPES } from "@/lib/seatingLayout";
-import { ELEMENT_LABELS, getDefaultElementShape, getRoomShapePreset, isTableType, ROOM_SHAPE_PRESETS, type ElementType } from "@/lib/seatGeometry";
+import {
+  ELEMENT_LABELS,
+  getDefaultElementShape,
+  getElementFootprint,
+  getRoomShapePreset,
+  isTableType,
+  MAX_LAYOUT_ELEMENTS,
+  ROOM_SHAPE_PRESETS,
+  type ElementType,
+} from "@/lib/seatGeometry";
+import { boxFromPoints, findFreeSpot, shapeBox, type Box } from "@/lib/layoutGeometry";
 import { auth, editor, json, log, objectId } from "@/lib/mcp/shared";
 import { pxToMeters, resolvePxPerMeter, roundMeters } from "@/lib/layoutUnits";
+import { baseRoomInfos, listVisibleRooms } from "@/lib/venueRooms";
+import { banquetCapacityStatus, seatedPeople } from "@/lib/venueLibrary";
 import type { Guest, LayoutElement } from "@/generated/prisma";
 
 /**
@@ -31,6 +43,14 @@ const elementFields = {
   columns: z.number().int().min(1).max(20).optional().describe("Solo chair-row"),
 };
 
+/**
+ * Ids de las mesas de todos los salones de la boda. Un invitado cuya mesa ya no existe (se
+ * borró en el editor) cuenta como sin mesa, igual que en el plano y en /invitados.
+ */
+function weddingTableIds(layouts: { elements: LayoutElement[] }[]) {
+  return new Set(layouts.flatMap((l) => l.elements).filter((el) => isTableType(el.type)).map((el) => el.id));
+}
+
 function describeElement(el: LayoutElement, guests: Guest[]) {
   const seated = isTableType(el.type) ? guests.filter((g) => g.tableElementId === el.id) : [];
   return {
@@ -43,7 +63,8 @@ function describeElement(el: LayoutElement, guests: Guest[]) {
           capacity: el.capacity,
           // Cada invitado ocupa 1 + sus acompañantes.
           seatsTaken: seated.reduce((n, g) => n + 1 + g.plusOnes, 0),
-          guests: seated.map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes })),
+          // seatIndex: primera silla del grupo (null = el plano lo acomoda en la primera libre).
+          guests: seated.map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes, seatIndex: g.seatIndex ?? null })),
         }
       : {}),
     ...(el.type === "chair-row" ? { rows: el.rows, columns: el.columns } : {}),
@@ -61,8 +82,25 @@ async function layoutFor(weddingId: string, eventId: string) {
   return { event, layout: await getOrCreateSeatingLayout(eventId, weddingId) };
 }
 
+/** Zona donde se pueden colocar elementos sin x/y: el contorno del local (si hay) o el lienzo. */
+function placementBounds(layout: { canvasWidth: number; canvasHeight: number; roomShape: { x: number; y: number }[] }): Box {
+  if (layout.roomShape.length >= 3) {
+    return layout.roomShape.reduce((box, p) => ({
+      minX: Math.min(box.minX, p.x),
+      minY: Math.min(box.minY, p.y),
+      maxX: Math.max(box.maxX, p.x),
+      maxY: Math.max(box.maxY, p.y),
+    }), boxFromPoints(layout.roomShape[0], layout.roomShape[0]));
+  }
+  return { minX: 0, minY: 0, maxX: layout.canvasWidth, maxY: layout.canvasHeight };
+}
+
 async function saveElements(layoutId: string, elements: LayoutElement[]) {
-  const sanitized = elements.map(sanitizeElement).filter((el): el is LayoutElement => el !== null);
+  // Mismo máximo que el editor (saveLayout): evita rebasar el tamaño del documento.
+  const sanitized = elements
+    .map(sanitizeElement)
+    .filter((el): el is LayoutElement => el !== null)
+    .slice(0, MAX_LAYOUT_ELEMENTS);
   await prisma.seatingLayout.update({ where: { id: layoutId }, data: { elements: sanitized } });
   return sanitized;
 }
@@ -73,7 +111,7 @@ export function registerSeatingTools(server: McpServer) {
     {
       title: "Ver distribución del salón",
       description:
-        "Distribución de un evento: tamaño y estilo del salón, mesas (con capacidad, asientos ocupados e invitados sentados), zonas y bloques de sillas, más los invitados sin mesa. Sin eventId devuelve un resumen de todos los eventos.",
+        "Distribución de un evento: tamaño y estilo del salón, mesas (con capacidad, asientos ocupados e invitados sentados), zonas y bloques de sillas, más los invitados sin mesa. Incluye el salón de la biblioteca en que se basa (baseRoomVersionId, si hay versión nueva y aviso de aforo). Sin eventId devuelve un resumen de todos los eventos.",
       inputSchema: z.object({ eventId: objectId.optional() }),
       annotations: { readOnlyHint: true },
     },
@@ -85,6 +123,7 @@ export function registerSeatingTools(server: McpServer) {
           prisma.weddingEvent.findMany({ where: { weddingId: a.weddingId }, orderBy: { sortOrder: "asc" } }),
           prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId } }),
         ]);
+        const tableIds = weddingTableIds(layouts);
         return json({
           elementTypes: ELEMENT_LABELS,
           events: events.map((e) => {
@@ -92,18 +131,22 @@ export function registerSeatingTools(server: McpServer) {
             return {
               eventId: e.id,
               name: e.name,
+              baseRoomVersionId: layouts.find((l) => l.id === e.id)?.baseRoomVersionId ?? null,
               tables: tables.length,
               capacity: tables.reduce((n, t) => n + (t.capacity ?? 0), 0),
               seatsTaken: guests.filter((g) => tables.some((t) => t.id === g.tableElementId)).reduce((n, g) => n + 1 + g.plusOnes, 0),
             };
           }),
-          guestsWithoutTable: guests.filter((g) => !g.tableElementId).length,
+          guestsWithoutTable: guests.filter((g) => !g.tableElementId || !tableIds.has(g.tableElementId)).length,
         });
       }
       const found = await layoutFor(a.weddingId, eventId);
       if (!found) return json({ error: "Evento no encontrado." });
       const { layout, event } = found;
       const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
+      const tableIds = weddingTableIds(await prisma.seatingLayout.findMany({ where: { weddingId: a.weddingId }, select: { elements: true } }));
+      const baseRoom = layout.baseRoomVersionId ? (await baseRoomInfos([layout.baseRoomVersionId])).get(layout.baseRoomVersionId) : undefined;
+      const capacity = banquetCapacityStatus(baseRoom?.banquetCapacity, seatedPeople(layout.elements, guests));
       return json({
         event: event.name,
         canvas: {
@@ -118,11 +161,56 @@ export function registerSeatingTools(server: McpServer) {
             height: roundMeters(pxToMeters(layout.canvasHeight, pxPerMeter)),
           },
           roomFixtures: layout.roomFixtures ?? [],
+          backgroundImage: layout.backgroundImage ?? null,
         },
+        // Salón de la biblioteca del que se copió la capa salón (null = salón propio).
+        baseRoomVersionId: layout.baseRoomVersionId ?? null,
+        baseRoom: baseRoom
+          ? {
+              venue: baseRoom.venueName,
+              room: baseRoom.roomName,
+              version: baseRoom.version,
+              latestVersion: baseRoom.latestVersion,
+              updateAvailable: baseRoom.latestVersionId !== baseRoom.versionId,
+              banquetCapacity: baseRoom.banquetCapacity,
+            }
+          : null,
+        ...(capacity?.over ? { capacityWarning: capacity.message } : {}),
         elements: layout.elements.map((el) => describeElement(el, guests)),
         guestsWithoutTable: guests
-          .filter((g) => !g.tableElementId && g.rsvpStatus !== "declined")
+          .filter((g) => (!g.tableElementId || !tableIds.has(g.tableElementId)) && g.rsvpStatus !== "declined")
           .map((g) => ({ id: g.id, fullName: g.fullName, seats: 1 + g.plusOnes, group: g.group || null, side: g.side || null })),
+      });
+    }
+  );
+
+  server.registerTool(
+    "list_venue_rooms",
+    {
+      title: "Ver la biblioteca de salones",
+      description:
+        "Salones reutilizables disponibles para esta boda (los guardados desde la boda o por quien creó el token, y los publicados para toda la plataforma): lugar, ciudad, capacidad por montaje (banquete, cóctel, auditorio), medidas y última versión. Solo lectura: copiar un salón al plano se hace desde el editor.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    async (_input, ctx) => {
+      const a = auth(ctx);
+      const rooms = await listVisibleRooms({ userId: a.userId, weddingId: a.weddingId });
+      return json({
+        rooms: rooms.map((r) => ({
+          roomId: r.id,
+          room: r.name,
+          venue: r.venue.name,
+          city: r.venue.city || null,
+          address: r.venue.address || null,
+          visibility: r.venue.visibility,
+          capacity: { banquet: r.banquetCapacity, cocktail: r.cocktailCapacity, theater: r.theaterCapacity },
+          latestVersionId: r.latest?.id ?? null,
+          latestVersion: r.latest?.version ?? null,
+          sizeMeters: r.sizeMeters && { width: roundMeters(r.sizeMeters.width), height: roundMeters(r.sizeMeters.height) },
+          fixtures: r.latest?.roomFixtures.length ?? 0,
+          hasFloorPlan: !!r.latest?.backgroundImage,
+        })),
       });
     }
   );
@@ -143,22 +231,47 @@ export function registerSeatingTools(server: McpServer) {
       const found = await layoutFor(a.weddingId, eventId);
       if (!found) return json({ error: "Evento no encontrado." });
       const { layout } = found;
+      if (layout.elements.length + elements.length > MAX_LAYOUT_ELEMENTS) {
+        return json({
+          error: `La distribución admite hasta ${MAX_LAYOUT_ELEMENTS} elementos (hay ${layout.elements.length}).`,
+        });
+      }
       const pxPerMeter = resolvePxPerMeter(layout.pxPerMeter);
       let nextNumber = Math.max(0, ...layout.elements.map((el) => el.tableNumber ?? 0));
+      // Sin x/y, cada elemento va al centro del lienzo o al hueco libre más cercano (no apilados),
+      // sin encimarse con paredes/columnas y sin salirse del local (o del lienzo).
+      const occupied = [
+        ...layout.elements.map((el) =>
+          shapeBox({ id: el.id, x: el.x, y: el.y, rotation: el.rotation, ...getElementFootprint(el, pxPerMeter) })
+        ),
+        ...(layout.roomFixtures ?? []).map((f) =>
+          shapeBox({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height, rotation: f.rotation, round: f.type === "column-round" })
+        ),
+      ];
+      const bounds = placementBounds(layout);
       const added: LayoutElement[] = elements.map((input, i) => {
         const shape = getDefaultElementShape(input.type, pxPerMeter);
         const isTable = isTableType(input.type);
         const tableNumber = isTable ? (input.tableNumber ?? ++nextNumber) : null;
         if (isTable && input.tableNumber) nextNumber = Math.max(nextNumber, input.tableNumber);
+        const width = input.width ?? shape.width;
+        const height = input.height ?? shape.height;
+        const footprint = getElementFootprint({ type: input.type, width, height, capacity: input.capacity ?? shape.capacity }, pxPerMeter);
+        const center = { x: input.x ?? (bounds.minX + bounds.maxX) / 2, y: input.y ?? (bounds.minY + bounds.maxY) / 2 };
+        const spot =
+          input.x === undefined && input.y === undefined
+            ? findFreeSpot(center, footprint.width, footprint.height, occupied, pxPerMeter * 0.3, bounds)
+            : center;
+        occupied.push(shapeBox({ id: "", x: spot.x, y: spot.y, rotation: input.rotation ?? 0, ...footprint }));
         return {
           id: randomUUID(),
           type: input.type,
           label: input.label ?? (isTable ? `Mesa ${tableNumber}` : ELEMENT_LABELS[input.type]),
           tableNumber,
-          x: input.x ?? layout.canvasWidth / 2,
-          y: input.y ?? layout.canvasHeight / 2,
-          width: input.width ?? shape.width,
-          height: input.height ?? shape.height,
+          x: spot.x,
+          y: spot.y,
+          width,
+          height,
           rotation: input.rotation ?? 0,
           capacity: input.capacity ?? shape.capacity,
           rows: input.rows ?? shape.rows,
@@ -214,7 +327,7 @@ export function registerSeatingTools(server: McpServer) {
       await saveElements(layout.id, layout.elements.filter((el) => !remove.has(el.id)));
       const unseated = await prisma.guest.updateMany({
         where: { weddingId: a.weddingId, tableElementId: { in: elementIds } },
-        data: { tableElementId: null },
+        data: { tableElementId: null, seatIndex: null },
       });
       await log(a, "layout.save", `Quitó ${remove.size} elementos de la distribución del salón`, eventId);
       return json({ removed: layout.elements.filter((el) => remove.has(el.id)).length, guestsUnseated: unseated.count });
@@ -280,7 +393,20 @@ export function registerSeatingTools(server: McpServer) {
         table = layouts.flatMap((l) => l.elements).find((el) => el.id === tableElementId && isTableType(el.type));
         if (!table) return json({ error: "Mesa no encontrada." });
       }
-      const result = await prisma.guest.updateMany({ where: { weddingId: a.weddingId, id: { in: guestIds } }, data: { tableElementId } });
+      const current = await prisma.guest.findMany({
+        where: { weddingId: a.weddingId, id: { in: guestIds } },
+        select: { id: true, tableElementId: true },
+      });
+      // Solo cambian los que van a otra mesa; su silla anterior ya no aplica (el plano los sienta
+      // en la primera libre). Los que ya estaban en esa mesa conservan su silla.
+      const changing = current.filter((g) => g.tableElementId !== tableElementId).map((g) => g.id);
+      if (changing.length > 0) {
+        await prisma.guest.updateMany({
+          where: { weddingId: a.weddingId, id: { in: changing } },
+          data: { tableElementId, seatIndex: null },
+        });
+      }
+      const result = { count: current.length };
       await log(a, "guest.assign_table", table ? `Asignó ${result.count} invitados a "${table.label}"` : `Quitó la mesa de ${result.count} invitados`);
       if (!table) return json({ updated: result.count });
       const seated = await prisma.guest.findMany({ where: { weddingId: a.weddingId, tableElementId } });

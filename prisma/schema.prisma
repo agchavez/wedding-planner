@@ -75,6 +75,10 @@ model Guest {
   notes               String    @default("")
   // Referencia suelta al id de un LayoutElement embebido en SeatingLayout.elements.
   tableElementId      String?
+  // Silla (índice 0..capacidad-1) dentro de la mesa de tableElementId donde empieza el grupo:
+  // el invitado y sus acompañantes ocupan sillas consecutivas desde aquí. null = sin silla fija
+  // (el plano lo acomoda en la primera libre). Se limpia cada vez que cambia tableElementId.
+  seatIndex           Int?
   // De qué lado viene el invitado: bride | groom | both | "" (sin definir).
   side                String    @default("")
   // Referencias sueltas a GuestLabel.id (etiquetas libres para filtrar: "Trabajo", "VIP"…).
@@ -360,29 +364,104 @@ type RoomFixture {
   rotation Float  @default(0)
 }
 
+// Plano importado (imagen) que se dibuja como fondo de la capa salón para calcar paredes y
+// calibrar la escala. Esquina superior izquierda (x, y) y tamaño en píxeles del lienzo.
+type PlanImage {
+  // /api/uploads/floorplans/<weddingId>/… (subido) o un enlace http(s).
+  url     String
+  x       Float  @default(0)
+  y       Float  @default(0)
+  width   Float
+  height  Float
+  opacity Float  @default(0.5)
+}
+
 // Distribución visual de un evento de la boda (una por WeddingEvent — comparten el mismo id
 // que su WeddingEvent, ver getOrCreateSeatingLayout en lib/seatingLayout.ts).
 model SeatingLayout {
-  id            String          @id @map("_id") @db.ObjectId
-  weddingId     String?         @db.ObjectId
-  eventId       String?         @db.ObjectId
-  canvasWidth   Int             @default(2000)
-  canvasHeight  Int             @default(1400)
+  id                String          @id @map("_id") @db.ObjectId
+  weddingId         String?         @db.ObjectId
+  eventId           String?         @db.ObjectId
+  canvasWidth       Int             @default(2000)
+  canvasHeight      Int             @default(1400)
   // indoor | garden — estilo visual del salón (interior o ceremonia al aire libre).
-  background    String          @default("indoor")
+  background        String          @default("indoor")
   // Contorno del local (polígono). Vacío = sin definir, se muestra un rectángulo simple.
-  roomShape     RoomPoint[]
+  roomShape         RoomPoint[]
   // Elementos fijos del salón. Con roomShape forman la "capa salón": se dibuja debajo de los
   // elementos de la boda y solo se edita en el modo "Editar salón".
-  roomFixtures  RoomFixture[]
+  roomFixtures      RoomFixture[]
   // Escala real: píxeles del lienzo por metro. null = DEFAULT_PX_PER_METER (lib/layoutUnits.ts);
   // los layouts anteriores no se reescriben, la conversión se hace al leer.
-  pxPerMeter    Float?
+  pxPerMeter        Float?
   // Versión del formato del documento (null = 1, anterior a escala y capa salón).
-  schemaVersion Int?
-  elements      LayoutElement[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  schemaVersion     Int?
+  // Plano importado como fondo (opcional). null = sin plano.
+  backgroundImage   PlanImage?
+  // Versión de la biblioteca de salones (VenueRoomVersion.id) de la que se copió la capa salón.
+  // null = salón propio de este layout. Solo es una referencia: la capa salón vive copiada aquí.
+  baseRoomVersionId String?         @db.ObjectId
+  elements          LayoutElement[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+// Biblioteca de salones: un lugar (hotel, hacienda, jardín…) con uno o varios salones
+// reutilizables entre bodas. Privado = lo ven la boda y la persona que lo guardó; platform =
+// lo ve todo el mundo (solo un administrador lo marca así).
+model Venue {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  city          String    @default("")
+  address       String    @default("")
+  notes         String    @default("")
+  // private | platform
+  visibility    String    @default("private")
+  createdById   String
+  createdByName String    @default("")
+  // Boda desde la que se guardó (sus participantes también lo ven y le agregan versiones).
+  weddingId     String?   @db.ObjectId
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([weddingId])
+  @@index([visibility])
+}
+
+// Salón dentro de un lugar, con la capacidad declarada por tipo de montaje (opcionales).
+model VenueRoom {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  venueId          String    @db.ObjectId
+  name             String
+  banquetCapacity  Int?
+  cocktailCapacity Int?
+  theaterCapacity  Int?
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([venueId])
+}
+
+// Versión inmutable de la capa salón de un VenueRoom (nunca se edita: un cambio crea otra).
+// Mismas coordenadas que SeatingLayout (píxeles del lienzo con su escala pxPerMeter).
+model VenueRoomVersion {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  roomId          String        @db.ObjectId
+  version         Int
+  roomShape       RoomPoint[]
+  roomFixtures    RoomFixture[]
+  pxPerMeter      Float
+  canvasWidth     Int
+  canvasHeight    Int
+  // indoor | garden
+  background      String        @default("indoor")
+  backgroundImage PlanImage?
+  createdById     String
+  createdAt       DateTime      @default(now())
+
+  @@unique([roomId, version])
 }
 
 // Registro de auditoría: inicios de sesión, cambios en los datos de cada boda y acciones
