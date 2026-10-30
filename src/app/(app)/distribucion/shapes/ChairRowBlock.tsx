@@ -1,7 +1,8 @@
 import { memo } from "react";
 import { Rect, Text } from "react-konva";
-import { computeChairGridPositions } from "@/lib/seatGeometry";
+import { computeChairGridPositions, getChairMetrics } from "@/lib/seatGeometry";
 import { ChairIcon } from "@/app/(app)/distribucion/shapes/ChairIcon";
+import { usePlanTheme } from "@/app/(app)/distribucion/planPalette";
 
 export const ChairRowBlock = memo(function ChairRowBlock({
   width,
@@ -10,6 +11,7 @@ export const ChairRowBlock = memo(function ChairRowBlock({
   columns,
   label,
   fill,
+  pxPerMeter,
 }: {
   width: number;
   height: number;
@@ -17,34 +19,39 @@ export const ChairRowBlock = memo(function ChairRowBlock({
   columns: number | null;
   label: string;
   fill: string | null;
+  pxPerMeter: number;
 }) {
+  const { palette } = usePlanTheme();
   const seats = computeChairGridPositions(width, height, rows ?? 1, columns ?? 1);
+  const { radius } = getChairMetrics(pxPerMeter);
 
   return (
     <>
       <Rect
-        x={-width / 2}
-        y={-height / 2}
-        width={width}
-        height={height}
-        fill={fill ?? "#f6f2ea"}
-        stroke="#c9a876"
+        x={-width / 2 - radius}
+        y={-height / 2 - radius}
+        width={width + radius * 2}
+        height={height + radius * 2}
+        fill={fill ?? undefined}
+        stroke={palette.zoneLine}
         strokeWidth={1}
         dash={[4, 4]}
-        cornerRadius={6}
+        cornerRadius={4}
       />
       {seats.map((seat, i) => (
-        <ChairIcon key={i} x={seat.x} y={seat.y} rotation={seat.rotation} color="#a8845c" />
+        <ChairIcon key={i} x={seat.x} y={seat.y} radius={radius} />
       ))}
       <Text
-        text={label}
-        width={width}
-        y={-height / 2 - 16}
-        offsetX={width / 2}
+        text={label.toUpperCase()}
+        width={width + 80}
+        y={-height / 2 - radius - 16}
+        offsetX={(width + 80) / 2}
         align="center"
-        fontSize={12}
+        fontSize={10}
+        letterSpacing={1.5}
+        fontFamily={palette.bodyFont}
         fontStyle="600"
-        fill="#6a5638"
+        fill={palette.muted}
         listening={false}
       />
     </>
