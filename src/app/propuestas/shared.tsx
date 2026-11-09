@@ -22,17 +22,10 @@ export const W = {
   headline: "¡Nos casamos!",
   message:
     "Nos encantaría que nos acompañes en este día tan especial y que nos bendigas con tu presencia y tus oraciones.",
-  quote: "Un matrimonio feliz es enamorarse muchas veces, siempre de la misma persona.",
+  quote: "Y sobre todas estas cosas vestíos de amor, que es el vínculo perfecto.",
+  quoteRef: "Colosenses 3:14",
   dressCode: "Formal",
-  dressNote: "Con cariño les pedimos evitar el blanco (es para la novia) y el verde (es el color de nuestra boda).",
-  /** Sugerencias de vestimenta: sin verde y sin blanco. */
-  dressPalette: [
-    { name: "Champaña", hex: "#cdb48e" },
-    { name: "Terracota", hex: "#a75a3f" },
-    { name: "Vino", hex: "#5e1f2b" },
-    { name: "Azul noche", hex: "#1e2740" },
-    { name: "Negro", hex: "#141414" },
-  ],
+  dressNote: "Con cariño les pedimos no usar el color verde: es el color de nuestra boda.",
   adultsOnly:
     "Amamos a sus pequeños, pero esta celebración será solo para adultos. Gracias por comprender y por regalarse una noche para ustedes.",
   gifts: "Tu presencia es nuestro mejor regalo. Si deseas tener un detalle con nosotros, habrá una lluvia de sobres el día de la boda, o puedes hacerlo por transferencia.",
@@ -113,6 +106,20 @@ export function useReveal(deps: unknown[] = []) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return ref;
+}
+
+/** Bloquea el scroll de la página mientras la portada de apertura está visible. */
+export function useScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (!locked) return;
+    const el = document.documentElement;
+    const prev = el.style.overflow;
+    el.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+    return () => {
+      el.style.overflow = prev;
+    };
+  }, [locked]);
 }
 
 /** Desplazamiento de la página (para parallax suave). */
@@ -282,6 +289,60 @@ export function RsvpDemo({ guest, skin }: { guest: Guest; skin: RsvpSkin }) {
       </button>
       <p className={`${skin.note} mt-3 text-center`}>Por favor confirma antes del {W.rsvpBy}.</p>
     </form>
+  );
+}
+
+/** Íconos de vestimenta formal: traje, vestido largo y "sin verde". */
+export function DressIcons({ color, muted, className = "" }: { color: string; muted: string; className?: string }) {
+  const stroke = { fill: "none", stroke: color, strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+  const items = [
+    {
+      label: "Traje",
+      svg: (
+        <>
+          <path {...stroke} d="M14 58V25q0-6 6-8l6-3 6 16 6-16 6 3q6 2 6 8v33z" />
+          <path {...stroke} d="M26 14l2 20 4-4M38 14l-2 20-4-4M32 30v28" />
+          <path fill={color} d="M28 17.5l4 2.3-4 2.3zM36 17.5l-4 2.3 4 2.3z" />
+          <circle fill={color} cx="32" cy="40" r="1.1" />
+          <circle fill={color} cx="32" cy="47" r="1.1" />
+        </>
+      ),
+    },
+    {
+      label: "Vestido largo",
+      svg: (
+        <>
+          <path {...stroke} d="M26 8l1.5 12M38 8l-1.5 12" />
+          <path {...stroke} d="M27.5 20q4.5 3 9 0L36 30q-4 2-8 0z" />
+          <path {...stroke} d="M28 30q-4 14-12 28 16 3 32 0-8-14-12-28" />
+          <path {...stroke} strokeWidth={1} d="M31 34l-3 23M34 34l4 23" />
+        </>
+      ),
+    },
+    {
+      label: "Sin verde",
+      svg: (
+        <>
+          <circle cx="32" cy="34" r="13" fill="#5f7a3a" />
+          <circle {...stroke} cx="32" cy="34" r="19" />
+          <path {...stroke} strokeWidth={2.2} d="M18.5 20.5l27 27" />
+        </>
+      ),
+    },
+  ];
+  return (
+    <div className={`flex gap-6 sm:gap-8 ${className}`}>
+      {items.map((it) => (
+        <div key={it.label} className="flex flex-col items-center gap-2 text-center">
+          <svg viewBox="0 0 64 64" className="size-14 sm:size-16" aria-hidden>
+            {it.svg}
+          </svg>
+          <span className="text-[10px] tracking-[0.2em] uppercase" style={{ color: muted }}>
+            {it.label}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

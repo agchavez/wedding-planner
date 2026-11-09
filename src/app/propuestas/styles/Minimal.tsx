@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Plus } from "lucide-react";
-import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, type Guest } from "../shared";
+import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, type Guest } from "../shared";
 
 const SERIF = "'Instrument Serif', Georgia, serif";
 const SANS = "'Manrope', system-ui, sans-serif";
@@ -23,7 +23,7 @@ export function Minimal({ guest }: { guest: Guest }) {
   }, []);
 
   const details = [
-    { q: "¿Cómo debo vestir?", a: <><p><strong>Formal.</strong> {W.dressNote}</p><div className="mt-4 flex gap-2">{W.dressPalette.map((c) => (<span key={c.hex} className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={{ borderColor: C.line }}><span className="size-3 rounded-full" style={{ background: c.hex }} />{c.name}</span>))}</div></> },
+    { q: "¿Cómo debo vestir?", a: <><p><strong>Formal.</strong> {W.dressNote}</p><DressIcons color={C.ink} muted={C.muted} className="mt-4" /></> },
     { q: "¿Puedo llevar a mis hijos?", a: <p>{W.adultsOnly}</p> },
     { q: "¿Qué les puedo regalar?", a: <><p>{W.gifts}</p><div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: C.line }}><div className="text-xs leading-relaxed"><p style={{ color: C.muted }}>{W.bank.bank} · {W.bank.holder}</p><p className="text-base tracking-wider">{W.bank.account}</p></div><CopyButton value={W.bank.account} className="inline-flex items-center gap-2 rounded-full bg-[#2e3123] px-4 py-2 text-xs text-white">Copiar</CopyButton></div></> },
     { q: "¿A qué hora debo llegar?", a: <p>La ceremonia empieza a las {W.time}. {W.recommendations.join(" ")}</p> },
@@ -177,7 +177,7 @@ export function Minimal({ guest }: { guest: Guest }) {
             </a>
           </div>
           <div data-reveal="wipe" className="aspect-[16/10] overflow-hidden rounded-2xl border" style={{ borderColor: C.line }}>
-            <iframe title="Mapa" src={W.mapEmbed} className="h-full w-full grayscale" loading="lazy" />
+            <iframe title="Mapa" src={W.mapEmbed} className="h-full w-full" loading="lazy" />
           </div>
         </div>
       </section>
@@ -257,6 +257,12 @@ export function Minimal({ guest }: { guest: Guest }) {
         </p>
         <p data-reveal className="mt-6 text-sm" style={{ color: C.muted }}>
           {W.closing}
+        </p>
+        <p data-reveal className="mx-auto mt-10 max-w-sm text-lg leading-snug italic" style={{ fontFamily: SERIF }}>
+          “{W.quote}”
+        </p>
+        <p data-reveal className="mt-2 text-[10px] tracking-[0.35em] uppercase" style={{ color: C.accent }}>
+          {W.quoteRef}
         </p>
       </footer>
 

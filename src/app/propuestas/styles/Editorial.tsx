@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowUpRight, CalendarPlus, MapPin } from "lucide-react";
-import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, useScrollY, type Guest } from "../shared";
+import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, useScrollY, type Guest } from "../shared";
 
 const SERIF = "'Bodoni Moda', 'Didot', serif";
 const SANS = "'Inter', system-ui, sans-serif";
@@ -108,6 +108,7 @@ export function Editorial({ guest }: { guest: Guest }) {
           </p>
           <blockquote data-reveal style={{ ["--d" as string]: 2, borderColor: C.ink }} className="mt-10 border-l-2 pl-5 text-sm leading-relaxed" >
             <span style={{ fontFamily: SERIF }} className="text-xl italic">“{W.quote}”</span>
+            <cite className="mt-2 block text-[10px] tracking-[0.35em] uppercase not-italic" style={{ color: C.muted }}>{W.quoteRef}</cite>
           </blockquote>
         </div>
       </section>
@@ -195,7 +196,7 @@ export function Editorial({ guest }: { guest: Guest }) {
               {W.city} · Ceremonia y recepción
             </p>
             <div data-reveal className="mt-8 aspect-video overflow-hidden border border-white/15">
-              <iframe title="Mapa" src={W.mapEmbed} className="h-full w-full grayscale" loading="lazy" />
+              <iframe title="Mapa" src={W.mapEmbed} className="h-full w-full" loading="lazy" />
             </div>
             <a
               href={W.mapUrl}
@@ -219,15 +220,8 @@ export function Editorial({ guest }: { guest: Guest }) {
           <p data-reveal className="mt-4 max-w-sm text-sm leading-relaxed" style={{ color: C.muted }}>
             {W.dressNote}
           </p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            {W.dressPalette.map((c, i) => (
-              <div key={c.hex} data-reveal="scale" style={{ ["--d" as string]: i }} className="text-center">
-                <div className="size-14 rounded-full ring-1 ring-black/10" style={{ background: c.hex }} />
-                <p className="mt-2 text-[10px] tracking-[0.15em] uppercase" style={{ color: C.muted }}>
-                  {c.name}
-                </p>
-              </div>
-            ))}
+          <div data-reveal>
+            <DressIcons color={C.ink} muted={C.muted} className="mt-8" />
           </div>
         </div>
         <div data-reveal className="flex flex-col justify-between bg-[#343a26] p-8 text-[#f2eee3] sm:p-10">

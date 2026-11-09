@@ -14,5 +14,5 @@ export default async function PropuestasPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const seats = Math.min(10, Math.max(1, Number(one(sp.lugares)) || 2));
-  return <Proposals initial={one(sp.estilo) ?? "editorial"} guest={{ name: one(sp.para) || "Familia Martínez", seats }} />;
+  return <Proposals initial={one(sp.estilo) ?? "editorial"} guest={{ name: one(sp.para) || "Indira Victoria Lopez", seats }} />;
 }

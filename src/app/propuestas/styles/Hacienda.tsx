@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Baby, CalendarPlus, Gift, Heart, MapPin, Shirt } from "lucide-react";
-import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, useScrollY, type Guest } from "../shared";
+import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, useScrollLock, useScrollY, type Guest } from "../shared";
 
 const SERIF = "'Fraunces', Georgia, serif";
 const SANS = "'DM Sans', system-ui, sans-serif";
@@ -10,16 +10,20 @@ const C = { bg: "#ece8da", paper: "#f8f6ee", ink: "#2e3123", muted: "#78765f", t
 const GALLERY = ["c-caminata", "c-anillo", "c-picnic2", "c-frente", "c-beso2", "c-sombrilla"].map(photo);
 
 export function Hacienda({ guest }: { guest: Guest }) {
-  const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
+  // closed → opening (sello, solapa y tarjeta) → reveal (se desvanece el sobre y entra la portada) → open
+  const [stage, setStage] = useState<"closed" | "opening" | "reveal" | "open">("closed");
   const [lb, setLb] = useState<number | null>(null);
   const ref = useReveal([stage]);
   const y = useScrollY();
   const { parts } = useCountdown();
+  const revealed = stage === "reveal" || stage === "open";
+  useScrollLock(stage !== "open");
 
   const openEnvelope = () => {
     if (stage !== "closed") return;
     setStage("opening");
-    setTimeout(() => setStage("open"), 2100);
+    setTimeout(() => setStage("reveal"), 2300);
+    setTimeout(() => setStage("open"), 3200);
   };
 
   return (
@@ -29,45 +33,67 @@ export function Hacienda({ guest }: { guest: Guest }) {
       {/* Sobre */}
       {stage !== "open" && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-10 transition-opacity duration-700 ${stage === "opening" ? "delay-[1400ms] opacity-0" : ""}`}
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-12 transition-opacity duration-[900ms] ease-out ${stage === "reveal" ? "opacity-0" : ""}`}
           style={{ background: `radial-gradient(circle at 50% 40%, ${C.paper}, ${C.bg})` }}
         >
-          <p style={{ fontFamily: SERIF }} className="text-center text-lg italic" >
-            Una invitación para <br />
-            <span className="text-2xl not-italic">{guest.name}</span>
-          </p>
-          <button onClick={openEnvelope} aria-label="Abrir sobre" className={`pp-env relative h-[220px] w-[320px] [perspective:900px] ${stage !== "closed" ? "open" : ""}`}>
-            <div className="pp-env-card absolute inset-x-5 top-3 bottom-3 flex flex-col items-center justify-center rounded-md shadow" style={{ background: C.paper }}>
-              <p style={{ fontFamily: SERIF }} className="text-3xl italic" >Angel &amp; Indira</p>
-              <p className="mt-1 text-[10px] tracking-[0.35em] uppercase" style={{ color: C.muted }}>12 · 12 · 2026</p>
+          <div className={`transition duration-500 ${stage !== "closed" ? "-translate-y-2 opacity-0" : ""}`}>
+            <p style={{ fontFamily: SERIF }} className="pp-rise text-center text-lg italic">
+              Una invitación para <br />
+              <span className="text-2xl not-italic">{guest.name}</span>
+            </p>
+          </div>
+          <div className={`transition duration-[900ms] ease-out ${stage === "reveal" ? "translate-y-6 scale-95" : ""}`}>
+            <div className="pp-rise" style={{ ["--d" as string]: 2 }}>
+            <button onClick={openEnvelope} aria-label="Abrir sobre" className={`pp-env relative block h-[220px] w-[min(320px,84vw)] ${stage !== "closed" ? "open" : ""}`}>
+              {/* Interior del sobre */}
+              <div className="absolute inset-0 rounded-md" style={{ background: C.deep }} />
+              <div className="pp-env-card absolute inset-x-4 top-3 bottom-3 flex flex-col items-center justify-center rounded-sm" style={{ background: C.paper }}>
+                <p style={{ fontFamily: SERIF }} className="text-3xl italic">
+                  Angel &amp; Indira
+                </p>
+                <span className="my-2 h-px w-10" style={{ background: C.caramel }} />
+                <p className="text-[10px] tracking-[0.35em] uppercase" style={{ color: C.muted }}>
+                  12 · 12 · 2026
+                </p>
+              </div>
+              {/* Bolsillo frontal */}
+              <div
+                className="pp-env-pocket absolute inset-0 rounded-md shadow-[0_18px_40px_-18px_rgb(30_34_20/0.6)]"
+                style={{ background: C.terra, clipPath: "polygon(0 0, 50% 56%, 100% 0, 100% 100%, 0 100%)" }}
+              />
+              <div className="pp-env-pocket absolute inset-0 rounded-md" style={{ background: "#000", opacity: 0.12, clipPath: "polygon(0 100%, 50% 52%, 100% 100%)" }} />
+              {/* Solapa */}
+              <div className="pp-env-flap absolute inset-x-0 top-0 h-[58%]" style={{ background: "#6c7451", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+              {/* Sello de cera */}
+              <div
+                className="pp-env-seal pp-pulse absolute top-[50%] left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg italic text-[#f3efe1] shadow-lg ring-4 ring-[#3a3f29]/40"
+                style={{ background: `radial-gradient(circle at 35% 30%, ${C.caramel}, #8a6e3c)`, fontFamily: SERIF }}
+              >
+                A·I
+              </div>
+            </button>
             </div>
-            <div className="absolute inset-0 rounded-md" style={{ background: C.terra, clipPath: "polygon(0 0, 50% 55%, 100% 0, 100% 100%, 0 100%)" }} />
-            <div className="absolute inset-0 rounded-md" style={{ background: C.deep, opacity: 0.25, clipPath: "polygon(0 100%, 50% 50%, 100% 100%)" }} />
-            <div className="pp-env-flap absolute inset-x-0 top-0 h-[60%]" style={{ background: "#6c7451", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
-            <div
-              className="pp-env-seal pp-pulse absolute top-[46%] left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg italic text-[#f3efe1] shadow-lg"
-              style={{ background: C.deep, fontFamily: SERIF }}
-            >
-              A·I
-            </div>
-          </button>
-          <p className={`pp-bob text-xs tracking-[0.3em] uppercase transition-opacity ${stage !== "closed" ? "opacity-0" : ""}`} style={{ color: C.muted }}>
-            Toca el sello para abrir
+          </div>
+          <p
+            className={`text-xs tracking-[0.3em] uppercase transition-opacity duration-300 ${stage !== "closed" ? "opacity-0" : ""}`}
+            style={{ color: C.muted }}
+          >
+            <span className="pp-bob inline-block">Toca el sello para abrir</span>
           </p>
         </div>
       )}
 
       {/* Portada con arco */}
-      <header className="relative mx-auto flex min-h-svh max-w-6xl flex-col items-center justify-center gap-10 px-5 py-16 md:flex-row md:gap-16">
-        <div className="relative">
+      <header
+        key={revealed ? "on" : "off"}
+        className={`relative mx-auto flex min-h-svh max-w-6xl flex-col items-center justify-center gap-10 px-5 py-16 md:flex-row md:gap-16 ${revealed ? "" : "invisible"}`}
+      >
+        <div className="pp-rise relative">
           <div className="relative h-[62svh] max-h-[620px] w-[min(78vw,380px)] overflow-hidden rounded-t-full border-[10px] shadow-2xl" style={{ borderColor: C.paper }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo("c-mirada")}
-              alt="Angel e Indira"
-              className={`h-full w-full object-cover ${stage === "open" ? "pp-ken" : ""}`}
-              style={{ transform: `translateY(${y * 0.08}px) scale(1.08)` }}
-            />
+            <div className="h-full w-full" style={{ transform: `translateY(${y * 0.08}px) scale(1.08)` }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo("c-mirada")} alt="Angel e Indira" className={`h-full w-full object-cover ${revealed ? "pp-ken" : "pp-ken-wait"}`} />
+            </div>
           </div>
           {/* Sello giratorio */}
           <div className="absolute -right-8 -bottom-8 size-32 rounded-full shadow-xl sm:-right-12" style={{ background: C.terra }}>
@@ -210,7 +236,7 @@ export function Hacienda({ guest }: { guest: Guest }) {
               {W.city}. La ceremonia y la recepción serán en el mismo lugar.
             </p>
             <div data-reveal className="mt-6 aspect-video overflow-hidden rounded-2xl">
-              <iframe title="Mapa" src={W.mapEmbed} className="h-full w-full [filter:grayscale(1)_sepia(.35)]" loading="lazy" />
+              <iframe title="Mapa" src={W.mapEmbed} className="h-full w-full" loading="lazy" />
             </div>
             <a
               data-reveal
@@ -233,12 +259,7 @@ export function Hacienda({ guest }: { guest: Guest }) {
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             <Card icon={<Shirt className="size-6" />} title="Vestimenta formal" d={0}>
               <p>{W.dressNote}</p>
-              <div className="mt-5 flex gap-2">
-                {W.dressPalette.map((c) => (
-                  <span key={c.hex} title={c.name} className="h-10 flex-1 rounded-full ring-1 ring-white/20" style={{ background: c.hex }} />
-                ))}
-              </div>
-              <p className="mt-2 text-[11px] opacity-60">Champaña · terracota · vino · azul noche · negro</p>
+              <DressIcons color="#f3efe1" muted="#f3efe1b3" className="mt-5" />
             </Card>
             <Card icon={<Baby className="size-6" />} title="Solo adultos" d={1}>
               <p>{W.adultsOnly}</p>
@@ -303,6 +324,7 @@ export function Hacienda({ guest }: { guest: Guest }) {
         </p>
         <p data-reveal className="mt-4 text-sm" style={{ color: C.muted }}>
           “{W.quote}”
+          <span className="mt-1 block text-[10px] tracking-[0.35em] uppercase" style={{ color: C.caramel }}>{W.quoteRef}</span>
         </p>
         <p data-reveal className="mt-8 text-xs tracking-[0.4em] uppercase" style={{ color: C.terra }}>
           Angel &amp; Indira

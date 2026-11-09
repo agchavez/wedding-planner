@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, useScrollY, type Guest } from "../shared";
+import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountdown, useReveal, useScrollLock, useScrollY, type Guest } from "../shared";
 
 const DISPLAY = "'Italiana', 'Cormorant Garamond', serif";
 const SANS = "'Jost', system-ui, sans-serif";
@@ -10,7 +10,9 @@ const C = { bg: "#262a1c", panel: "#30351f", ink: "#f3eedd", muted: "#b3b096", g
 const GALLERY = ["c-sombrilla", "c-picnic3", "c-anillo", "c-risa", "c-alzar", "c-pareja", "c-anillo3"].map(photo);
 
 export function Gala({ guest }: { guest: Guest }) {
-  const [open, setOpen] = useState(false);
+  // closed → leaving (el monograma se desvanece y entra la portada) → open
+  const [stage, setStage] = useState<"closed" | "leaving" | "open">("closed");
+  const open = stage !== "closed";
   const [slide, setSlide] = useState(0);
   const [lb, setLb] = useState<number | null>(null);
   const ref = useReveal([open]);
@@ -20,6 +22,13 @@ export function Gala({ guest }: { guest: Guest }) {
     () => Array.from({ length: 46 }, (_, i) => ({ x: (i * 37) % 100, y: (i * 61) % 100, s: 1 + (i % 3), d: (i % 7) * 0.45 })),
     []
   );
+
+  useScrollLock(stage !== "open");
+  const enter = () => {
+    if (stage !== "closed") return;
+    setStage("leaving");
+    setTimeout(() => setStage("open"), 1500);
+  };
 
   useEffect(() => {
     const id = setInterval(() => setSlide((s) => (s + 1) % GALLERY.length), 4500);
@@ -31,57 +40,73 @@ export function Gala({ guest }: { guest: Guest }) {
       <Fonts families="family=Italiana&family=Jost:wght@300;400;500" />
 
       {/* Apertura: monograma que se dibuja */}
-      <div
-        className={`fixed inset-0 z-50 flex flex-col items-center justify-center transition-all duration-1000 ${open ? "pointer-events-none scale-110 opacity-0" : ""}`}
-        style={{ background: C.bg }}
-      >
-        {stars.map((s, i) => (
-          <span
-            key={i}
-            className="pp-twinkle absolute rounded-full"
-            style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, background: C.gold, animationDelay: `${s.d}s` }}
-          />
-        ))}
-        <button onClick={() => setOpen(true)} className="group relative flex flex-col items-center">
-          <span className="relative block size-56">
-          <svg viewBox="0 0 200 200" className="pp-draw in size-56">
-            <circle cx="100" cy="100" r="92" fill="none" stroke={C.gold} strokeWidth="0.8" pathLength={1} />
-            <circle cx="100" cy="100" r="84" fill="none" stroke={C.gold} strokeWidth="0.4" pathLength={1} />
-            <path d="M100 40 L100 160" stroke={C.gold} strokeWidth="0.5" pathLength={1} />
-          </svg>
-          <span className="pp-fade absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-12 text-7xl" style={{ fontFamily: DISPLAY, animationDelay: "1s" }}>
-            <span className="pp-shimmer">A</span>
-            <span className="pp-shimmer">I</span>
-          </span>
-          </span>
-          <span className="pp-fade mt-8 text-[11px] tracking-[0.6em] uppercase" style={{ color: C.muted, animationDelay: "1.6s" }}>
-            {guest.name}
-          </span>
-          <span className="pp-fade pp-pulse mt-6 rounded-full border px-8 py-3 text-[11px] tracking-[0.5em] uppercase transition group-hover:bg-[#d4b673] group-hover:text-black" style={{ borderColor: C.gold, color: C.gold, animationDelay: "2s" }}>
-            Abrir
-          </span>
-        </button>
-      </div>
+      {stage !== "open" && (
+        <div
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center px-6 transition-opacity duration-[900ms] ease-out ${stage === "leaving" ? "pointer-events-none opacity-0 delay-500" : ""}`}
+          style={{ background: `radial-gradient(ellipse at 50% 45%, #333923, ${C.bg} 70%)` }}
+        >
+          {stars.map((s, i) => (
+            <span
+              key={i}
+              className="pp-twinkle absolute rounded-full"
+              style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, background: C.gold, animationDelay: `${s.d}s` }}
+            />
+          ))}
+          <button onClick={enter} className="group relative flex flex-col items-center outline-none">
+            <span
+              className={`relative block size-52 transition duration-700 ease-out sm:size-60 ${stage === "leaving" ? "scale-[1.35] opacity-0 blur-sm" : "group-hover:scale-[1.03]"}`}
+            >
+              <svg viewBox="0 0 200 200" className="pp-draw in absolute inset-0 size-full">
+                <circle cx="100" cy="100" r="92" fill="none" stroke={C.gold} strokeWidth="0.8" pathLength={1} />
+                <circle cx="100" cy="100" r="84" fill="none" stroke={C.gold} strokeWidth="0.4" pathLength={1} />
+                <path d="M100 48 L100 152" stroke={C.gold} strokeWidth="0.5" pathLength={1} />
+              </svg>
+              <span className="absolute inset-0 grid grid-cols-2 items-center text-6xl sm:text-7xl" style={{ fontFamily: DISPLAY }}>
+                <span className="pp-fade pr-5 text-right" style={{ animationDelay: "1.1s" }}>
+                  <span className="pp-shimmer">A</span>
+                </span>
+                <span className="pp-fade pl-5 text-left" style={{ animationDelay: "1.3s" }}>
+                  <span className="pp-shimmer">I</span>
+                </span>
+              </span>
+            </span>
+            <span className={`transition duration-300 ${stage === "leaving" ? "translate-y-2 opacity-0" : ""}`}>
+              <span className="pp-rise mt-8 block text-[11px] tracking-[0.5em] uppercase" style={{ color: C.muted, ["--d" as string]: 12 }}>
+                Para {guest.name}
+              </span>
+              <span className="pp-rise mt-6 inline-block" style={{ ["--d" as string]: 14 }}>
+                <span
+                  className="pp-pulse inline-block rounded-full border px-9 py-3 text-[11px] tracking-[0.5em] uppercase transition duration-300 group-hover:bg-[#d4b673] group-hover:text-[#262a1c]"
+                  style={{ borderColor: C.gold, color: C.gold }}
+                >
+                  Abrir
+                </span>
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Portada */}
       <header className="relative h-svh min-h-[640px] overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo("c-atardecer")}
-          alt="Angel e Indira"
-          className={`absolute inset-0 h-full w-full object-cover object-[60%_center] ${open ? "pp-ken" : ""}`}
-          style={{ transform: `translateY(${y * 0.35}px)` }}
-        />
-        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${C.bg}cc 0%, transparent 35%, transparent 55%, ${C.bg} 100%)` }} />
+        <div className="absolute inset-0" style={{ transform: `translateY(${y * 0.35}px)` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photo("c-atardecer")}
+            alt="Angel e Indira"
+            className={`h-full w-full object-cover object-[60%_center] ${open ? "pp-ken" : "pp-ken-wait"}`}
+          />
+        </div>
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${C.bg}cc 0%, transparent 28%, transparent 48%, ${C.bg}e6 78%, ${C.bg} 100%)` }} />
         {open && (
-          <div className="relative flex h-full flex-col items-center justify-end pb-24 text-center">
-            <p className="pp-rise text-[11px] tracking-[0.6em] uppercase" style={{ color: C.gold, ["--d" as string]: 2 }}>
+          <div className="relative flex h-full flex-col items-center justify-end px-4 pb-24 text-center">
+            <p className="pp-rise text-[11px] tracking-[0.6em] uppercase" style={{ color: C.gold, ["--d" as string]: 4 }}>
               {W.headline}
             </p>
-            <h1 className="pp-rise mt-4 text-[17vw] leading-none sm:text-[9rem]" style={{ fontFamily: DISPLAY, ["--d" as string]: 3 }}>
+            <h1 className="pp-rise mt-4 text-[15vw] leading-[0.95] sm:text-[9rem]" style={{ fontFamily: DISPLAY, ["--d" as string]: 5 }}>
               <span className="pp-shimmer">Angel &amp; Indira</span>
             </h1>
-            <div className="pp-rise mt-6 flex items-center gap-4 text-xs tracking-[0.45em] uppercase" style={{ ["--d" as string]: 4 }}>
+            <div className="pp-rise mt-6 flex items-center gap-4 text-xs tracking-[0.45em] uppercase" style={{ ["--d" as string]: 6 }}>
               <span className="h-px w-10" style={{ background: C.gold }} />
               12 · Diciembre · 2026
               <span className="h-px w-10" style={{ background: C.gold }} />
@@ -98,6 +123,7 @@ export function Gala({ guest }: { guest: Guest }) {
         </p>
         <p data-reveal className="mt-8 text-sm tracking-wide italic" style={{ color: C.muted }}>
           “{W.quote}”
+          <span className="mt-2 block text-[10px] tracking-[0.4em] uppercase not-italic" style={{ color: C.gold }}>{W.quoteRef}</span>
         </p>
       </section>
 
@@ -190,7 +216,7 @@ export function Gala({ guest }: { guest: Guest }) {
               </a>
             </div>
             <div data-reveal className="min-h-[320px]">
-              <iframe title="Mapa" src={W.mapEmbed} className="h-full min-h-[320px] w-full [filter:grayscale(1)_invert(.92)_sepia(.2)]" loading="lazy" />
+              <iframe title="Mapa" src={W.mapEmbed} className="h-full min-h-[320px] w-full" loading="lazy" />
             </div>
           </div>
         </div>
@@ -209,11 +235,7 @@ export function Gala({ guest }: { guest: Guest }) {
             <p className="mt-4 text-sm leading-relaxed" style={{ color: C.muted }}>
               {W.dressNote}
             </p>
-            <div className="mt-8 flex -space-x-3">
-              {W.dressPalette.map((c, i) => (
-                <span key={c.hex} title={c.name} className="size-12 rounded-full ring-2 transition hover:-translate-y-2" style={{ background: c.hex, ["--tw-ring-color" as string]: C.gold, zIndex: 5 - i }} />
-              ))}
-            </div>
+            <DressIcons color={C.gold} muted={C.muted} className="mt-8" />
           </div>
           <div data-reveal style={{ ["--d" as string]: 1, borderColor: `${C.gold}40`, background: C.panel }} className="flex flex-col items-center justify-center rounded-2xl border p-8 text-center sm:p-10">
             <div className="flex size-28 items-center justify-center rounded-full border-2" style={{ borderColor: C.gold }}>
