@@ -24,7 +24,7 @@ export const W = {
     "Nos encantaría que nos acompañes en este día tan especial y que nos bendigas con tu presencia y tus oraciones.",
   quote: "Un matrimonio feliz es enamorarse muchas veces, siempre de la misma persona.",
   dressCode: "Formal",
-  dressNote: "Con cariño les pedimos evitar el color blanco y tonos similares; ese color es para la novia.",
+  dressNote: "Con cariño les pedimos evitar el blanco (es para la novia) y el verde (es el color de nuestra boda).",
   /** Sugerencias de vestimenta: sin verde y sin blanco. */
   dressPalette: [
     { name: "Champaña", hex: "#cdb48e" },

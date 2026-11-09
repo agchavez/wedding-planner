@@ -6,8 +6,8 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 
 const SERIF = "'Bodoni Moda', 'Didot', serif";
 const SANS = "'Inter', system-ui, sans-serif";
-const C = { bg: "#f3f0e9", ink: "#121212", muted: "#6f6a62", line: "#d9d3c7", accent: "#a88d5f" };
-const GALLERY = ["beso-bn", "retrato-bn", "manos-bn", "alzar-bn", "bugambilia-bn", "puerta-alta-bn", "risa-bn", "picnic-bn"].map(photo);
+const C = { bg: "#f2eee3", ink: "#343a26", muted: "#757359", line: "#d9d4c1", accent: "#a8996a" };
+const GALLERY = ["c-risa", "c-sombrilla", "c-bugambilia", "c-picnic", "c-alzar", "c-mirada", "manos", "c-banca"].map(photo);
 
 export function Editorial({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false);
@@ -22,17 +22,17 @@ export function Editorial({ guest }: { guest: Guest }) {
 
       {/* Telón de apertura */}
       <div className={`pp-curtain fixed inset-0 z-50 ${open ? "open pointer-events-none" : ""}`}>
-        <div className="absolute inset-x-0 top-0 flex h-1/2 items-end justify-center bg-[#121212] pb-6 text-[#f3f0e9]">
+        <div className="absolute inset-x-0 top-0 flex h-1/2 items-end justify-center bg-[#343a26] pb-6 text-[#f2eee3]">
           <p style={{ fontFamily: SERIF }} className="text-7xl italic sm:text-8xl">
-            A <span className="text-[#a88d5f]">&amp;</span> I
+            A <span className="text-[#a8996a]">&amp;</span> I
           </p>
         </div>
-        <div className="absolute inset-x-0 bottom-0 flex h-1/2 flex-col items-center justify-start gap-6 bg-[#121212] pt-4 text-[#f3f0e9]">
+        <div className="absolute inset-x-0 bottom-0 flex h-1/2 flex-col items-center justify-start gap-6 bg-[#343a26] pt-4 text-[#f2eee3]">
           <p className="text-[11px] tracking-[0.5em] uppercase opacity-70">Edición especial · 12.12.2026</p>
           <p className="text-sm opacity-80">Para {guest.name}</p>
           <button
             onClick={() => setOpen(true)}
-            className="pp-pulse mt-2 rounded-full border border-[#f3f0e9]/40 px-7 py-3 text-xs tracking-[0.35em] uppercase transition hover:bg-[#f3f0e9] hover:text-[#121212]"
+            className="pp-pulse mt-2 rounded-full border border-[#f2eee3]/40 px-7 py-3 text-xs tracking-[0.35em] uppercase transition hover:bg-[#f2eee3] hover:text-[#343a26]"
           >
             Abrir invitación
           </button>
@@ -43,9 +43,9 @@ export function Editorial({ guest }: { guest: Guest }) {
       <header className="relative h-svh min-h-[620px] overflow-hidden bg-black text-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={photo("beso-bn")}
+          src={photo("c-beso")}
           alt="Angel e Indira"
-          className={`absolute inset-0 h-full w-full object-cover opacity-80 ${open ? "pp-ken" : ""}`}
+          className={`absolute inset-0 h-full w-full object-cover opacity-90 ${open ? "pp-ken" : ""}`}
           style={{ transform: `translateY(${y * 0.25}px)` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
@@ -64,7 +64,7 @@ export function Editorial({ guest }: { guest: Guest }) {
                 Angel
               </span>
               <span className="pp-rise block pl-[12vw] text-[22vw] sm:pl-40 sm:text-[12rem]" style={{ ["--d" as string]: 3 }}>
-                <span className="text-[#c9b083]">&amp;</span> Indira
+                <span className="text-[#d8c99a]">&amp;</span> Indira
               </span>
             </h1>
             <div className="pp-line mt-6 h-px w-full bg-white/50" style={{ ["--d" as string]: 4 }} />
@@ -77,13 +77,13 @@ export function Editorial({ guest }: { guest: Guest }) {
       </header>
 
       {/* Marquesina */}
-      <div className="overflow-hidden border-y border-[#121212] bg-[#121212] py-3 text-[#f3f0e9]">
+      <div className="overflow-hidden border-y border-[#343a26] bg-[#343a26] py-3 text-[#f2eee3]">
         <div className="pp-marquee flex w-max gap-10 whitespace-nowrap" style={{ fontFamily: SERIF }}>
           {Array.from({ length: 2 }).map((_, k) => (
             <span key={k} className="flex gap-10 text-2xl italic">
               {["Save the date", "12 de diciembre", "Comayagua", "Angel & Indira", "3:30 pm", "Solo adultos"].map((t) => (
                 <span key={t} className="flex items-center gap-10">
-                  {t} <span className="text-[#a88d5f]">✦</span>
+                  {t} <span className="text-[#a8996a]">✦</span>
                 </span>
               ))}
             </span>
@@ -95,8 +95,8 @@ export function Editorial({ guest }: { guest: Guest }) {
       <section className="mx-auto grid max-w-6xl gap-10 px-5 py-24 sm:px-10 md:grid-cols-[1fr_1.1fr] md:items-center">
         <figure data-reveal="clip" className="relative aspect-[3/4] overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photo("retrato-bn")} alt="" className="h-full w-full object-cover" />
-          <figcaption className="absolute bottom-3 left-3 bg-[#f3f0e9] px-2 py-1 text-[10px] tracking-[0.3em] uppercase">Fig. 01 — Nosotros</figcaption>
+          <img src={photo("c-abrazo")} alt="" className="h-full w-full object-cover" />
+          <figcaption className="absolute bottom-3 left-3 bg-[#f2eee3] px-2 py-1 text-[10px] tracking-[0.3em] uppercase">Fig. 01 — Nosotros</figcaption>
         </figure>
         <div>
           <p data-reveal className="text-[11px] tracking-[0.45em] uppercase" style={{ color: C.accent }}>
@@ -162,7 +162,7 @@ export function Editorial({ guest }: { guest: Guest }) {
               key={it.title}
               data-reveal
               style={{ ["--d" as string]: i % 4, borderColor: C.line }}
-              className="group grid grid-cols-[3rem_6rem_1fr] items-baseline gap-3 border-t py-5 transition-colors hover:bg-[#121212] hover:text-[#f3f0e9] sm:grid-cols-[5rem_10rem_1fr] sm:px-3"
+              className="group grid grid-cols-[3rem_6rem_1fr] items-baseline gap-3 border-t py-5 transition-colors hover:bg-[#343a26] hover:text-[#f2eee3] sm:grid-cols-[5rem_10rem_1fr] sm:px-3"
             >
               <span className="text-xs" style={{ color: C.accent }}>
                 {String(i + 1).padStart(2, "0")}
@@ -177,11 +177,11 @@ export function Editorial({ guest }: { guest: Guest }) {
       </section>
 
       {/* Lugar */}
-      <section className="bg-[#121212] text-[#f3f0e9]">
+      <section className="bg-[#343a26] text-[#f2eee3]">
         <div className="mx-auto grid max-w-6xl md:grid-cols-2">
           <div data-reveal="clip" className="relative min-h-[420px] overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo("arco-bn")} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={photo("c-arco")} alt="" className="absolute inset-0 h-full w-full object-cover" />
           </div>
           <div className="px-5 py-16 sm:px-12">
             <SectionTitle n="03" title="El lugar" dark />
@@ -201,7 +201,7 @@ export function Editorial({ guest }: { guest: Guest }) {
               href={W.mapUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-6 inline-flex items-center gap-2 bg-[#f3f0e9] px-6 py-3 text-xs tracking-[0.3em] text-[#121212] uppercase transition hover:bg-[#a88d5f]"
+              className="mt-6 inline-flex items-center gap-2 bg-[#f2eee3] px-6 py-3 text-xs tracking-[0.3em] text-[#343a26] uppercase transition hover:bg-[#a8996a]"
             >
               <MapPin className="size-4" /> Cómo llegar <ArrowUpRight className="size-4" />
             </a>
@@ -230,7 +230,7 @@ export function Editorial({ guest }: { guest: Guest }) {
             ))}
           </div>
         </div>
-        <div data-reveal className="flex flex-col justify-between bg-[#121212] p-8 text-[#f3f0e9] sm:p-10">
+        <div data-reveal className="flex flex-col justify-between bg-[#343a26] p-8 text-[#f2eee3] sm:p-10">
           <p className="text-[11px] tracking-[0.45em] uppercase opacity-60">05 — Nota importante</p>
           <p style={{ fontFamily: SERIF }} className="mt-6 text-6xl leading-none italic">
             Solo
@@ -251,7 +251,7 @@ export function Editorial({ guest }: { guest: Guest }) {
             <button key={src} onClick={() => setLb(i)} className="group relative shrink-0 snap-start overflow-hidden" data-reveal="scale" style={{ ["--d" as string]: i % 4 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt="" loading="lazy" className="h-[60svh] max-h-[520px] w-auto object-cover transition duration-700 group-hover:scale-105" />
-              <span className="absolute top-3 left-3 bg-[#f3f0e9] px-2 py-0.5 text-[10px] tracking-[0.2em]">{String(i + 1).padStart(2, "0")}</span>
+              <span className="absolute top-3 left-3 bg-[#f2eee3] px-2 py-0.5 text-[10px] tracking-[0.2em]">{String(i + 1).padStart(2, "0")}</span>
             </button>
           ))}
         </div>
@@ -278,7 +278,7 @@ export function Editorial({ guest }: { guest: Guest }) {
             </dl>
             <CopyButton
               value={W.bank.account}
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-[#121212] py-3 text-xs tracking-[0.3em] text-[#f3f0e9] uppercase transition hover:bg-[#a88d5f]"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-[#343a26] py-3 text-xs tracking-[0.3em] text-[#f2eee3] uppercase transition hover:bg-[#a8996a]"
             >
               Copiar cuenta
             </CopyButton>
@@ -296,11 +296,11 @@ export function Editorial({ guest }: { guest: Guest }) {
               skin={{
                 wrap: "",
                 label: "text-[11px] tracking-[0.3em] uppercase",
-                input: "w-full border-0 border-b border-[#121212] bg-transparent px-0 py-2 text-base outline-none focus:border-[#a88d5f]",
-                choice: "border border-[#121212] py-4 text-xs tracking-[0.25em] uppercase transition hover:bg-[#121212]/5",
-                choiceOn: "!bg-[#121212] text-[#f3f0e9]",
-                button: "bg-[#121212] py-4 text-xs tracking-[0.35em] text-[#f3f0e9] uppercase transition hover:bg-[#a88d5f]",
-                note: "text-sm text-[#6f6a62]",
+                input: "w-full border-0 border-b border-[#343a26] bg-transparent px-0 py-2 text-base outline-none focus:border-[#a8996a]",
+                choice: "border border-[#343a26] py-4 text-xs tracking-[0.25em] uppercase transition hover:bg-[#343a26]/5",
+                choiceOn: "!bg-[#343a26] text-[#f2eee3]",
+                button: "bg-[#343a26] py-4 text-xs tracking-[0.35em] text-[#f2eee3] uppercase transition hover:bg-[#a8996a]",
+                note: "text-sm text-[#757359]",
               }}
             />
           </div>
@@ -310,7 +310,7 @@ export function Editorial({ guest }: { guest: Guest }) {
       {/* Cierre */}
       <footer className="relative h-[85svh] overflow-hidden text-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo("puerta-beso-bn")} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={photo("c-atardecer")} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-black/45" />
         <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
           <p data-reveal className="text-[11px] tracking-[0.5em] uppercase">
@@ -346,7 +346,7 @@ function SectionTitle({ n, title, dark }: { n: string; title: string; dark?: boo
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-4 border-b border-dashed border-black/15 pb-2">
-      <dt className="text-[#6f6a62]">{k}</dt>
+      <dt className="text-[#757359]">{k}</dt>
       <dd className="text-right font-medium">{v}</dd>
     </div>
   );

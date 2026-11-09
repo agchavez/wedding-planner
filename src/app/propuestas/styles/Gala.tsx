@@ -6,8 +6,8 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 
 const DISPLAY = "'Italiana', 'Cormorant Garamond', serif";
 const SANS = "'Jost', system-ui, sans-serif";
-const C = { bg: "#0d0c10", panel: "#16141a", ink: "#f1e9da", muted: "#9d9486", gold: "#cfae6b" };
-const GALLERY = ["puerta-ancha", "puerta-beso", "puerta-abrazo", "puerta-retrato", "manos", "puerta-alta"].map(photo);
+const C = { bg: "#262a1c", panel: "#30351f", ink: "#f3eedd", muted: "#b3b096", gold: "#d4b673" };
+const GALLERY = ["c-sombrilla", "c-picnic3", "puerta-retrato", "c-risa", "c-alzar", "c-pareja"].map(photo);
 
 export function Gala({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false);
@@ -57,7 +57,7 @@ export function Gala({ guest }: { guest: Guest }) {
           <span className="pp-fade mt-8 text-[11px] tracking-[0.6em] uppercase" style={{ color: C.muted, animationDelay: "1.6s" }}>
             {guest.name}
           </span>
-          <span className="pp-fade pp-pulse mt-6 rounded-full border px-8 py-3 text-[11px] tracking-[0.5em] uppercase transition group-hover:bg-[#cfae6b] group-hover:text-black" style={{ borderColor: C.gold, color: C.gold, animationDelay: "2s" }}>
+          <span className="pp-fade pp-pulse mt-6 rounded-full border px-8 py-3 text-[11px] tracking-[0.5em] uppercase transition group-hover:bg-[#d4b673] group-hover:text-black" style={{ borderColor: C.gold, color: C.gold, animationDelay: "2s" }}>
             Abrir
           </span>
         </button>
@@ -67,7 +67,7 @@ export function Gala({ guest }: { guest: Guest }) {
       <header className="relative h-svh min-h-[640px] overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={photo("puerta-ancha")}
+          src={photo("c-atardecer")}
           alt="Angel e Indira"
           className={`absolute inset-0 h-full w-full object-cover object-[60%_center] ${open ? "pp-ken" : ""}`}
           style={{ transform: `translateY(${y * 0.35}px)` }}
@@ -151,7 +151,7 @@ export function Gala({ guest }: { guest: Guest }) {
                 <span className="w-20 shrink-0 text-right text-sm tracking-widest" style={{ color: C.gold }}>
                   {it.time}
                 </span>
-                <span className="size-2 shrink-0 rotate-45 border transition group-hover:bg-[#cfae6b]" style={{ borderColor: C.gold }} />
+                <span className="size-2 shrink-0 rotate-45 border transition group-hover:bg-[#d4b673]" style={{ borderColor: C.gold }} />
                 <span className="text-2xl sm:text-3xl" style={{ fontFamily: DISPLAY }}>
                   {it.title}
                 </span>
@@ -183,7 +183,7 @@ export function Gala({ guest }: { guest: Guest }) {
                 href={W.mapUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-8 inline-flex items-center gap-2 rounded-full border px-6 py-3 text-[11px] tracking-[0.4em] uppercase transition hover:bg-[#cfae6b] hover:text-black"
+                className="mt-8 inline-flex items-center gap-2 rounded-full border px-6 py-3 text-[11px] tracking-[0.4em] uppercase transition hover:bg-[#d4b673] hover:text-black"
                 style={{ borderColor: C.gold, color: C.gold }}
               >
                 <MapPin className="size-4" /> Cómo llegar
@@ -293,7 +293,7 @@ export function Gala({ guest }: { guest: Guest }) {
               <p className="mt-2 text-sm">{W.bank.holder}</p>
               <CopyButton
                 value={W.bank.account}
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#cfae6b] px-6 py-2.5 text-[11px] tracking-[0.35em] text-black uppercase transition hover:brightness-110"
+                className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#d4b673] px-6 py-2.5 text-[11px] tracking-[0.35em] text-black uppercase transition hover:brightness-110"
               >
                 Copiar
               </CopyButton>
@@ -311,12 +311,12 @@ export function Gala({ guest }: { guest: Guest }) {
               guest={guest}
               skin={{
                 wrap: "",
-                label: "text-[11px] tracking-[0.35em] uppercase text-[#cfae6b]",
-                input: "w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-[#f1e9da] outline-none focus:border-[#cfae6b]",
-                choice: "rounded-lg border border-white/15 py-4 text-sm tracking-wider transition hover:border-[#cfae6b]",
-                choiceOn: "!border-[#cfae6b] !bg-[#cfae6b] text-black",
-                button: "rounded-full bg-[#cfae6b] py-4 text-[11px] tracking-[0.45em] text-black uppercase transition hover:brightness-110",
-                note: "text-sm text-[#9d9486]",
+                label: "text-[11px] tracking-[0.35em] uppercase text-[#d4b673]",
+                input: "w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-[#f3eedd] outline-none focus:border-[#d4b673]",
+                choice: "rounded-lg border border-white/15 py-4 text-sm tracking-wider transition hover:border-[#d4b673]",
+                choiceOn: "!border-[#d4b673] !bg-[#d4b673] text-black",
+                button: "rounded-full bg-[#d4b673] py-4 text-[11px] tracking-[0.45em] text-black uppercase transition hover:brightness-110",
+                note: "text-sm text-[#b3b096]",
               }}
             />
           </div>

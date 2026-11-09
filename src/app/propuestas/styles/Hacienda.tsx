@@ -6,10 +6,10 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 
 const SERIF = "'Fraunces', Georgia, serif";
 const SANS = "'DM Sans', system-ui, sans-serif";
-const C = { bg: "#f2e8dc", paper: "#fbf6ef", ink: "#3f241a", muted: "#8a6a5a", terra: "#a75a3f", caramel: "#c99a6b", deep: "#5c2f22" };
-const GALLERY = ["puerta-retrato", "manos", "puerta-abrazo", "puerta-alta", "puerta-beso", "puerta-ancha"].map(photo);
+const C = { bg: "#ece8da", paper: "#f8f6ee", ink: "#2e3123", muted: "#78765f", terra: "#5f6745", caramel: "#b8975a", deep: "#454a31" };
+const GALLERY = ["c-caminata", "manos", "c-picnic2", "c-frente", "c-beso2", "c-sombrilla"].map(photo);
 
-export function Terracota({ guest }: { guest: Guest }) {
+export function Hacienda({ guest }: { guest: Guest }) {
   const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
   const [lb, setLb] = useState<number | null>(null);
   const ref = useReveal([stage]);
@@ -43,9 +43,9 @@ export function Terracota({ guest }: { guest: Guest }) {
             </div>
             <div className="absolute inset-0 rounded-md" style={{ background: C.terra, clipPath: "polygon(0 0, 50% 55%, 100% 0, 100% 100%, 0 100%)" }} />
             <div className="absolute inset-0 rounded-md" style={{ background: C.deep, opacity: 0.25, clipPath: "polygon(0 100%, 50% 50%, 100% 100%)" }} />
-            <div className="pp-env-flap absolute inset-x-0 top-0 h-[60%]" style={{ background: "#b9694c", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+            <div className="pp-env-flap absolute inset-x-0 top-0 h-[60%]" style={{ background: "#6c7451", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
             <div
-              className="pp-env-seal pp-pulse absolute top-[46%] left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg italic text-[#f6e7d8] shadow-lg"
+              className="pp-env-seal pp-pulse absolute top-[46%] left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg italic text-[#f3efe1] shadow-lg"
               style={{ background: C.deep, fontFamily: SERIF }}
             >
               A·I
@@ -63,7 +63,7 @@ export function Terracota({ guest }: { guest: Guest }) {
           <div className="relative h-[62svh] max-h-[620px] w-[min(78vw,380px)] overflow-hidden rounded-t-full border-[10px] shadow-2xl" style={{ borderColor: C.paper }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={photo("puerta-retrato")}
+              src={photo("c-mirada")}
               alt="Angel e Indira"
               className={`h-full w-full object-cover ${stage === "open" ? "pp-ken" : ""}`}
               style={{ transform: `translateY(${y * 0.08}px) scale(1.08)` }}
@@ -71,15 +71,15 @@ export function Terracota({ guest }: { guest: Guest }) {
           </div>
           {/* Sello giratorio */}
           <div className="absolute -right-8 -bottom-8 size-32 rounded-full shadow-xl sm:-right-12" style={{ background: C.terra }}>
-            <svg viewBox="0 0 100 100" className="pp-spin absolute inset-0 text-[#f6e7d8]">
+            <svg viewBox="0 0 100 100" className="pp-spin absolute inset-0 text-[#f3efe1]">
               <defs>
-                <path id="tc-circle" d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" />
+                <path id="hc-circle" d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" />
               </defs>
               <text fontSize="9.5" letterSpacing="3" fill="currentColor" style={{ fontFamily: SANS }}>
-                <textPath href="#tc-circle">ANGEL & INDIRA · 12 DIC 2026 ·</textPath>
+                <textPath href="#hc-circle">ANGEL & INDIRA · 12 DIC 2026 ·</textPath>
               </text>
             </svg>
-            <Heart className="absolute top-1/2 left-1/2 size-6 -translate-x-1/2 -translate-y-1/2 fill-[#f6e7d8] text-[#f6e7d8]" />
+            <Heart className="absolute top-1/2 left-1/2 size-6 -translate-x-1/2 -translate-y-1/2 fill-[#f3efe1] text-[#f3efe1]" />
           </div>
         </div>
         <div className="max-w-md text-center md:text-left">
@@ -128,7 +128,7 @@ export function Terracota({ guest }: { guest: Guest }) {
               {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                 <span key={d} className="relative flex h-9 items-center justify-center">
                   {d === 12 ? (
-                    <span className="pp-pulse flex size-10 items-center justify-center rounded-full font-semibold text-[#f6e7d8]" style={{ background: C.terra }}>
+                    <span className="pp-pulse flex size-10 items-center justify-center rounded-full font-semibold text-[#f3efe1]" style={{ background: C.terra }}>
                       12
                     </span>
                   ) : (
@@ -162,7 +162,7 @@ export function Terracota({ guest }: { guest: Guest }) {
               href={calendarUrl()}
               target="_blank"
               rel="noreferrer"
-              className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-[#f6e7d8] transition hover:brightness-110"
+              className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-[#f3efe1] transition hover:brightness-110"
               style={{ background: C.terra }}
             >
               <CalendarPlus className="size-4" /> Guardar la fecha
@@ -199,7 +199,7 @@ export function Terracota({ guest }: { guest: Guest }) {
         <div className="mx-auto grid max-w-5xl overflow-hidden rounded-[2rem] shadow-xl md:grid-cols-[1fr_1.2fr]" style={{ background: C.paper }}>
           <div data-reveal="clip" className="relative min-h-[360px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo("puerta-alta")} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={photo("c-pergola")} alt="" className="absolute inset-0 h-full w-full object-cover" />
           </div>
           <div className="p-8 sm:p-12">
             <Title kicker={W.venueKind} title="La Hacienda" left />
@@ -217,7 +217,7 @@ export function Terracota({ guest }: { guest: Guest }) {
               href={W.mapUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-[#f6e7d8]"
+              className="mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-[#f3efe1]"
               style={{ background: C.deep }}
             >
               <MapPin className="size-4" /> Abrir en Google Maps
@@ -227,7 +227,7 @@ export function Terracota({ guest }: { guest: Guest }) {
       </section>
 
       {/* Detalles */}
-      <section className="px-5 py-20" style={{ background: C.deep, color: "#f6e7d8" }}>
+      <section className="px-5 py-20" style={{ background: C.deep, color: "#f3efe1" }}>
         <div className="mx-auto max-w-5xl">
           <Title kicker="Para que todo salga perfecto" title="Detalles" light />
           <div className="mt-12 grid gap-5 md:grid-cols-3">
@@ -250,7 +250,7 @@ export function Terracota({ guest }: { guest: Guest }) {
                 <p className="font-semibold tracking-wider">{W.bank.account}</p>
                 <p className="opacity-70">{W.bank.holder}</p>
               </div>
-              <CopyButton value={W.bank.account} className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#f6e7d8] px-4 py-2 text-xs font-semibold text-[#5c2f22]">
+              <CopyButton value={W.bank.account} className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#f3efe1] px-4 py-2 text-xs font-semibold text-[#454a31]">
                 Copiar cuenta
               </CopyButton>
             </Card>
@@ -280,12 +280,12 @@ export function Terracota({ guest }: { guest: Guest }) {
               guest={guest}
               skin={{
                 wrap: "",
-                label: "text-sm font-medium text-[#5c2f22]",
-                input: "w-full rounded-2xl border border-[#e3d2bf] bg-white/60 px-4 py-3 outline-none focus:border-[#a75a3f]",
-                choice: "rounded-2xl border border-[#e3d2bf] py-4 text-sm font-medium transition hover:border-[#a75a3f]",
-                choiceOn: "!border-[#a75a3f] !bg-[#a75a3f] text-[#f6e7d8]",
-                button: "rounded-full bg-[#5c2f22] py-4 font-medium text-[#f6e7d8] transition hover:bg-[#a75a3f]",
-                note: "text-sm text-[#8a6a5a]",
+                label: "text-sm font-medium text-[#454a31]",
+                input: "w-full rounded-2xl border border-[#d9d4c0] bg-white/60 px-4 py-3 outline-none focus:border-[#5f6745]",
+                choice: "rounded-2xl border border-[#d9d4c0] py-4 text-sm font-medium transition hover:border-[#5f6745]",
+                choiceOn: "!border-[#5f6745] !bg-[#5f6745] text-[#f3efe1]",
+                button: "rounded-full bg-[#454a31] py-4 font-medium text-[#f3efe1] transition hover:bg-[#5f6745]",
+                note: "text-sm text-[#78765f]",
               }}
             />
           </div>
@@ -330,7 +330,7 @@ function Title({ kicker, title, left, light }: { kicker: string; title: string; 
 function Card({ icon, title, children, d }: { icon: React.ReactNode; title: string; children: React.ReactNode; d: number }) {
   return (
     <div data-reveal style={{ ["--d" as string]: d }} className="rounded-[1.75rem] bg-white/5 p-7 text-sm leading-relaxed ring-1 ring-white/10 transition hover:-translate-y-1 hover:bg-white/10">
-      <div className="flex size-12 items-center justify-center rounded-full" style={{ background: C.terra }}>
+      <div className="flex size-12 items-center justify-center rounded-full text-[#2e3123]" style={{ background: C.caramel }}>
         {icon}
       </div>
       <p style={{ fontFamily: SERIF }} className="mt-5 text-2xl">

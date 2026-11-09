@@ -6,8 +6,8 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 
 const SERIF = "'Instrument Serif', Georgia, serif";
 const SANS = "'Manrope', system-ui, sans-serif";
-const C = { bg: "#faf8f4", ink: "#1c1b19", muted: "#8a8478", line: "#e6e1d7", accent: "#b39b74" };
-const GALLERY = ["retrato2-bn", "manos2-bn", "caminata-bn", "banca-bn", "atardecer-bn", "puerta-alta-bn"].map(photo);
+const C = { bg: "#f9f8f2", ink: "#2e3123", muted: "#85836d", line: "#e3e0d2", accent: "#7d855c" };
+const GALLERY = ["c-pareja", "manos", "c-caminata", "c-banca", "c-paisaje", "c-beso2"].map(photo);
 
 export function Minimal({ guest }: { guest: Guest }) {
   const [intro, setIntro] = useState(true);
@@ -25,7 +25,7 @@ export function Minimal({ guest }: { guest: Guest }) {
   const details = [
     { q: "¿Cómo debo vestir?", a: <><p><strong>Formal.</strong> {W.dressNote}</p><div className="mt-4 flex gap-2">{W.dressPalette.map((c) => (<span key={c.hex} className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={{ borderColor: C.line }}><span className="size-3 rounded-full" style={{ background: c.hex }} />{c.name}</span>))}</div></> },
     { q: "¿Puedo llevar a mis hijos?", a: <p>{W.adultsOnly}</p> },
-    { q: "¿Qué les puedo regalar?", a: <><p>{W.gifts}</p><div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: C.line }}><div className="text-xs leading-relaxed"><p style={{ color: C.muted }}>{W.bank.bank} · {W.bank.holder}</p><p className="text-base tracking-wider">{W.bank.account}</p></div><CopyButton value={W.bank.account} className="inline-flex items-center gap-2 rounded-full bg-[#1c1b19] px-4 py-2 text-xs text-white">Copiar</CopyButton></div></> },
+    { q: "¿Qué les puedo regalar?", a: <><p>{W.gifts}</p><div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: C.line }}><div className="text-xs leading-relaxed"><p style={{ color: C.muted }}>{W.bank.bank} · {W.bank.holder}</p><p className="text-base tracking-wider">{W.bank.account}</p></div><CopyButton value={W.bank.account} className="inline-flex items-center gap-2 rounded-full bg-[#2e3123] px-4 py-2 text-xs text-white">Copiar</CopyButton></div></> },
     { q: "¿A qué hora debo llegar?", a: <p>La ceremonia empieza a las {W.time}. {W.recommendations.join(" ")}</p> },
   ];
 
@@ -70,7 +70,7 @@ export function Minimal({ guest }: { guest: Guest }) {
           </div>
           <div className="pp-rise relative mx-auto aspect-[3/4] w-full max-w-sm overflow-hidden rounded-[999px_999px_24px_24px]" style={{ ["--d" as string]: 9 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo("retrato2-bn")} alt="Angel e Indira" className="h-full w-full object-cover" />
+            <img src={photo("c-frente")} alt="Angel e Indira" className="h-full w-full object-cover" />
           </div>
         </div>
         <div className="flex items-end justify-between border-t pt-4 text-xs" style={{ borderColor: C.line, color: C.muted }}>
@@ -172,7 +172,7 @@ export function Minimal({ guest }: { guest: Guest }) {
             <p className="mt-3 text-sm" style={{ color: C.muted }}>
               {W.city} · ceremonia y recepción
             </p>
-            <a href={W.mapUrl} target="_blank" rel="noreferrer" className="group mt-8 inline-flex items-center gap-3 rounded-full border px-5 py-3 text-sm transition hover:bg-[#1c1b19] hover:text-white" style={{ borderColor: C.ink }}>
+            <a href={W.mapUrl} target="_blank" rel="noreferrer" className="group mt-8 inline-flex items-center gap-3 rounded-full border px-5 py-3 text-sm transition hover:bg-[#2e3123] hover:text-white" style={{ borderColor: C.ink }}>
               Abrir en Maps <ArrowUpRight className="size-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </a>
           </div>
@@ -239,12 +239,12 @@ export function Minimal({ guest }: { guest: Guest }) {
               guest={guest}
               skin={{
                 wrap: "",
-                label: "text-xs text-[#8a8478]",
-                input: "w-full border-0 border-b border-[#e6e1d7] bg-transparent px-0 py-2 outline-none focus:border-[#1c1b19]",
-                choice: "rounded-full border border-[#e6e1d7] py-3 text-sm transition hover:border-[#1c1b19]",
-                choiceOn: "!border-[#1c1b19] !bg-[#1c1b19] text-white",
-                button: "rounded-full bg-[#1c1b19] py-4 text-sm text-white transition hover:bg-[#b39b74]",
-                note: "text-sm text-[#8a8478]",
+                label: "text-xs text-[#85836d]",
+                input: "w-full border-0 border-b border-[#e3e0d2] bg-transparent px-0 py-2 outline-none focus:border-[#2e3123]",
+                choice: "rounded-full border border-[#e3e0d2] py-3 text-sm transition hover:border-[#2e3123]",
+                choiceOn: "!border-[#2e3123] !bg-[#2e3123] text-white",
+                button: "rounded-full bg-[#2e3123] py-4 text-sm text-white transition hover:bg-[#7d855c]",
+                note: "text-sm text-[#85836d]",
               }}
             />
           </div>

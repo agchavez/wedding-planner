@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Propuestas de invitación (solo local). ?estilo=editorial|terracota|gala|minimal,
+ * Propuestas de invitación (solo local). ?estilo=editorial|hacienda|gala|minimal,
  * ?para=Nombre del invitado, ?lugares=N para simular la invitación personal.
  */
 export default async function PropuestasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

@@ -24,6 +24,7 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/agenda/") ||
     pathname.startsWith("/galeria/") ||
     pathname.startsWith("/i/") ||
+    pathname === "/propuestas" ||
     pathname === "/ejemplos" ||
     pathname.startsWith("/ejemplos/") ||
     pathname === "/api/mcp" ||

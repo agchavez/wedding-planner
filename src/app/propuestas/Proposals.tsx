@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import "./propuestas.css";
 import type { Guest } from "./shared";
 import { Editorial } from "./styles/Editorial";
-import { Terracota } from "./styles/Terracota";
+import { Hacienda } from "./styles/Hacienda";
 import { Gala } from "./styles/Gala";
 import { Minimal } from "./styles/Minimal";
 
 const STYLES = [
-  { key: "editorial", name: "Editorial", dot: "#121212", C: Editorial },
-  { key: "terracota", name: "Terracota", dot: "#a75a3f", C: Terracota },
-  { key: "gala", name: "Gala", dot: "#cfae6b", C: Gala },
-  { key: "minimal", name: "Minimal", dot: "#e6e1d7", C: Minimal },
+  { key: "editorial", name: "Editorial", dot: "#343a26", C: Editorial },
+  { key: "hacienda", name: "Hacienda", dot: "#5f6745", C: Hacienda },
+  { key: "gala", name: "Gala", dot: "#d4b673", C: Gala },
+  { key: "minimal", name: "Minimal", dot: "#7d855c", C: Minimal },
 ] as const;
 
 export function Proposals({ initial, guest }: { initial: string; guest: Guest }) {
