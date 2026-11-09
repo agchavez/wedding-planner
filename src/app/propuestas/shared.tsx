@@ -45,7 +45,8 @@ export const W = {
   ],
 };
 
-export const photo = (name: string) => `/propuestas/${name}.webp`;
+/** Foto de la sesión: se resuelve en /propuestas/foto/<nombre> (Google Drive o copia local). */
+export const photo = (name: string) => `/propuestas/foto/${name}`;
 
 export type Guest = { name: string; seats: number };
 
