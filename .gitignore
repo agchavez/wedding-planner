@@ -54,3 +54,6 @@ skills-lock.json
 # Archivos subidos en desarrollo (comprobantes de pago)
 /uploads/
 /public/uploads/
+
+# fotos personales de las propuestas de invitación (solo local)
+/public/propuestas/
