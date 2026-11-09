@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   // Solo quien puede editar la boda activa conecta su Drive (redirige al login sin sesión).
   await getEditableWeddingId();
   if (!isGoogleDriveConfigured()) {
-    return NextResponse.redirect(new URL("/fotos?error=not_configured", request.url));
+    return NextResponse.redirect(new URL("/fotos?error=not_configured", process.env.BETTER_AUTH_URL || request.url));
   }
 
   // `state` aleatorio en una cookie: la callback solo acepta la respuesta de este mismo flujo.

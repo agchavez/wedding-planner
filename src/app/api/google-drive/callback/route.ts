@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const errorParam = request.nextUrl.searchParams.get("error");
 
   const redirect = (path: string) => {
-    const response = NextResponse.redirect(new URL(path, request.url));
+    const response = NextResponse.redirect(new URL(path, process.env.BETTER_AUTH_URL || request.url));
     response.cookies.delete({ name: DRIVE_STATE_COOKIE, path: "/api/google-drive" });
     return response;
   };
