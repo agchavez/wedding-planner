@@ -23,6 +23,8 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/invitacion/") ||
     pathname.startsWith("/agenda/") ||
     pathname.startsWith("/galeria/") ||
+    pathname.startsWith("/compartir/") ||
+    pathname.startsWith("/api/compartir/") ||
     pathname.startsWith("/i/") ||
     pathname === "/propuestas" ||
     pathname.startsWith("/propuestas/foto/") ||
