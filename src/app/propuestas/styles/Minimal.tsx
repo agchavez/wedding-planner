@@ -7,7 +7,7 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 const SERIF = "'Instrument Serif', Georgia, serif";
 const SANS = "'Manrope', system-ui, sans-serif";
 const C = { bg: "#f9f8f2", ink: "#2e3123", muted: "#85836d", line: "#e3e0d2", accent: "#7d855c" };
-const GALLERY = ["c-pareja", "manos", "c-caminata", "c-banca", "c-paisaje", "c-beso2"].map(photo);
+const GALLERY = ["c-pareja", "c-anillo2", "c-caminata", "c-banca", "c-paisaje", "c-beso2", "c-anillo3"].map(photo);
 
 export function Minimal({ guest }: { guest: Guest }) {
   const [intro, setIntro] = useState(true);

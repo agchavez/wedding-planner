@@ -7,7 +7,7 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 const SERIF = "'Bodoni Moda', 'Didot', serif";
 const SANS = "'Inter', system-ui, sans-serif";
 const C = { bg: "#f2eee3", ink: "#343a26", muted: "#757359", line: "#d9d4c1", accent: "#a8996a" };
-const GALLERY = ["c-risa", "c-sombrilla", "c-bugambilia", "c-picnic", "c-alzar", "c-mirada", "manos", "c-banca"].map(photo);
+const GALLERY = ["c-risa", "c-sombrilla", "c-abrazo", "c-picnic", "c-alzar", "c-mirada", "c-anillo", "c-banca", "c-anillo3"].map(photo);
 
 export function Editorial({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false);
@@ -95,7 +95,7 @@ export function Editorial({ guest }: { guest: Guest }) {
       <section className="mx-auto grid max-w-6xl gap-10 px-5 py-24 sm:px-10 md:grid-cols-[1fr_1.1fr] md:items-center">
         <figure data-reveal="clip" className="relative aspect-[3/4] overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photo("c-abrazo")} alt="" className="h-full w-full object-cover" />
+          <img src={photo("c-bugambilia")} alt="" className="h-full w-full object-cover" />
           <figcaption className="absolute bottom-3 left-3 bg-[#f2eee3] px-2 py-1 text-[10px] tracking-[0.3em] uppercase">Fig. 01 — Nosotros</figcaption>
         </figure>
         <div>

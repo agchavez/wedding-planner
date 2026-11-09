@@ -7,7 +7,7 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 const DISPLAY = "'Italiana', 'Cormorant Garamond', serif";
 const SANS = "'Jost', system-ui, sans-serif";
 const C = { bg: "#262a1c", panel: "#30351f", ink: "#f3eedd", muted: "#b3b096", gold: "#d4b673" };
-const GALLERY = ["c-sombrilla", "c-picnic3", "puerta-retrato", "c-risa", "c-alzar", "c-pareja"].map(photo);
+const GALLERY = ["c-sombrilla", "c-picnic3", "c-anillo", "c-risa", "c-alzar", "c-pareja", "c-anillo3"].map(photo);
 
 export function Gala({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false);

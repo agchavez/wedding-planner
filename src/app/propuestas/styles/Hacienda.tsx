@@ -7,7 +7,7 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 const SERIF = "'Fraunces', Georgia, serif";
 const SANS = "'DM Sans', system-ui, sans-serif";
 const C = { bg: "#ece8da", paper: "#f8f6ee", ink: "#2e3123", muted: "#78765f", terra: "#5f6745", caramel: "#b8975a", deep: "#454a31" };
-const GALLERY = ["c-caminata", "manos", "c-picnic2", "c-frente", "c-beso2", "c-sombrilla"].map(photo);
+const GALLERY = ["c-caminata", "c-anillo", "c-picnic2", "c-frente", "c-beso2", "c-sombrilla"].map(photo);
 
 export function Hacienda({ guest }: { guest: Guest }) {
   const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
@@ -296,7 +296,7 @@ export function Hacienda({ guest }: { guest: Guest }) {
       <footer className="px-5 pb-28 text-center">
         <div data-reveal className="mx-auto size-40 overflow-hidden rounded-full border-8 shadow-lg" style={{ borderColor: C.paper }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photo("manos")} alt="" className="h-full w-full object-cover" />
+          <img src={photo("c-anillo2")} alt="" className="h-full w-full object-cover" />
         </div>
         <p data-reveal style={{ fontFamily: SERIF }} className="mt-8 text-4xl font-light italic sm:text-5xl">
           {W.closing}
