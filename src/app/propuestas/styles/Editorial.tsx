@@ -7,7 +7,7 @@ import { CopyButton, Fonts, Lightbox, RsvpDemo, W, calendarUrl, photo, useCountd
 const SERIF = "'Bodoni Moda', 'Didot', serif";
 const SANS = "'Inter', system-ui, sans-serif";
 const C = { bg: "#f2eee3", ink: "#343a26", muted: "#757359", line: "#d9d4c1", accent: "#a8996a" };
-const GALLERY = ["c-risa", "c-sombrilla", "c-abrazo", "c-picnic", "c-alzar", "c-mirada", "c-anillo", "c-banca", "c-anillo3"].map(photo);
+const GALLERY = ["c-risa", "c-sombrilla", "c-abrazo", "c-picnic", "c-alzar", "c-mirada", "c-anillo2", "c-banca", "c-anillo3"].map(photo);
 
 export function Editorial({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false);
@@ -310,9 +310,9 @@ export function Editorial({ guest }: { guest: Guest }) {
       {/* Cierre */}
       <footer className="relative h-[85svh] overflow-hidden text-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo("c-atardecer")} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
+        <img src={photo("c-anillo")} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_58%]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#1f2316]/85 via-[#1f2316]/25 via-45% to-transparent" />
+        <div className="relative flex h-full flex-col items-center justify-end px-5 pb-24 text-center">
           <p data-reveal className="text-[11px] tracking-[0.5em] uppercase">
             {W.recommendations[0]}
           </p>
