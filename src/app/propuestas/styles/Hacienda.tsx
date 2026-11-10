@@ -7,7 +7,7 @@ import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, phot
 const SERIF = "'Fraunces', Georgia, serif";
 const SANS = "'DM Sans', system-ui, sans-serif";
 const C = { bg: "#ece8da", paper: "#f8f6ee", ink: "#2e3123", muted: "#78765f", terra: "#5f6745", caramel: "#b8975a", deep: "#454a31" };
-const GALLERY = ["c-caminata", "c-anillo", "c-picnic2", "c-frente", "c-beso2", "c-sombrilla"].map(photo);
+const GALLERY = ["c-caminata", "c-anillo", "c-beso3", "c-frente", "c-beso2", "c-sombrilla"].map(photo);
 
 export function Hacienda({ guest }: { guest: Guest }) {
   // closed → opening (sello, solapa y tarjeta) → reveal (se desvanece el sobre y entra la portada) → open
@@ -225,7 +225,7 @@ export function Hacienda({ guest }: { guest: Guest }) {
         <div className="mx-auto grid max-w-5xl overflow-hidden rounded-[2rem] shadow-xl md:grid-cols-[1fr_1.2fr]" style={{ background: C.paper }}>
           <div data-reveal="clip" className="relative min-h-[360px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo("c-pergola")} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={photo("c-jardin")} alt="" className="absolute inset-0 h-full w-full object-cover" />
           </div>
           <div className="p-8 sm:p-12">
             <Title kicker={W.venueKind} title="La Hacienda" left />

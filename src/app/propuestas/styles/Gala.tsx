@@ -7,7 +7,7 @@ import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, phot
 const DISPLAY = "'Italiana', 'Cormorant Garamond', serif";
 const SANS = "'Jost', system-ui, sans-serif";
 const C = { bg: "#262a1c", panel: "#30351f", ink: "#f3eedd", muted: "#b3b096", gold: "#d4b673" };
-const GALLERY = ["c-sombrilla", "c-picnic3", "c-anillo", "c-risa", "c-alzar", "c-pareja", "c-anillo3"].map(photo);
+const GALLERY = ["c-sombrilla", "c-jardin", "c-anillo", "c-giro", "c-alzar", "c-pareja", "c-anillo3"].map(photo);
 
 export function Gala({ guest }: { guest: Guest }) {
   // closed → leaving (el monograma se desvanece y entra la portada) → open
@@ -92,7 +92,7 @@ export function Gala({ guest }: { guest: Guest }) {
         <div className="absolute inset-0" style={{ transform: `translateY(${y * 0.35}px)` }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={photo("c-atardecer")}
+            src={photo("puerta-retrato")}
             alt="Angel e Indira"
             className={`h-full w-full object-cover object-[60%_center] ${open ? "pp-ken" : "pp-ken-wait"}`}
           />
