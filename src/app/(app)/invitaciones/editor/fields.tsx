@@ -1,17 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ITINERARY_ICONS, type ItineraryEntry } from "@/lib/invitationThemes";
-import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
-/** Editores de listas de la invitación: programa del día, paleta de vestimenta y galería. */
+/** Campos del inspector de bloques y editores de listas (programa del día, paleta). */
+
+export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  // <label> envolvente: asocia el texto con el primer control del campo.
+  return (
+    <div>
+      <Label className="flex-col items-stretch gap-0">
+        <span>{label}</span>
+        <div className="mt-1 font-normal leading-normal select-auto">{children}</div>
+      </Label>
+      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
 
 const SUGGESTED_ITINERARY: ItineraryEntry[] = [
-  { time: "4:00 pm", title: "Ceremonia", icon: "church" },
+  { time: "3:30 pm", title: "Ceremonia", icon: "church" },
   { time: "5:30 pm", title: "Cóctel de bienvenida", icon: "cheers" },
   { time: "7:00 pm", title: "Primer baile", icon: "dance" },
   { time: "8:00 pm", title: "Cena", icon: "dinner" },
@@ -47,9 +60,9 @@ export function ItineraryEditor({
         </div>
       )}
       {value.map((item, i) => (
-        <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 sm:flex-nowrap">
+        <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2">
           <Select value={item.icon} onValueChange={(icon) => update(i, { icon: String(icon) })} disabled={disabled}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full">
               <SelectValue>{(v: string) => ITINERARY_ICONS[v] ?? v}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -190,86 +203,6 @@ export function PaletteEditor({
             {p.name}
           </button>
         ))}
-      </div>
-    </div>
-  );
-}
-
-export function GalleryEditor({
-  value,
-  onChange,
-  suggestions,
-  disabled,
-}: {
-  value: string[];
-  onChange: (next: string[]) => void;
-  suggestions: string[];
-  disabled?: boolean;
-}) {
-  const [url, setUrl] = useState("");
-  const add = (u: string) => {
-    if (!u || value.includes(u) || value.length >= 8) return;
-    onChange([...value, u]);
-  };
-
-  return (
-    <div className="space-y-3">
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {value.map((u) => (
-            <div key={u} className="group relative h-16 w-20 overflow-hidden rounded-md border border-border">
-              {/* eslint-disable-next-line @next/next/no-img-element -- miniatura */}
-              <img src={u} alt="" className="size-full object-cover" />
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={() => onChange(value.filter((x) => x !== u))}
-                  className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-white"
-                  aria-label="Quitar foto"
-                >
-                  <X className="size-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex gap-2">
-        <Input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…/foto.jpg"
-          aria-label="Enlace de una foto"
-          disabled={disabled || value.length >= 8}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled || !/^https?:\/\//i.test(url) || value.length >= 8}
-          onClick={() => {
-            add(url.trim());
-            setUrl("");
-          }}
-        >
-          Agregar
-        </Button>
-      </div>
-      <div>
-        <p className="mb-1.5 text-xs text-muted-foreground">O usa fotos de ejemplo para probar:</p>
-        <div className="flex flex-wrap gap-1.5">
-          {suggestions.map((u) => (
-            <button
-              key={u}
-              type="button"
-              disabled={disabled || value.includes(u) || value.length >= 8}
-              onClick={() => add(u)}
-              className={cn("h-10 w-14 overflow-hidden rounded-md border border-border", value.includes(u) && "opacity-30")}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- miniatura local */}
-              <img src={u} alt="" className="size-full object-cover" />
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );
