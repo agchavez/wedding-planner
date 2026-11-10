@@ -188,7 +188,41 @@ export function Lightbox({ images, index, onClose, onIndex }: { images: string[]
 }
 
 /** Íconos de vestimenta: traje, vestido largo y, si la nota pide evitar el verde, "sin verde". */
-export function DressIcons({ color, muted, noGreen, className = "" }: { color: string; muted: string; noGreen: boolean; className?: string }) {
+/** Tonos de verde por defecto (olivo, salvia, esmeralda, menta) para el ícono "sin verde". */
+export const AVOID_GREENS = ["#5f7a3a", "#8fa66b", "#1f7a4d", "#9fd8b4"];
+
+/** Círculos de color dentro del ícono tachado: uno grande o hasta 4 en racimo. */
+function AvoidSwatches({ colors }: { colors: string[] }) {
+  const list = colors.slice(0, 4);
+  if (list.length === 1) return <circle cx="32" cy="34" r="13" fill={list[0]} />;
+  const spots: Record<number, [number, number][]> = {
+    2: [[26, 34], [38, 34]],
+    3: [[32, 27], [25.5, 38.5], [38.5, 38.5]],
+    4: [[26, 28], [38, 28], [26, 40], [38, 40]],
+  };
+  return (
+    <>
+      {list.map((c, i) => (
+        <circle key={i} cx={spots[list.length][i][0]} cy={spots[list.length][i][1]} r={list.length === 2 ? 7.5 : 6.5} fill={c} />
+      ))}
+    </>
+  );
+}
+
+export function DressIcons({
+  color,
+  muted,
+  avoidColors,
+  avoidLabel = "Sin verde",
+  className = "",
+}: {
+  color: string;
+  muted: string;
+  /** Colores a evitar; vacío = sin ese ícono. */
+  avoidColors: string[];
+  avoidLabel?: string;
+  className?: string;
+}) {
   const stroke = { fill: "none", stroke: color, strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
   const items = [
     {
@@ -214,13 +248,13 @@ export function DressIcons({ color, muted, noGreen, className = "" }: { color: s
         </>
       ),
     },
-    ...(noGreen
+    ...(avoidColors.length
       ? [
           {
-            label: "Sin verde",
+            label: avoidLabel,
             svg: (
               <>
-                <circle cx="32" cy="34" r="13" fill="#5f7a3a" />
+                <AvoidSwatches colors={avoidColors} />
                 <circle {...stroke} cx="32" cy="34" r="19" />
                 <path {...stroke} strokeWidth={2.2} d="M18.5 20.5l27 27" />
               </>
