@@ -65,7 +65,14 @@ const SPECS: Record<BlockType, Spec[]> = {
     { key: "title", label: "Título", kind: "text" },
     { key: "code", label: "Código", kind: "text", placeholder: "Formal" },
     { key: "note", label: "Nota", kind: "area", rows: 2, placeholder: "Con cariño les pedimos no usar el color verde." },
-    { key: "showIcons", label: "Íconos de traje y vestido", kind: "bool", hint: "Si la nota menciona el verde, se agrega «sin verde»." },
+    { key: "showIcons", label: "Íconos de traje y vestido", kind: "bool" },
+    {
+      key: "avoidColors",
+      label: "Colores que no deben usar",
+      kind: "colors",
+      hint: "Aparecen tachados junto a los íconos (por ejemplo, varios tonos de verde).",
+    },
+    { key: "avoidLabel", label: "Texto bajo esos colores", kind: "text", placeholder: "Sin verde" },
     { key: "colors", label: "Paleta sugerida", kind: "colors" },
   ],
   gallery: [

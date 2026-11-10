@@ -76,7 +76,17 @@ export type BlockPropsMap = {
   program: { title: string; items: ItineraryEntry[] };
   ceremony: EventProps;
   reception: EventProps;
-  dressCode: { title: string; code: string; note: string; colors: string[]; showIcons: boolean };
+  dressCode: {
+    title: string;
+    code: string;
+    note: string;
+    colors: string[];
+    showIcons: boolean;
+    /** Colores que se pide no usar (el ícono "sin verde" muestra estos tonos). */
+    avoidColors: string[];
+    /** Etiqueta bajo ese ícono; vacía = "Sin verde". */
+    avoidLabel: string;
+  };
   gallery: { title: string; photos: string[] };
   gifts: { title: string; note: string; bankName: string; account: string; holder: string; registryUrl: string };
   recommendations: { title: string; adultsOnly: boolean; adultsOnlyText: string; items: string };
@@ -130,7 +140,7 @@ export const DEFAULT_PROPS: { [K in BlockType]: BlockPropsMap[K] } = {
   program: { title: "El programa", items: [] },
   ceremony: { title: "El lugar", time: "", place: "", address: "", mapUrl: "", note: "", showMap: true, photoUrl: "" },
   reception: { title: "La recepción", time: "", place: "", address: "", mapUrl: "", note: "", showMap: false, photoUrl: "" },
-  dressCode: { title: "Vestimenta", code: "Formal", note: "", colors: [], showIcons: true },
+  dressCode: { title: "Vestimenta", code: "Formal", note: "", colors: [], showIcons: true, avoidColors: [], avoidLabel: "" },
   gallery: { title: "Portafolio", photos: [] },
   gifts: {
     title: "Regalos",
@@ -302,7 +312,15 @@ export function designFromData(d: DesignSource): InvitationDesign {
     createBlock("program", { items: (d.itinerary ?? []).map((i) => ({ time: i.time, title: i.title, icon: i.icon })) }, !d.itinerary?.length),
     createBlock(
       "dressCode",
-      { code: d.dressCode ?? "", note: d.dressCodeNote ?? "", colors: d.dressCodeColors ?? [], showIcons: Boolean(d.dressCode) },
+      {
+        code: d.dressCode ?? "",
+        note: d.dressCodeNote ?? "",
+        colors: d.dressCodeColors ?? [],
+        showIcons: Boolean(d.dressCode),
+        // Si la nota pide no usar verde, se precargan tonos de verde (editables en el bloque).
+        avoidColors: /verde/i.test(d.dressCodeNote ?? "") ? ["#5f7a3a", "#8fa66b", "#1f7a4d", "#9fd8b4"] : [],
+        avoidLabel: "",
+      },
       !d.dressCode && !d.dressCodeColors?.length
     ),
     createBlock("gallery", { photos: gallery }, gallery.length === 0),
@@ -394,7 +412,7 @@ function cleanProps<T extends BlockType>(type: T, raw: unknown, trim: boolean): 
     if (URL_KEYS.has(key)) out[key] = cleanUrl(key, value);
     else if (key === "time") out[key] = typeof value === "string" && DATETIME_RE.test(value) ? value : "";
     else if (key === "deadline") out[key] = typeof value === "string" && DATE_RE.test(value) ? value : "";
-    else if (key === "colors")
+    else if (key === "colors" || key === "avoidColors")
       out[key] = Array.isArray(value) ? value.filter((c): c is string => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 6) : [];
     else if (key === "photos")
       out[key] = Array.isArray(value)

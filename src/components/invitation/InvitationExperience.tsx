@@ -42,6 +42,9 @@ export function InvitationExperience(props: InvitationViewProps) {
   const day = eventDay(start, Boolean(fx.ceremonyTime || fx.receptionTime));
   const p1 = data.partner1.trim();
   const p2 = data.partner2.trim();
+  // En la apertura van solo los nombres de pila: con apellidos se parte en dos líneas en el celular.
+  const first1 = p1.split(/\s+/)[0] ?? "";
+  const first2 = p2.split(/\s+/)[0] ?? "";
   const mono = [p1[0], p2[0]].filter(Boolean).join("·").toUpperCase() || "♥";
   const kicker = [cover?.props.openingKicker, day?.dots].filter(Boolean).join(" · ");
   const headline = (cover?.props.headline || "Nos casamos").replace(/[¡!]/g, "");
@@ -69,16 +72,20 @@ export function InvitationExperience(props: InvitationViewProps) {
 
           <div className="ed-open-content absolute inset-0 flex flex-col items-center justify-evenly px-6 py-[4svh] text-center">
             {kicker && (
-              <p className="pp-fade flex items-center gap-3 text-[10px] tracking-[0.45em] uppercase" style={{ color: C.muted }}>
-                <span className="h-px w-6" style={{ background: C.accent }} />
+              <p className="pp-fade flex items-center gap-2.5 whitespace-nowrap text-[clamp(8px,2.6vw,10px)] tracking-[0.3em] uppercase" style={{ color: C.muted }}>
+                <span className="h-px w-5 shrink-0" style={{ background: C.accent }} />
                 {kicker}
-                <span className="h-px w-6" style={{ background: C.accent }} />
+                <span className="h-px w-5 shrink-0" style={{ background: C.accent }} />
               </p>
             )}
 
-            <div className="pp-rise relative" style={{ ["--d" as string]: 1 }}>
+            <div className="pp-rise relative mx-auto w-fit shrink-0" style={{ ["--d" as string]: 1 }}>
               <div className="absolute -inset-2.5 rounded-t-full border" style={{ borderColor: `${C.accent}99` }} aria-hidden />
-              <div className="relative aspect-[3/4] h-[30svh] max-h-[340px] min-h-[180px] overflow-hidden rounded-t-full" style={{ background: C.deep }}>
+              {/* Ancho y alto explícitos (3:4): iOS Safari no deriva bien el ancho de aspect-ratio en flex. */}
+              <div
+                className="relative overflow-hidden rounded-t-full"
+                style={{ background: C.deep, height: "clamp(180px, 30svh, 340px)", width: "calc(clamp(180px, 30svh, 340px) * 0.75)" }}
+              >
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja
                   <img src={photo} alt={[p1, p2].filter(Boolean).join(" y ")} className="ed-drift h-full w-full object-cover" />
@@ -102,12 +109,12 @@ export function InvitationExperience(props: InvitationViewProps) {
             </div>
 
             <div className="pp-rise" style={{ ["--d" as string]: 5 }}>
-              <p className="text-[clamp(1.6rem,7vw,2.2rem)] italic" style={{ fontFamily: SERIF }}>
-                {p1 || "Nuestra boda"}
-                {p1 && p2 && <span style={{ color: C.accent }}> &amp; </span>}
-                {p2}
+              <p className="text-[clamp(1.7rem,8vw,2.4rem)] italic leading-tight" style={{ fontFamily: SERIF }}>
+                {first1 || "Nuestra boda"}
+                {first1 && first2 && <span style={{ color: C.accent }}> &amp; </span>}
+                {first2}
               </p>
-              <p className="mt-2 text-[10px] tracking-[0.35em] uppercase" style={{ color: C.muted }}>
+              <p className="mt-2 text-[clamp(8px,2.5vw,10px)] tracking-[0.25em] uppercase" style={{ color: C.muted }}>
                 {[headline, dateLine].filter(Boolean).join(" · ")}
               </p>
             </div>
