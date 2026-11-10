@@ -1,4 +1,4 @@
-import { Images, Plus } from "lucide-react";
+import { Images, Plus, QrCode } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
 import { isGoogleDriveConfigured, getDriveConnection } from "@/lib/googleDrive";
@@ -26,6 +26,10 @@ export default async function FotosPage() {
         description="Fotos, videos, mapas y links de referencia de la boda — compártelos con quien quieras."
         actions={
           <>
+            <Button variant="outline" size="sm" render={<a href={`/compartir/${weddingId}`} target="_blank" rel="noopener noreferrer" />}>
+              <QrCode className="size-3.5" />
+              Fotos de invitados
+            </Button>
             <ShareGalleryButton weddingId={weddingId} />
             <MediaFormDialog
               driveConnected={Boolean(connection?.accountEmail)}
