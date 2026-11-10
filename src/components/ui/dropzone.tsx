@@ -14,12 +14,15 @@ export function FileDropzone({
   accept,
   className,
   existingFileName,
+  multiple = false,
 }: {
   name: string;
   accept?: string;
   className?: string;
   /** Nombre del archivo ya subido previamente (modo edición), solo informativo. */
   existingFileName?: string;
+  /** Permite elegir o soltar varios archivos a la vez. */
+  multiple?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -28,7 +31,7 @@ export function FileDropzone({
   function applyFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     if (inputRef.current) inputRef.current.files = files;
-    setFileName(files[0].name);
+    setFileName(files.length > 1 ? `${files.length} archivos` : files[0].name);
   }
 
   function clearFile(e: React.MouseEvent) {
@@ -69,6 +72,7 @@ export function FileDropzone({
         type="file"
         name={name}
         accept={accept}
+        multiple={multiple}
         className="hidden"
         onChange={(e) => applyFiles(e.target.files)}
       />

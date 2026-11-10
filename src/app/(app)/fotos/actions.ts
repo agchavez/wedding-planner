@@ -8,7 +8,7 @@ import { deleteDriveFile, disconnectGoogleDrive, uploadFileToDrive } from "@/lib
 
 export async function createMediaItem(formData: FormData) {
   const weddingId = await getEditableWeddingId();
-  const label = String(formData.get("label") ?? "").trim();
+  let label = String(formData.get("label") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const urlInput = String(formData.get("url") ?? "").trim();
   const typeInput = String(formData.get("type") ?? "link");
@@ -24,6 +24,8 @@ export async function createMediaItem(formData: FormData) {
     url = uploaded.url;
     driveFileId = uploaded.driveFileId;
     type = file.type.startsWith("video/") ? "video" : "image";
+    // Sin nombre, se usa el del archivo (sin extensión) para reconocerlo en la lista.
+    if (!label) label = file.name.replace(/\.[^.]+$/, "").slice(0, 120);
   }
 
   if (!url) return;

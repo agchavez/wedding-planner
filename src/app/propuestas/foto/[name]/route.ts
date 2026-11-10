@@ -9,7 +9,7 @@ const WEDDING_ID = "6ab8b4cfac4dc16342704a50";
 /**
  * Foto de una propuesta de invitación. Las fotos de la sesión no están en el repositorio (es
  * público): en producción se suben a la carpeta de Google Drive de la boda (Fotos) con la
- * etiqueta "propuesta:<nombre>" y aquí se redirige al archivo compartido. En desarrollo se usa la
+ * etiqueta "propuesta:<nombre>" o simplemente "<nombre>" (el nombre del archivo, sin extensión) y aquí se redirige al archivo compartido. En desarrollo se usa la
  * copia local de public/propuestas (ignorada por git) si existe.
  */
 export async function GET(request: Request, ctx: RouteContext<"/propuestas/foto/[name]">) {
@@ -24,7 +24,7 @@ export async function GET(request: Request, ctx: RouteContext<"/propuestas/foto/
 
   try {
     const item = await prisma.mediaItem.findFirst({
-      where: { weddingId: WEDDING_ID, label: `propuesta:${name}`, driveFileId: { not: null } },
+      where: { weddingId: WEDDING_ID, label: { in: [`propuesta:${name}`, name] }, driveFileId: { not: null } },
       select: { driveFileId: true },
     });
     if (item?.driveFileId) {

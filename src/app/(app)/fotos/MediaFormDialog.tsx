@@ -45,13 +45,39 @@ export function MediaFormDialog({
           id="media-form"
           action={(formData) => {
             startTransition(async () => {
-              try {
-                await createMediaItem(formData);
+              // Varios archivos: se guarda uno por uno (cada uno con su nombre de archivo).
+              const files = formData.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+              const batches =
+                files.length > 1
+                  ? files.map((file) => {
+                      const single = new FormData();
+                      single.set("type", String(formData.get("type") ?? "image"));
+                      single.set("notes", String(formData.get("notes") ?? ""));
+                      single.set("file", file);
+                      return single;
+                    })
+                  : [formData];
+              let saved = 0;
+              const progress = batches.length > 1 ? toast.loading(`Subiendo 0 de ${batches.length}…`) : undefined;
+              for (const batch of batches) {
+                try {
+                  await createMediaItem(batch);
+                  saved += 1;
+                  if (progress) toast.loading(`Subiendo ${saved} de ${batches.length}…`, { id: progress });
+                } catch {
+                  // Se sigue con los demás; al final se avisa cuántos fallaron.
+                }
+              }
+              if (progress) toast.dismiss(progress);
+              if (saved === batches.length) {
                 formRef.current?.reset();
                 setType("image");
                 setOpen(false);
-                toast.success("Agregado a Fotos");
-              } catch {
+                toast.success(saved > 1 ? `${saved} archivos agregados a Fotos` : "Agregado a Fotos");
+              } else if (saved > 0) {
+                setOpen(false);
+                toast.error(`Se agregaron ${saved} de ${batches.length}. Vuelve a subir los que faltan.`);
+              } else {
                 toast.error("No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.");
               }
             });
@@ -77,7 +103,8 @@ export function MediaFormDialog({
           {canUpload && (
             <div>
               <Label htmlFor="file">Subir archivo a Google Drive</Label>
-              <FileDropzone name="file" accept={type === "video" ? "video/*" : "image/*"} className="mt-1" />
+              <FileDropzone name="file" accept={type === "video" ? "video/*" : "image/*"} multiple className="mt-1" />
+              <p className="mt-1 text-xs text-muted-foreground">Puedes elegir varios a la vez; sin nombre, se usa el del archivo.</p>
             </div>
           )}
 
