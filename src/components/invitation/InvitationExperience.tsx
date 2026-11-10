@@ -1,148 +1,132 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
-import { InvitationView, themeStyle, type InvitationViewProps } from "@/components/invitation/InvitationView";
-import { invitationTheme, monogram } from "@/lib/invitationThemes";
+import { useEffect, useMemo, useState } from "react";
+import { InvitationView, effectiveData, type InvitationViewProps } from "@/components/invitation/InvitationView";
+import { C, SCRIPT, SERIF, eventDay } from "@/components/invitation/kit";
+import { designFromData, findBlock } from "@/lib/invitationBlocks";
 
-type Petal = { left: number; size: number; delay: number; dur: number; drift: number; sway: number; spin: number; color: string };
-
-/** Lluvia de pétalos al abrir el sobre (posiciones al azar; solo existe en el cliente). */
-function PetalShower({ theme }: { theme: string }) {
-  const [petals] = useState<Petal[]>(() => {
-    const t = invitationTheme(theme);
-    const colors = [t.accent, t.gold, t.seal, t.envelope];
-    return Array.from({ length: 26 }, (_, i) => ({
-      left: Math.random() * 100,
-      size: 8 + Math.random() * 10,
-      delay: Math.random() * 1.8,
-      dur: 4.5 + Math.random() * 3,
-      drift: (Math.random() - 0.5) * 160,
-      sway: 15 + Math.random() * 30,
-      spin: 360 + Math.random() * 540,
-      color: colors[i % colors.length],
-    }));
-  });
-  return (
-    <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden" aria-hidden>
-      {petals.map((p, i) => (
-        <span
-          key={i}
-          className="inv-petal"
-          style={
-            {
-              left: `${p.left}%`,
-              width: p.size,
-              height: p.size * 0.8,
-              background: p.color,
-              "--delay": `${p.delay}s`,
-              "--dur": `${p.dur}s`,
-              "--drift": `${p.drift}px`,
-              "--sway": `${p.sway}px`,
-              "--spin": `${p.spin}deg`,
-            } as CSSProperties
-          }
-        />
-      ))}
-    </div>
-  );
-}
-
-/** Invitación pública: primero el sobre cerrado con el nombre del invitado; al tocar el sello se abre. */
+/**
+ * Invitación pública: primero la pantalla de apertura (lino, foto de la pareja en un arco y el
+ * nombre del invitado). Al tocar el sello, el contenido se desvanece y el telón se abre en dos
+ * mitades sobre la portada, que empieza su animación a la vista. Textos y foto salen del
+ * bloque de portada (editable).
+ */
 export function InvitationExperience(props: InvitationViewProps) {
   const { data, guest } = props;
-  const [opened, setOpened] = useState(false);
+  const design = useMemo(() => props.design ?? designFromData(data), [props.design, data]);
+  const [stage, setStage] = useState<"closed" | "opening" | "done">("closed");
   const [started, setStarted] = useState(false);
-  const [introGone, setIntroGone] = useState(false);
-  const [showPetals, setShowPetals] = useState(false);
 
   useEffect(() => {
-    if (introGone) {
-      document.documentElement.style.overflow = "";
-      return;
-    }
-    document.documentElement.style.overflow = "hidden";
+    if (stage === "done") return;
+    const el = document.documentElement;
+    const prev = el.style.overflow;
+    el.style.overflow = "hidden";
     return () => {
-      document.documentElement.style.overflow = "";
+      el.style.overflow = prev;
     };
-  }, [introGone]);
+  }, [stage]);
 
   function open() {
-    if (opened) return;
-    setOpened(true);
+    if (stage !== "closed") return;
     window.scrollTo({ top: 0 });
-    // Los pétalos caen mientras sale la carta; la portada empieza a animarse cuando el sobre
-    // se desvanece, para que la animación se vea y no ocurra detrás.
-    setTimeout(() => setShowPetals(true), 900);
-    setTimeout(() => setStarted(true), 1500);
-    setTimeout(() => setIntroGone(true), 2300);
-    setTimeout(() => setShowPetals(false), 11000);
+    setStage("opening");
+    setTimeout(() => setStarted(true), 900);
+    setTimeout(() => setStage("done"), 1900);
   }
 
-  const mono = monogram(data.partner1, data.partner2);
+  const cover = findBlock(design, "cover", true) ?? findBlock(design, "cover");
+  const photo = cover?.props.openingPhotoUrl || cover?.props.photoUrl || "";
+  const fx = effectiveData(data, design);
+  const start = fx.ceremonyTime ?? fx.receptionTime ?? data.weddingDate;
+  const day = eventDay(start, Boolean(fx.ceremonyTime || fx.receptionTime));
+  const p1 = data.partner1.trim();
+  const p2 = data.partner2.trim();
+  const mono = [p1[0], p2[0]].filter(Boolean).join("·").toUpperCase() || "♥";
+  const kicker = [cover?.props.openingKicker, day?.dots].filter(Boolean).join(" · ");
+  const headline = (cover?.props.headline || "Nos casamos").replace(/[¡!]/g, "");
+  const dateLine = day ? `${day.day} de ${day.monthName} de ${day.year}` : "";
+
+  const half = (side: "top" | "bottom") => (
+    <div className={`ed-half ed-half-${side} ed-linen absolute inset-x-0 h-1/2 overflow-hidden ${side === "top" ? "top-0" : "bottom-0"}`}>
+      {photo && (
+        <div
+          className={`absolute inset-x-0 h-[100svh] bg-cover bg-center opacity-[0.16] grayscale-[35%] ${side === "top" ? "top-0" : "bottom-0"}`}
+          style={{ backgroundImage: `url("${photo.replace(/"/g, "%22")}")` }}
+        />
+      )}
+    </div>
+  );
 
   return (
     <>
-      <InvitationView {...props} started={started} />
-      {showPetals && <PetalShower theme={data.theme} />}
-      {!introGone && (
-        <div
-          style={themeStyle(data.theme)}
-          className={`inv-root inv-intro fixed inset-0 z-50 flex flex-col items-center justify-center bg-(--inv-bg) px-6 text-(--inv-ink) ${opened ? "is-done" : ""}`}
-        >
-          <p className="inv-caps text-[0.7rem] text-(--inv-muted)">Una invitación para</p>
-          <p className="inv-script mt-2 text-center text-5xl text-(--inv-accent) sm:text-6xl">
-            {guest?.fullName ?? "ti"}
-          </p>
+      <InvitationView {...props} design={design} started={started || !design.blocks.some((b) => b.type === "cover" && !b.hidden)} />
+      {stage !== "done" && (
+        <div className={`ed-opening fixed inset-0 z-50 ${stage !== "closed" ? "open pointer-events-none" : ""}`} style={{ color: C.ink }}>
+          {half("top")}
+          {half("bottom")}
+          <span className="ed-seam absolute top-1/2 left-[calc(50%-4rem)] h-px w-32" style={{ background: C.accent }} aria-hidden />
 
-          <div
-            className={`inv-envelope relative mt-10 aspect-[1.45] w-[min(86vw,26rem)] [perspective:1200px] ${opened ? "is-open" : ""}`}
-          >
-            {/* Fondo del sobre */}
-            <div className="absolute inset-0 rounded-md bg-(--inv-envelope) shadow-[0_30px_60px_-30px_rgba(0,0,0,0.45)]" />
-            {/* Carta */}
-            <div className="inv-envelope-letter inv-paper absolute inset-x-[6%] top-[6%] bottom-[4%] z-10 flex flex-col items-center justify-center rounded-sm border border-(--inv-gold)/40 text-center">
-              <span className="text-sm tracking-[0.3em] text-(--inv-gold)">{mono}</span>
-              <span className="inv-script mt-1 text-3xl">{[data.partner1, data.partner2].filter(Boolean).join(" & ")}</span>
+          <div className="ed-open-content absolute inset-0 flex flex-col items-center justify-evenly px-6 py-[4svh] text-center">
+            {kicker && (
+              <p className="pp-fade flex items-center gap-3 text-[10px] tracking-[0.45em] uppercase" style={{ color: C.muted }}>
+                <span className="h-px w-6" style={{ background: C.accent }} />
+                {kicker}
+                <span className="h-px w-6" style={{ background: C.accent }} />
+              </p>
+            )}
+
+            <div className="pp-rise relative" style={{ ["--d" as string]: 1 }}>
+              <div className="absolute -inset-2.5 rounded-t-full border" style={{ borderColor: `${C.accent}99` }} aria-hidden />
+              <div className="relative aspect-[3/4] h-[30svh] max-h-[340px] min-h-[180px] overflow-hidden rounded-t-full" style={{ background: C.deep }}>
+                {photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja
+                  <img src={photo} alt={[p1, p2].filter(Boolean).join(" y ")} className="ed-drift h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full items-center justify-center text-6xl italic" style={{ fontFamily: SERIF, color: C.cream }}>
+                    {p1[0]}
+                    <span style={{ color: C.accent }}>&amp;</span>
+                    {p2[0]}
+                  </span>
+                )}
+              </div>
             </div>
-            {/* Bolsillo frontal */}
-            <div
-              className="absolute inset-0 z-20 rounded-md bg-(--inv-envelope)"
-              style={{ clipPath: "polygon(0 0, 50% 52%, 100% 0, 100% 100%, 0 100%)" }}
-            />
-            <div
-              className="absolute inset-0 z-20 rounded-md"
-              style={{
-                clipPath: "polygon(0 100%, 50% 48%, 100% 100%)",
-                background: "linear-gradient(to top, rgba(0,0,0,0.05), transparent)",
-              }}
-            />
-            {/* Solapa */}
-            <div
-              className="inv-envelope-flap absolute inset-x-0 top-0 h-[60%] bg-(--inv-flap)"
-              style={{
-                clipPath: "polygon(0 0, 100% 0, 50% 100%)",
-                zIndex: opened ? 5 : 30,
-                transition: "transform 0.9s cubic-bezier(0.65,0,0.35,1), z-index 0s linear 0.45s",
-              }}
-            />
-            {/* Sello */}
-            <button
-              type="button"
-              onClick={open}
-              aria-label="Abrir la invitación"
-              className="inv-envelope-seal inv-seal-pulse inv-shine absolute overflow-hidden top-[60%] left-1/2 z-40 flex size-[4.5rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-(--inv-seal) text-sm tracking-[0.18em] text-(--inv-seal-ink) shadow-[inset_0_-3px_6px_rgba(0,0,0,0.25),0_6px_14px_-4px_rgba(0,0,0,0.4)] outline-none focus-visible:ring-4 focus-visible:ring-(--inv-gold)/50"
-            >
-              {mono}
-            </button>
-          </div>
 
-          <button
-            type="button"
-            onClick={open}
-            className="inv-caps mt-10 text-[0.7rem] text-(--inv-muted) transition-colors hover:text-(--inv-accent)"
-          >
-            Toca el sello para abrir
-          </button>
+            <div className="pp-rise" style={{ ["--d" as string]: 3 }}>
+              <p className="text-[10px] tracking-[0.45em] uppercase" style={{ color: C.muted }}>
+                Una invitación para
+              </p>
+              <p className="mt-1 text-[clamp(2.4rem,11vw,3.6rem)] leading-[1.05]" style={{ fontFamily: SCRIPT }}>
+                {guest?.fullName ?? "ti"}
+              </p>
+            </div>
+
+            <div className="pp-rise" style={{ ["--d" as string]: 5 }}>
+              <p className="text-[clamp(1.6rem,7vw,2.2rem)] italic" style={{ fontFamily: SERIF }}>
+                {p1 || "Nuestra boda"}
+                {p1 && p2 && <span style={{ color: C.accent }}> &amp; </span>}
+                {p2}
+              </p>
+              <p className="mt-2 text-[10px] tracking-[0.35em] uppercase" style={{ color: C.muted }}>
+                {[headline, dateLine].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+
+            <div className="pp-rise flex flex-col items-center gap-3" style={{ ["--d" as string]: 7 }}>
+              <button
+                type="button"
+                onClick={open}
+                aria-label="Abrir la invitación"
+                className="ed-seal ed-breathe flex size-[5.25rem] items-center justify-center rounded-full text-xl italic outline-none ring-1 ring-[#a8996a]/70 ring-offset-4 ring-offset-[#f2eee3] focus-visible:ring-2"
+                style={{ fontFamily: SERIF, color: C.cream, background: "radial-gradient(circle at 35% 30%, #5d6444, #343a26 70%)" }}
+              >
+                {mono}
+              </button>
+              <button type="button" onClick={open} className="text-[10px] tracking-[0.4em] uppercase" style={{ color: C.ink }}>
+                Abrir invitación
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

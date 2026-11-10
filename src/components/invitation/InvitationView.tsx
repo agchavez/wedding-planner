@@ -1,768 +1,809 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import {
-  Armchair,
-  Ban,
-  Cake,
-  CalendarPlus,
-  Camera,
-  Car,
-  Check,
-  ChevronDown,
-  Church,
-  Copy,
-  Gem,
-  Gift,
-  Heart,
-  MapPin,
-  Moon,
-  Music,
-  Pause,
-  PartyPopper,
-  Play,
-  Sparkles,
-  UtensilsCrossed,
-  Wine,
-  type LucideIcon,
-} from "lucide-react";
-import { invitationTheme, monogram } from "@/lib/invitationThemes";
-import { EVENT_TIME_ZONE, formatEventTime } from "@/lib/eventTime";
-import { firstName } from "@/lib/invitationMessage";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { ArrowUpRight, CalendarPlus, Gift, MapPin } from "lucide-react";
+import "@/components/invitation/editorial.css";
 import { calendarLinks } from "@/components/invitation/calendar";
 import { RsvpSection } from "@/components/invitation/RsvpSection";
-import { HeartDivider, Ornament, Sprig, TornEdge } from "@/components/invitation/decor";
+import {
+  C,
+  CopyButton,
+  DressIcons,
+  EditorialFonts,
+  Lightbox,
+  SANS,
+  SCRIPT,
+  SERIF,
+  SongButton,
+  eventDay,
+  prettyTime,
+  useCountdown,
+  useReveal,
+} from "@/components/invitation/kit";
+import {
+  BLOCK_INFO,
+  designFromData,
+  eventTimeToIso,
+  projectDesign,
+  type BlockOf,
+  type BlockType,
+  type EventProps,
+  type InvitationBlock,
+  type InvitationDesign,
+} from "@/lib/invitationBlocks";
 import type { InvitationData, InvitationGuestData } from "@/lib/guestInvitations";
 import { cn } from "@/lib/utils";
 
-export { Ornament };
-
 export type InvitationViewProps = {
   data: InvitationData;
+  /** Bloques a mostrar; sin ellos se derivan de `data` (ejemplos, invitaciones anteriores). */
+  design?: InvitationDesign;
   guest: InvitationGuestData | null;
   /** Token del enlace; sin él (vista previa del editor o ejemplos) el RSVP no se envía. */
   token?: string;
-  /** Dentro del editor: sin altura de pantalla completa (las animaciones sí se ven). */
+  /** Dentro del editor: altura de pantalla fija y todo visible sin animaciones de scroll. */
   embedded?: boolean;
-  /**
-   * Las animaciones esperan a que sea `true` (la invitación pública lo activa al abrir el
-   * sobre, para que la portada se anime a la vista y no detrás del sobre).
-   */
+  /** Las animaciones de la portada esperan a que sea `true` (al abrir la invitación). */
   started?: boolean;
+  /** Editor: bloque seleccionado y selección al tocar un bloque. */
+  selectedId?: string | null;
+  onSelectBlock?: (id: string) => void;
 };
 
-/** Orden en una cascada de animación (ver .inv-rise, .inv-pop… en globals.css). */
-const order = (i: number) => ({ "--i": i }) as CSSProperties;
+/** Paleta como variables CSS: la usan el formulario de confirmación y el editor. */
+export const editorialStyle = {
+  "--inv-bg": C.bg,
+  "--inv-paper": "#f7f4ea",
+  "--inv-ink": C.ink,
+  "--inv-muted": C.muted,
+  "--inv-accent": C.ink,
+  "--inv-gold": C.accent,
+  "--inv-band": C.deep,
+  "--inv-band-ink": C.cream,
+} as CSSProperties;
 
-export function themeStyle(themeName: string): CSSProperties {
-  const t = invitationTheme(themeName);
-  return {
-    "--inv-bg": t.background,
-    "--inv-paper": t.paper,
-    "--inv-ink": t.ink,
-    "--inv-muted": t.muted,
-    "--inv-accent": t.accent,
-    "--inv-gold": t.gold,
-    "--inv-envelope": t.envelope,
-    "--inv-flap": t.envelopeFlap,
-    "--inv-seal": t.seal,
-    "--inv-seal-ink": t.sealInk,
-    "--inv-band": t.band,
-    "--inv-band-ink": t.bandInk,
-  } as CSSProperties;
-}
-
-const ITINERARY_ICON: Record<string, LucideIcon> = {
-  rings: Gem,
-  church: Church,
-  cheers: Wine,
-  camera: Camera,
-  dinner: UtensilsCrossed,
-  dance: Sparkles,
-  cake: Cake,
-  party: PartyPopper,
-  music: Music,
-  car: Car,
-  heart: Heart,
-  moon: Moon,
-};
-
-/** Solo http(s) o rutas de la propia app (fotos de ejemplo); nunca javascript:, data:, etc. */
-const isSafeUrl = (url: string) => /^https?:\/\//i.test(url) || /^\/(?!\/)/.test(url);
-
-/** Hace aparecer los bloques `.inv-reveal` al entrar en pantalla. */
-function useReveal(rootRef: React.RefObject<HTMLElement | null>, enabled: boolean, started: boolean) {
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || !started) return;
-    const items = Array.from(root.querySelectorAll<HTMLElement>(".inv-reveal"));
-    if (!enabled || typeof IntersectionObserver === "undefined") {
-      items.forEach((el) => el.classList.add("is-visible"));
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
-        }
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
-    );
-    items.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [rootRef, enabled, started]);
-}
-
-/** Día del evento (año, mes 0-11, día) en la zona de la boda, con nombres en español. */
-function eventDayParts(data: InvitationData) {
-  const source = data.ceremonyTime ?? data.receptionTime ?? data.weddingDate;
-  if (!source) return null;
-  const tz = data.ceremonyTime || data.receptionTime ? EVENT_TIME_ZONE : "UTC";
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(
-    new Date(source)
-  );
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const year = get("year");
-  const month = get("month") - 1;
-  const day = get("day");
-  const utc = new Date(Date.UTC(year, month, day));
-  return {
-    year,
-    month,
-    day,
-    weekday: new Intl.DateTimeFormat("es-HN", { weekday: "long", timeZone: "UTC" }).format(utc),
-    monthName: new Intl.DateTimeFormat("es-HN", { month: "long", timeZone: "UTC" }).format(utc),
-  };
-}
-
-function Countdown({ target }: { target: string }) {
-  const [now, setNow] = useState<number | null>(null);
-
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    const first = setTimeout(tick, 0);
-    const id = setInterval(tick, 1000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(id);
-    };
-  }, []);
-
-  const diff = Math.max(0, new Date(target).getTime() - (now ?? 0));
-  if (now !== null && diff === 0) {
-    return <p className="inv-script text-5xl">¡Hoy es el gran día!</p>;
-  }
-  const units = [
-    { label: "Días", value: Math.floor(diff / 86_400_000) },
-    { label: "Horas", value: Math.floor(diff / 3_600_000) % 24 },
-    { label: "Min", value: Math.floor(diff / 60_000) % 60 },
-    { label: "Seg", value: Math.floor(diff / 1000) % 60 },
-  ];
-  return (
-    <div className="flex items-start justify-center gap-1.5" aria-label="Cuenta regresiva">
-      {units.map((u, i) => (
-        <div key={u.label} className="flex items-start gap-1.5">
-          <div className="flex min-w-14 flex-col items-center">
-            <span className="overflow-hidden text-[2.6rem] leading-none font-medium tabular-nums">
-              {now === null ? (
-                "–"
-              ) : (
-                <span key={u.value} className="inv-tick">
-                  {String(u.value).padStart(2, "0")}
-                </span>
-              )}
-            </span>
-            <span className="inv-caps mt-2 text-[0.55rem] opacity-75">{u.label}</span>
-          </div>
-          {i < units.length - 1 && <span className="text-3xl leading-none opacity-60">:</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Mes de la boda con el día marcado con un corazón. */
-function MonthCalendar({ year, month, day }: { year: number; month: number; day: number }) {
-  const first = new Date(Date.UTC(year, month, 1));
-  const offset = (first.getUTCDay() + 6) % 7; // lunes primero
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const cells: (number | null)[] = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-  return (
-    <div className="mx-auto mt-6 w-full max-w-[17rem]">
-      <div className="grid grid-cols-7 gap-y-1.5 text-center">
-        {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
-          <span key={i} className="inv-caps text-[0.55rem] text-(--inv-muted)">
-            {d}
-          </span>
-        ))}
-        {cells.map((n, i) => (
-          <span key={i} className="relative flex h-7 items-center justify-center text-sm tabular-nums">
-            {n === day && (
-              <span className="inv-pop absolute inset-0 flex items-center justify-center" style={order(4)} aria-hidden>
-                <Heart className="inv-beat size-7 text-(--inv-accent)" fill="currentColor" strokeWidth={0} />
-              </span>
-            )}
-            <span className={cn("relative", n === day && "font-semibold text-(--inv-paper)")}>{n ?? ""}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SongPlayer({ url, title }: { url: string; title: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-
-  function toggle() {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) {
-      void audio
-        .play()
-        .then(() => setPlaying(true))
-        .catch(() => setPlaying(false));
-    } else {
-      audio.pause();
-      setPlaying(false);
-    }
-  }
-
-  return (
-    <div className="inv-paper mx-auto max-w-sm rounded-2xl border border-(--inv-gold)/40 px-6 py-5 text-center shadow-[0_14px_30px_-24px_rgba(0,0,0,0.5)]">
-      <p className="text-base italic text-(--inv-muted)">{title || "Dale play a nuestra canción"}</p>
-      <div className="mt-3 h-1 overflow-hidden rounded-full bg-(--inv-gold)/25">
-        <div className="h-full rounded-full bg-(--inv-accent) transition-[width] duration-300" style={{ width: `${progress}%` }} />
-      </div>
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={playing ? "Pausar canción" : "Reproducir canción"}
-        className="mx-auto mt-4 flex size-12 items-center justify-center rounded-full bg-(--inv-accent) text-(--inv-paper) shadow-md transition-transform active:scale-95"
-      >
-        {playing ? <Pause className="size-5" fill="currentColor" /> : <Play className="ml-0.5 size-5" fill="currentColor" />}
-      </button>
-      <audio
-        ref={audioRef}
-        src={url}
-        preload="none"
-        onTimeUpdate={(e) => {
-          const a = e.currentTarget;
-          setProgress(a.duration ? (a.currentTime / a.duration) * 100 : 0);
-        }}
-        onEnded={() => setPlaying(false)}
-      />
-    </div>
-  );
-}
-
-function CopyAccount({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value.replace(/\s/g, ""));
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          // Sin portapapeles: el número queda visible para copiarlo a mano.
-        }
-      }}
-      className="inv-caps inline-flex items-center gap-1.5 rounded-full border border-(--inv-accent)/50 px-3 py-1.5 text-[0.6rem] text-(--inv-accent)"
-    >
-      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      {copied ? "Copiado" : "Copiar"}
-    </button>
-  );
-}
-
-function Section({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("inv-reveal px-7 py-12 text-center", className)}>{children}</section>;
-}
-
-function Title({ eyebrow, title }: { eyebrow?: string; title: string }) {
-  return (
-    <div className="mb-7">
-      {eyebrow && <p className="inv-caps text-[0.68rem] text-(--inv-muted)">{eyebrow}</p>}
-      <h2 className="inv-script mt-1 text-[2.75rem] leading-tight text-(--inv-accent)">
-        <span className="inv-draw">{title}</span>
-      </h2>
-      <HeartDivider className="mt-2" />
-    </div>
-  );
-}
-
-/** Franja oscura con bordes de papel rasgado. */
-function Band({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className="inv-reveal">
-      <TornEdge side="top" />
-      <div className={cn("bg-(--inv-band) px-7 py-12 text-center text-(--inv-band-ink)", className)}>{children}</div>
-      <TornEdge side="bottom" />
-    </div>
-  );
-}
-
-function mapsUrl(mapUrl: string, place: string, address: string) {
-  if (/^https?:\/\//i.test(mapUrl)) return mapUrl;
-  const q = [place, address].filter(Boolean).join(", ");
-  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : "";
-}
-
-function EventBlock({
-  icon: Icon,
-  title,
-  time,
-  place,
-  address,
-  mapUrl,
-}: {
-  icon: LucideIcon;
-  title: string;
-  time: string | null;
-  place: string;
-  address: string;
-  mapUrl: string;
-}) {
-  const href = mapsUrl(mapUrl, place, address);
-  return (
-    <div className="flex flex-col items-center">
-      <span className="inv-pop flex size-14 items-center justify-center rounded-full bg-(--inv-band) text-(--inv-band-ink)">
-        <Icon className="size-6" strokeWidth={1.4} />
-      </span>
-      <h3 className="inv-script mt-3 text-4xl text-(--inv-accent)">
-        <span className="inv-draw" style={order(2)}>
-          {title}
-        </span>
-      </h3>
-      {time && <p className="mt-1 text-xl font-semibold">{formatEventTime(time)}</p>}
-      {place && <p className="inv-caps mt-1 text-[0.72rem] font-semibold">{place}</p>}
-      {address && <p className="mt-0.5 text-base italic text-(--inv-muted)">{address}</p>}
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inv-caps mt-4 inline-flex items-center gap-2 rounded-full bg-(--inv-band) px-5 py-2.5 text-[0.62rem] text-(--inv-band-ink) shadow-sm transition-opacity hover:opacity-90"
-        >
-          <MapPin className="size-3.5" />
-          Ver ubicación
-        </a>
-      )}
-    </div>
-  );
-}
-
-/** "Rol: Nombres" por línea → pares. */
-function parseSponsors(raw: string) {
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [role, ...rest] = line.split(":");
-      return rest.length ? { role: role.trim(), names: rest.join(":").trim() } : { role: "", names: line };
-    });
-}
-
+const d = (n: number) => ({ "--d": n }) as CSSProperties;
 const lines = (raw: string) =>
   raw
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
-export function InvitationView({ data, guest, token, embedded = false, started = true }: InvitationViewProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  useReveal(rootRef, true, started);
+function mapsLink(mapUrl: string, place: string, address: string) {
+  if (/^https?:\/\//i.test(mapUrl)) return mapUrl;
+  const q = [place, address].filter(Boolean).join(", ");
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : "";
+}
 
-  const p1 = data.partner1 || "";
-  const p2 = data.partner2 || "";
-  const mono = monogram(p1, p2);
-  const day = eventDayParts(data);
-  const eventStart = data.ceremonyTime ?? data.receptionTime ?? data.weddingDate;
-  const hasCeremony = Boolean(data.ceremonyPlace || data.ceremonyTime);
-  const hasReception = Boolean(data.receptionPlace || data.receptionTime);
-  const fallbackVenue = !hasCeremony && !hasReception && (data.venueName || data.venueAddress);
-  const calendar = calendarLinks(data, token);
-  const cover = isSafeUrl(data.coverImageUrl) ? data.coverImageUrl : "";
-  const gallery = data.galleryUrls.filter(isSafeUrl);
-  const closingPhoto = gallery.at(-1) ?? cover;
-  const sponsors = parseSponsors(data.sponsors);
-  const brideParents = lines(data.brideParents);
-  const groomParents = lines(data.groomParents);
-  const colors = data.dressCodeColors.filter((c) => /^#[0-9a-f]{6}$/i.test(c));
-  const hasGiftAccount = Boolean(data.giftAccount);
-  const registry = /^https?:\/\//i.test(data.giftRegistryUrl) ? data.giftRegistryUrl : "";
-  const song = isSafeUrl(data.songUrl) ? data.songUrl : "";
+const mapEmbed = (place: string, address: string) =>
+  `https://www.google.com/maps?q=${encodeURIComponent([place, address].filter(Boolean).join(", "))}&output=embed`;
 
+type Ctx = {
+  data: InvitationData;
+  design: InvitationDesign;
+  guest: InvitationGuestData | null;
+  token?: string;
+  embedded: boolean;
+  started: boolean;
+  p1: string;
+  p2: string;
+  initials: string;
+  couple: string;
+  start: string | null;
+  day: ReturnType<typeof eventDay>;
+  city: string;
+  calendar: ReturnType<typeof calendarLinks>;
+  numbers: Record<string, string>;
+  openLightbox: (images: string[], i: number) => void;
+};
+
+type BlockProps<T extends BlockType> = { block: BlockOf<T>; ctx: Ctx };
+
+function Photo({ src, alt = "", className, style }: { src: string; alt?: string; className?: string; style?: CSSProperties }) {
+  // eslint-disable-next-line @next/next/no-img-element -- fotos elegidas por la pareja (Drive u otra URL)
+  return <img src={src} alt={alt} className={className} style={style} loading="lazy" />;
+}
+
+/** Hueco para una foto que falta (solo en el editor). */
+function PhotoSlot({ ctx, label, className }: { ctx: Ctx; label: string; className?: string }) {
+  if (!ctx.embedded) return null;
   return (
-    <div ref={rootRef} style={themeStyle(data.theme)} className="inv-root @container bg-(--inv-bg) text-(--inv-ink)">
-      <div className="inv-paper relative mx-auto max-w-[34rem] overflow-hidden shadow-[0_0_60px_-20px_rgba(0,0,0,0.25)]">
-        {/* Portada */}
-        <header className={cn("inv-reveal inv-reveal-static relative px-7 pt-14 pb-10 text-center", !embedded && "min-h-svh")}>
-          <Sprig className="absolute -top-2 -left-6 w-36 rotate-[200deg] opacity-80" />
-          <Sprig className="absolute -top-2 -right-6 w-36 rotate-[200deg] opacity-80" flip />
+    <div className={cn("flex items-center justify-center border border-dashed text-[10px] tracking-[0.3em] uppercase", className)} style={{ borderColor: C.accent, color: C.muted }}>
+      {label}
+    </div>
+  );
+}
 
-          <p className="inv-caps inv-rise relative text-[0.66rem] text-(--inv-muted)" style={order(0)}>
-            Junto a sus familias
-          </p>
-          <h1 className="relative mt-4 leading-none">
-            <span className="inv-letters block text-[clamp(2.4rem,13cqw,3.6rem)] font-medium uppercase" style={order(0)}>
-              {p1 || "Nuestra"}
-            </span>
-            <span className="inv-script my-1 block text-[2.4rem] text-(--inv-accent)">
-              <span className="inv-draw" style={order(5)}>
-                {p1 && p2 ? "y" : ""}
-              </span>
-            </span>
-            <span className="inv-letters block text-[clamp(2.4rem,13cqw,3.6rem)] font-medium uppercase" style={order(1)}>
-              {p2 || "boda"}
-            </span>
-          </h1>
-          <p className="inv-caps inv-rise mt-4 text-[0.66rem] text-(--inv-muted)" style={order(5)}>
-            te invitan a su
-          </p>
-          <p className="inv-script text-[3.2rem] leading-tight text-(--inv-accent)">
-            <span className="inv-draw" style={order(6)}>
-              Boda
-            </span>
-          </p>
+function SectionTitle({ n, title, dark }: { n?: string; title: string; dark?: boolean }) {
+  return (
+    <div data-reveal className="flex items-baseline gap-4 border-b pb-3" style={{ borderColor: dark ? "rgb(255 255 255 / 0.2)" : C.ink }}>
+      {n && (
+        <span className="text-xs" style={{ color: C.accent }}>
+          {n}
+        </span>
+      )}
+      <h2 style={{ fontFamily: SERIF }} className="text-3xl @xl:text-5xl">
+        {title}
+      </h2>
+    </div>
+  );
+}
 
-          {cover ? (
-            <div className="relative mx-auto mt-6 w-[78%]">
-              <Sprig className="absolute -bottom-6 -left-10 z-10 w-28" />
-              <Sprig className="absolute -right-10 -bottom-6 z-10 w-28" flip />
-              <div className="inv-unveil overflow-hidden rounded-t-full border-[6px] border-(--inv-paper) shadow-[0_20px_40px_-20px_rgba(0,0,0,0.45)] ring-1 ring-(--inv-gold)/50">
-                {/* eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja */}
-                <img src={cover} alt={[p1, p2].filter(Boolean).join(" y ")} className="aspect-[3/4] w-full object-cover" />
-              </div>
-            </div>
-          ) : (
-            <div
-              className="inv-pop mx-auto mt-8 flex size-24 items-center justify-center rounded-full border border-(--inv-gold) text-lg tracking-[0.2em] text-(--inv-accent)"
-              style={order(6)}
-            >
-              {mono}
-            </div>
-          )}
+/* ------------------------------------------------------------------------------------ */
+/* Bloques                                                                               */
+/* ------------------------------------------------------------------------------------ */
 
-          <p className="inv-script mt-8 text-[2.4rem] leading-tight text-(--inv-accent)">
-            <span className="inv-draw" style={order(14)}>
-              {data.headline || "¡Nos casamos!"}
-            </span>
-          </p>
-          <HeartDivider className="mt-2" />
-          {!embedded && <ChevronDown className="inv-float mx-auto mt-6 size-5 text-(--inv-gold)" aria-hidden />}
-        </header>
-
-        {/* Saludo personal, mensaje y familia */}
-        <Section className="pt-4">
-          {guest && (
-            <p className="inv-script text-[2.8rem] text-(--inv-accent)">
-              <span className="inv-draw">{firstName(guest.fullName)},</span>
+function Cover({ block, ctx }: BlockProps<"cover">) {
+  const p = block.props;
+  const marquee = lines(p.marquee);
+  const items = marquee.length
+    ? marquee
+    : [
+        "Save the date",
+        ctx.day ? `${ctx.day.day} de ${ctx.day.monthName}` : "",
+        ctx.city.split(",")[0],
+        ctx.couple,
+        prettyTime(ctx.start && ctx.day ? ctx.start : null),
+      ].filter(Boolean);
+  const hasPhoto = Boolean(p.photoUrl);
+  return (
+    <>
+      <header
+        className={cn("relative overflow-hidden", hasPhoto ? "text-white" : "ed-linen")}
+        style={{ height: "var(--inv-screen)", minHeight: 560, background: hasPhoto ? "#2b301f" : undefined }}
+      >
+        {hasPhoto && (
+          <>
+            <Photo
+              src={p.photoUrl}
+              alt={ctx.couple}
+              className={cn("absolute inset-0 h-full w-full object-cover", ctx.started ? "pp-ken" : "pp-ken-wait")}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#1f2316]/45 via-transparent to-[#1f2316]/75" />
+          </>
+        )}
+        <div
+          className="relative flex items-center justify-between border-b px-5 py-4 text-[10px] tracking-[0.35em] uppercase @xl:px-10"
+          style={{ borderColor: hasPhoto ? "rgb(255 255 255 / 0.3)" : C.line }}
+        >
+          <span>{p.kicker}</span>
+          <span>{ctx.day?.short ?? ""}</span>
+        </div>
+        {ctx.started && (
+          <div className="absolute inset-x-0 bottom-0 px-5 pb-14 @xl:px-10">
+            <p className="pp-rise text-xs tracking-[0.5em] uppercase" style={d(1)}>
+              {p.headline}
             </p>
-          )}
-          <p className="mx-auto mt-3 max-w-sm text-[1.15rem] leading-relaxed">
-            {data.message ||
-              "Con la bendición de Dios y de nuestras familias, tenemos el honor de invitarte a celebrar el día en que uniremos nuestras vidas."}
-          </p>
-          {data.quote && <blockquote className="mx-auto mt-6 max-w-xs text-base italic text-(--inv-muted)">“{data.quote}”</blockquote>}
-
-          {guest && (
-            <div className="inv-rise mx-auto mt-8 flex w-fit items-center gap-4 rounded-2xl border border-(--inv-gold)/50 px-6 py-4" style={order(3)}>
-              <Armchair className="size-8 text-(--inv-accent)" strokeWidth={1.2} />
-              <div className="text-left">
-                <p className="inv-caps text-[0.6rem] text-(--inv-muted)">Lugares reservados</p>
-                <p className="text-sm italic text-(--inv-muted)">para ti{guest.seats > 1 ? " y tu compañía" : ""}</p>
-              </div>
-              <span className="flex size-11 items-center justify-center rounded-md border border-(--inv-accent) text-2xl font-semibold text-(--inv-accent)">
-                {guest.seats}
+            <h1 style={{ fontFamily: SERIF }} className="mt-3 leading-[0.85]">
+              <span className="pp-rise block text-[21cqw] italic @3xl:text-[12rem]" style={d(2)}>
+                {ctx.p1 || "Nuestra"}
               </span>
-            </div>
-          )}
-
-          {(brideParents.length > 0 || groomParents.length > 0) && (
-            <div className="mt-10 grid grid-cols-2 gap-5">
-              {[
-                { title: "Padres de la novia", names: brideParents },
-                { title: "Padres del novio", names: groomParents },
-              ]
-                .filter((g) => g.names.length > 0)
-                .map((g) => (
-                  <div key={g.title} className={cn((brideParents.length === 0 || groomParents.length === 0) && "col-span-2")}>
-                    <p className="inv-caps text-[0.6rem] font-semibold text-(--inv-accent)">{g.title}</p>
-                    {g.names.map((n) => (
-                      <p key={n} className="mt-1 text-[0.95rem]">
-                        {n}
-                      </p>
-                    ))}
-                  </div>
-                ))}
-            </div>
-          )}
-
-          {sponsors.length > 0 && (
-            <div className="mt-8 grid grid-cols-2 gap-x-5 gap-y-4">
-              {sponsors.map((s, i) => (
-                <div key={i} className={cn(sponsors.length % 2 === 1 && i === sponsors.length - 1 && "col-span-2")}>
-                  {s.role && <p className="inv-caps text-[0.58rem] font-semibold text-(--inv-accent)">{s.role}</p>}
-                  <p className="mt-1 text-[0.95rem]">{s.names}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* Reserva la fecha */}
-        {day && (
-          <Section className="pt-2">
-            <p className="inv-caps text-[0.68rem] text-(--inv-muted)">Reserva la fecha</p>
-            <p className="inv-caps mt-5 text-sm font-semibold text-(--inv-accent)">{day.monthName}</p>
-            <div className="mt-2 flex items-center justify-center gap-4">
-              <span className="inv-caps w-24 border-y border-(--inv-gold)/70 py-1.5 text-[0.65rem]">{day.weekday}</span>
-              <span className="inv-pop text-6xl leading-none font-medium text-(--inv-accent)" style={order(1)}>
-                {day.day}
+              <span className="pp-rise block pl-[10cqw] text-[21cqw] @3xl:pl-40 @3xl:text-[12rem]" style={d(3)}>
+                <span style={{ color: hasPhoto ? "#d8c99a" : C.accent }}>&amp;</span> {ctx.p2 || "boda"}
               </span>
-              <span className="inv-caps w-24 border-y border-(--inv-gold)/70 py-1.5 text-[0.65rem]">{day.year}</span>
-            </div>
-            <MonthCalendar year={day.year} month={day.month} day={day.day} />
-            {calendar && (
-              <div className="mt-6 flex flex-wrap justify-center gap-2">
-                <a
-                  href={calendar.google}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inv-caps inline-flex items-center gap-1.5 rounded-full border border-(--inv-accent)/50 px-4 py-2 text-[0.58rem] text-(--inv-accent)"
-                >
-                  <CalendarPlus className="size-3.5" />
-                  Google Calendar
-                </a>
-                {calendar.ics && (
-                  <a
-                    href={calendar.ics}
-                    className="inv-caps inline-flex items-center gap-1.5 rounded-full border border-(--inv-accent)/50 px-4 py-2 text-[0.58rem] text-(--inv-accent)"
-                  >
-                    <CalendarPlus className="size-3.5" />
-                    Apple / Outlook
-                  </a>
-                )}
-              </div>
-            )}
-          </Section>
-        )}
-
-        {data.showCountdown && eventStart && (
-          <Band>
-            <p className="inv-caps text-xs opacity-80">Faltan</p>
-            <div className="mt-4">
-              <Countdown target={eventStart} />
-            </div>
-            <p className="inv-script mt-5 text-3xl opacity-90">para nuestro gran día</p>
-          </Band>
-        )}
-
-        {song && (
-          <Section className="py-10">
-            <SongPlayer url={song} title={data.songTitle} />
-          </Section>
-        )}
-
-        {(hasCeremony || hasReception || fallbackVenue) && (
-          <Section>
-            <Title eyebrow="Cuándo y dónde" title="El gran día" />
-            <div className="space-y-10">
-              {hasCeremony && (
-                <EventBlock
-                  icon={Church}
-                  title="Ceremonia"
-                  time={data.ceremonyTime}
-                  place={data.ceremonyPlace}
-                  address={data.ceremonyAddress}
-                  mapUrl={data.ceremonyMapUrl}
-                />
-              )}
-              {hasCeremony && hasReception && <HeartDivider />}
-              {hasReception && (
-                <EventBlock
-                  icon={Wine}
-                  title="Recepción"
-                  time={data.receptionTime}
-                  place={data.receptionPlace}
-                  address={data.receptionAddress}
-                  mapUrl={data.receptionMapUrl}
-                />
-              )}
-              {fallbackVenue && <EventBlock icon={MapPin} title="Lugar" time={null} place={data.venueName} address={data.venueAddress} mapUrl="" />}
-            </div>
-          </Section>
-        )}
-
-        {data.itinerary.length > 0 && (
-          <Section>
-            <Title eyebrow="Programa" title="del gran día" />
-            <ol className="relative mx-auto max-w-[19rem] text-left">
-              <span className="inv-grow-y absolute top-6 bottom-6 left-7 w-px bg-(--inv-gold)/60" aria-hidden />
-              {data.itinerary.map((item, i) => {
-                const Icon = ITINERARY_ICON[item.icon] ?? Heart;
-                return (
-                  <li key={i} className="inv-rise relative flex items-center gap-5 py-2.5" style={order(i * 2 + 1)}>
-                    <span
-                      style={order(i * 2 + 1)}
-                      className="inv-pop relative z-10 flex size-14 shrink-0 items-center justify-center rounded-full bg-(--inv-band) text-(--inv-band-ink) shadow-[0_6px_14px_-8px_rgba(0,0,0,0.5)]"
-                    >
-                      <Icon className="size-6" strokeWidth={1.4} />
-                    </span>
-                    <div>
-                      {item.time && <p className="text-xl leading-tight font-semibold">{item.time}</p>}
-                      <p className="text-[1.05rem] leading-snug text-(--inv-muted)">{item.title}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </Section>
-        )}
-
-        {(data.dressCode || colors.length > 0) && (
-          <Band>
-            <p className="inv-caps text-xs text-(--inv-gold)">Código de vestimenta</p>
-            {data.dressCode && (
-              <p className="inv-script mt-2 text-5xl">
-                <span className="inv-draw">{data.dressCode}</span>
-              </p>
-            )}
-            {colors.length > 0 && (
-              <div className="mt-6 flex justify-center gap-3">
-                {colors.map((c, i) => (
-                  <span
-                    key={c}
-                    className="inv-pop size-10 rounded-full ring-2 ring-(--inv-band-ink)/30"
-                    style={{ background: c, ...order(i + 4) }}
-                  />
-                ))}
-              </div>
-            )}
-            {data.dressCodeNote && <p className="mx-auto mt-5 max-w-xs text-base italic opacity-85">{data.dressCodeNote}</p>}
-          </Band>
-        )}
-
-        {(data.giftsNote || hasGiftAccount || registry) && (
-          <Section>
-            <Gift className="inv-pop mx-auto size-9 text-(--inv-accent)" strokeWidth={1.2} />
-            <h2 className="inv-script mt-2 text-[2.75rem] leading-tight text-(--inv-accent)">
-              <span className="inv-draw" style={order(1)}>
-                Sugerencia de regalo
-              </span>
-            </h2>
-            <HeartDivider className="mt-2 mb-5" />
-            {data.giftsNote && <p className="mx-auto max-w-sm text-[1.05rem] leading-relaxed whitespace-pre-line">{data.giftsNote}</p>}
-            {hasGiftAccount && (
-              <div className="mx-auto mt-6 max-w-xs rounded-2xl border border-(--inv-gold)/50 px-5 py-5">
-                <p className="inv-caps text-[0.6rem] text-(--inv-muted)">Transferencia</p>
-                {data.giftBankName && <p className="mt-2 font-semibold">{data.giftBankName}</p>}
-                <p className="mt-1 text-xl font-medium tracking-wider tabular-nums">{data.giftAccount}</p>
-                {data.giftAccountHolder && <p className="text-sm italic text-(--inv-muted)">Titular: {data.giftAccountHolder}</p>}
-                <div className="mt-3">
-                  <CopyAccount value={data.giftAccount} />
-                </div>
-              </div>
-            )}
-            {registry && (
-              <a
-                href={registry}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inv-caps mt-5 inline-flex items-center gap-2 rounded-full bg-(--inv-band) px-5 py-2.5 text-[0.62rem] text-(--inv-band-ink)"
-              >
-                <Gift className="size-3.5" />
-                Ver mesa de regalos
-              </a>
-            )}
-          </Section>
-        )}
-
-        {gallery.length > 0 && (
-          <Section className="px-5">
-            <Title eyebrow="Nuestra historia" title="Galería" />
-            <div className="grid auto-rows-[8.5rem] grid-cols-2 gap-2">
-              {gallery.slice(0, 6).map((url, i) => (
-                <div
-                  key={url + i}
-                  style={order(i + 2)}
-                  className={cn(
-                    "inv-rise overflow-hidden rounded-md",
-                    i === 0 && gallery.length >= 3 && "row-span-2",
-                    gallery.length === 1 && "col-span-2 row-span-2"
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- fotos elegidas por la pareja */}
-                  <img src={url} alt="" loading="lazy" className="inv-zoom size-full object-cover" style={order(i + 2)} />
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {guest && (
-          <Section>
-            <Title eyebrow="Confirma tu asistencia" title="¿Nos acompañas?" />
-            <RsvpSection guest={guest} token={token} rsvpDeadline={data.rsvpDeadline} />
-          </Section>
-        )}
-
-        {(data.adultsOnly || data.recommendations) && (
-          <Section className="pt-2">
-            {data.adultsOnly && (
-              <div>
-                <Ban className="mx-auto size-7 text-(--inv-accent)" strokeWidth={1.3} />
-                <p className="inv-caps mt-2 text-xs font-semibold">Solo adultos</p>
-                <p className="mx-auto mt-1 max-w-xs text-base text-(--inv-muted)">
-                  Amamos a los niños, pero esta será una celebración solo para adultos. ¡Tómense la noche libre y disfruten con nosotros!
-                </p>
-              </div>
-            )}
-            {data.adultsOnly && data.recommendations && <HeartDivider className="my-6" />}
-            {data.recommendations && (
-              <div>
-                <p className="inv-caps text-xs font-semibold">Recomendaciones</p>
-                <p className="mx-auto mt-1 max-w-xs text-base whitespace-pre-line text-(--inv-muted)">{data.recommendations}</p>
-              </div>
-            )}
-          </Section>
-        )}
-
-        {/* Cierre */}
-        <div className="inv-reveal">
-          <TornEdge side="top" />
-          <div className="relative overflow-hidden bg-(--inv-band) px-7 py-16 text-center text-(--inv-band-ink)">
-            {closingPhoto && (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja */}
-                <img src={closingPhoto} alt="" className="inv-kenburns absolute inset-0 size-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" />
-              </>
-            )}
-            <div className={cn("relative", closingPhoto && "text-white")}>
-              <p className="inv-caps text-[0.66rem] opacity-80">Esperamos contar con tu presencia</p>
-              <p className="inv-script mt-2 text-6xl">
-                <span className="inv-draw" style={order(2)}>
-                  ¡Gracias!
-                </span>
-              </p>
-              {data.closingMessage && <p className="mx-auto mt-3 max-w-xs text-base opacity-90">{data.closingMessage}</p>}
-              <p className="mt-6 text-sm tracking-[0.3em] uppercase opacity-90">{[p1, p2].filter(Boolean).join(" & ")}</p>
-              {data.hashtag && <p className="inv-caps mt-2 text-[0.62rem] opacity-80">{data.hashtag}</p>}
+            </h1>
+            <div className="pp-line mt-6 h-px w-full" style={{ ...d(4), background: hasPhoto ? "rgb(255 255 255 / 0.5)" : C.ink }} />
+            <div className="pp-rise mt-4 flex flex-wrap justify-between gap-2 text-[11px] tracking-[0.3em] uppercase" style={d(5)}>
+              <span>{ctx.day?.long ?? ""}</span>
+              <span>{ctx.city}</span>
             </div>
           </div>
-          <p className="bg-(--inv-band) pb-5 text-center text-[0.6rem] text-(--inv-band-ink) opacity-60">Invitación hecha con Wedplan</p>
+        )}
+      </header>
+      {items.length > 0 && (
+        <div className="overflow-hidden py-3" style={{ background: C.deep, color: C.cream }}>
+          <div className="pp-marquee flex w-max gap-10 whitespace-nowrap" style={{ fontFamily: SERIF }}>
+            {[0, 1].map((k) => (
+              <span key={k} className="flex gap-10 text-2xl italic" aria-hidden={k === 1}>
+                {items.map((t, i) => (
+                  <span key={i} className="flex items-center gap-10">
+                    {t} <span style={{ color: C.accent }}>✦</span>
+                  </span>
+                ))}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function FamilyList({ title, names }: { title: string; names: string[] }) {
+  return (
+    <div>
+      <p className="text-[10px] tracking-[0.35em] uppercase" style={{ color: C.accent }}>
+        {title}
+      </p>
+      {names.map((n) => (
+        <p key={n} className="mt-1 text-sm">
+          {n}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function GuestMessage({ block, ctx }: BlockProps<"guestMessage">) {
+  const p = block.props;
+  const message = p.message.trim();
+  const bride = lines(p.brideParents);
+  const groom = lines(p.groomParents);
+  const sponsors = lines(p.sponsors).map((l) => {
+    const [role, ...rest] = l.split(":");
+    return rest.length ? { role: role.trim(), names: rest.join(":").trim() } : { role: "", names: l };
+  });
+  return (
+    <section className="mx-auto grid max-w-6xl gap-10 px-5 py-20 @xl:px-10 @3xl:grid-cols-[1fr_1.1fr] @3xl:items-center">
+      {p.photoUrl ? (
+        <figure data-reveal="clip" className="relative aspect-[3/4] overflow-hidden">
+          <Photo src={p.photoUrl} className="h-full w-full object-cover" />
+          {p.caption && (
+            <figcaption className="absolute bottom-3 left-3 px-2 py-1 text-[10px] tracking-[0.3em] uppercase" style={{ background: C.bg }}>
+              {p.caption}
+            </figcaption>
+          )}
+        </figure>
+      ) : (
+        <PhotoSlot ctx={ctx} label="Foto (Fig. 01)" className="aspect-[3/4]" />
+      )}
+      <div>
+        {ctx.guest && (
+          <>
+            <p data-reveal className="text-[11px] tracking-[0.45em] uppercase" style={{ color: C.accent }}>
+              Para
+            </p>
+            <p data-reveal className="mt-1 text-5xl leading-tight" style={{ fontFamily: SCRIPT, color: C.ink }}>
+              {ctx.guest.fullName}
+            </p>
+          </>
+        )}
+        {message && (
+          <p data-reveal style={{ fontFamily: SERIF, ...d(1) }} className="mt-6 text-[1.7rem] leading-snug @xl:text-4xl">
+            <span className="float-left mt-1 mr-3 text-[5.2rem] leading-[0.8] italic">{message[0]}</span>
+            {message.slice(1)}
+          </p>
+        )}
+        {ctx.guest && p.showSeats && (
+          <div data-reveal className="mt-8 flex items-center gap-4 border-y py-4" style={{ ...d(2), borderColor: C.line }}>
+            <span className="text-5xl leading-none italic" style={{ fontFamily: SERIF }}>
+              {ctx.guest.seats}
+            </span>
+            <p className="text-[11px] leading-relaxed tracking-[0.25em] uppercase" style={{ color: C.muted }}>
+              {ctx.guest.seats === 1 ? "Lugar reservado" : "Lugares reservados"}
+              <br />
+              {ctx.guest.seats === 1 ? "para ti" : "para ti y tu compañía"}
+            </p>
+          </div>
+        )}
+        {(bride.length > 0 || groom.length > 0 || sponsors.length > 0) && (
+          <div data-reveal className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5">
+            {bride.length > 0 && <FamilyList title="Padres de la novia" names={bride} />}
+            {groom.length > 0 && <FamilyList title="Padres del novio" names={groom} />}
+            {sponsors.map((s, i) => (
+              <FamilyList key={i} title={s.role || "Padrinos"} names={[s.names]} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Verse({ block }: BlockProps<"verse">) {
+  const p = block.props;
+  if (!p.text) return null;
+  return (
+    <section className="mx-auto max-w-3xl px-5 pb-20 @xl:px-10">
+      <blockquote data-reveal className="border-l-2 pl-5" style={{ borderColor: C.ink }}>
+        <span style={{ fontFamily: SERIF }} className="text-2xl leading-snug italic @xl:text-3xl">
+          “{p.text}”
+        </span>
+        {p.reference && (
+          <cite className="mt-3 block text-[10px] tracking-[0.35em] uppercase not-italic" style={{ color: C.muted }}>
+            {p.reference}
+          </cite>
+        )}
+      </blockquote>
+    </section>
+  );
+}
+
+function Countdown({ block, ctx }: BlockProps<"countdown">) {
+  const { parts, done } = useCountdown(ctx.start);
+  const p = block.props;
+  return (
+    <section className="border-y px-5 py-16 @xl:px-10" style={{ borderColor: C.line }}>
+      <div className="mx-auto grid max-w-6xl items-center gap-10 @3xl:grid-cols-2">
+        {ctx.day && (
+          <div data-reveal="left" className="flex items-end gap-5">
+            <span style={{ fontFamily: SERIF }} className="text-[9rem] leading-[0.75] font-medium @3xl:text-[14rem]">
+              {ctx.day.day}
+            </span>
+            <div className="pb-3 text-sm tracking-[0.3em] uppercase">
+              <p>{ctx.day.monthName}</p>
+              <p style={{ color: C.muted }}>{ctx.day.weekday}</p>
+              {ctx.start && (ctx.data.ceremonyTime || ctx.data.receptionTime) && <p className="mt-2 font-semibold">{prettyTime(ctx.start)}</p>}
+            </div>
+          </div>
+        )}
+        <div data-reveal="right">
+          {done ? (
+            <p style={{ fontFamily: SERIF }} className="text-4xl italic">
+              ¡Hoy es el gran día!
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] tracking-[0.45em] uppercase" style={{ color: C.muted }}>
+                {p.title}
+              </p>
+              <div className="mt-4 grid grid-cols-4 divide-x" style={{ borderColor: C.line }}>
+                {parts.map((part) => (
+                  <div key={part.label} className="px-2 text-center first:pl-0" style={{ borderColor: C.line }}>
+                    <p style={{ fontFamily: SERIF }} className="text-4xl tabular-nums @xl:text-6xl">
+                      {String(part.value).padStart(2, "0")}
+                    </p>
+                    <p className="mt-1 text-[10px] tracking-[0.3em] uppercase" style={{ color: C.muted }}>
+                      {part.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {p.showCalendar && ctx.calendar && (
+            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
+              <a
+                href={ctx.calendar.google}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border-b border-current pb-1 text-xs tracking-[0.3em] uppercase transition hover:opacity-60"
+              >
+                <CalendarPlus className="size-4" /> Google Calendar
+              </a>
+              {ctx.calendar.ics && (
+                <a href={ctx.calendar.ics} className="inline-flex items-center gap-2 border-b border-current pb-1 text-xs tracking-[0.3em] uppercase transition hover:opacity-60">
+                  <CalendarPlus className="size-4" /> Apple / Outlook
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
+    </section>
+  );
+}
+
+function FeaturedPhoto({ block, ctx }: BlockProps<"featuredPhoto">) {
+  const p = block.props;
+  if (!p.photoUrl) return <PhotoSlot ctx={ctx} label="Foto destacada" className="mx-5 my-10 aspect-[4/5]" />;
+  return (
+    <figure data-reveal="clip" className="relative mx-auto aspect-[4/5] max-h-[90svh] w-full max-w-4xl overflow-hidden @3xl:aspect-[16/10]">
+      <Photo src={p.photoUrl} className="h-full w-full object-cover" />
+      {p.caption && (
+        <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1f2316]/75 to-transparent px-5 pt-16 pb-6 text-white">
+          <span style={{ fontFamily: SERIF }} className="text-2xl italic">
+            {p.caption}
+          </span>
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+function Program({ block, ctx }: BlockProps<"program">) {
+  const items = block.props.items.filter((i) => i.title);
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-20 @xl:px-10">
+      <SectionTitle n={ctx.numbers[block.id]} title={block.props.title} />
+      <ol className="mt-8">
+        {items.map((it, i) => (
+          <li
+            key={i}
+            data-reveal
+            style={{ ...d(i % 4), borderColor: C.line }}
+            className="grid grid-cols-[2rem_5.5rem_1fr] items-baseline gap-3 border-t py-4 @xl:grid-cols-[5rem_10rem_1fr] @xl:px-3"
+          >
+            <span className="text-xs" style={{ color: C.accent }}>
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span className="text-[11px] tracking-[0.2em] uppercase">{it.time}</span>
+            <span style={{ fontFamily: SERIF }} className="text-xl leading-snug @xl:text-4xl">
+              {it.title}
+            </span>
+          </li>
+        ))}
+        {items.length === 0 && ctx.embedded && (
+          <li className="border-t py-6 text-sm" style={{ borderColor: C.line, color: C.muted }}>
+            Agrega los momentos del día en el panel del bloque.
+          </li>
+        )}
+      </ol>
+    </section>
+  );
+}
+
+function Venue({ block, ctx }: { block: BlockOf<"ceremony"> | BlockOf<"reception">; ctx: Ctx }) {
+  const p: EventProps = block.props;
+  const iso = eventTimeToIso(p.time);
+  const href = mapsLink(p.mapUrl, p.place, p.address);
+  const when = iso ? [eventDay(iso, true)?.long, prettyTime(iso)].filter(Boolean).join(" · ") : "";
+  return (
+    <section style={{ background: C.deep, color: C.cream }}>
+      <div className="mx-auto grid max-w-6xl @3xl:grid-cols-2">
+        {p.photoUrl ? (
+          <div data-reveal="clip" className="relative min-h-[340px] overflow-hidden">
+            <Photo src={p.photoUrl} className="absolute inset-0 h-full w-full object-cover" />
+          </div>
+        ) : null}
+        <div className="px-5 py-16 @xl:px-12">
+          <SectionTitle n={ctx.numbers[block.id]} title={p.title} dark />
+          {when && (
+            <p data-reveal className="mt-8 text-[11px] tracking-[0.35em] uppercase opacity-70">
+              {block.type === "ceremony" ? "Ceremonia" : "Recepción"} · {when}
+            </p>
+          )}
+          {p.place && (
+            <p data-reveal style={{ fontFamily: SERIF }} className="mt-3 text-4xl leading-tight italic @xl:text-5xl">
+              {p.place}
+            </p>
+          )}
+          {(p.address || p.note) && (
+            <p data-reveal className="mt-3 text-sm opacity-70">
+              {[p.address, p.note].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          {p.showMap && (p.place || p.address) && (
+            <div data-reveal className="mt-8 aspect-video overflow-hidden border border-white/15">
+              {ctx.embedded ? (
+                <div className="flex h-full items-center justify-center text-[10px] tracking-[0.3em] uppercase opacity-60">
+                  <MapPin className="mr-2 size-4" /> Mapa
+                </div>
+              ) : (
+                <iframe title={`Mapa: ${p.place}`} src={mapEmbed(p.place, p.address)} className="h-full w-full" loading="lazy" />
+              )}
+            </div>
+          )}
+          {href && (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex items-center gap-2 px-6 py-3 text-xs tracking-[0.3em] uppercase transition hover:opacity-85"
+              style={{ background: C.cream, color: C.ink }}
+            >
+              <MapPin className="size-4" /> Cómo llegar <ArrowUpRight className="size-4" />
+            </a>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DressCode({ block, ctx }: BlockProps<"dressCode">) {
+  const p = block.props;
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-20 @xl:px-10">
+      <SectionTitle n={ctx.numbers[block.id]} title={p.title} />
+      {p.code && (
+        <p data-reveal style={{ fontFamily: SERIF }} className="mt-8 text-7xl italic">
+          {p.code}
+        </p>
+      )}
+      {p.note && (
+        <p data-reveal className="mt-4 max-w-sm text-sm leading-relaxed" style={{ color: C.muted }}>
+          {p.note}
+        </p>
+      )}
+      {p.colors.length > 0 && (
+        <div data-reveal className="mt-6 flex gap-3">
+          {p.colors.map((c) => (
+            <span key={c} className="size-10 rounded-full ring-1 ring-black/10" style={{ background: c }} />
+          ))}
+        </div>
+      )}
+      {p.showIcons && (
+        <div data-reveal>
+          <DressIcons color={C.ink} muted={C.muted} noGreen={/verde/i.test(p.note)} className="mt-8" />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Recommendations({ block, ctx }: BlockProps<"recommendations">) {
+  const p = block.props;
+  const items = lines(p.items);
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-12 @xl:px-10">
+      {p.adultsOnly && (
+        <div data-reveal className="p-8 @xl:p-10" style={{ background: C.deep, color: C.cream }}>
+          <p className="text-[11px] tracking-[0.45em] uppercase opacity-60">
+            {[ctx.numbers[block.id], p.title].filter(Boolean).join(" — ")}
+          </p>
+          <p style={{ fontFamily: SERIF }} className="mt-6 text-6xl leading-none italic">
+            Solo
+            <br />
+            adultos
+          </p>
+          {p.adultsOnlyText && <p className="mt-6 text-sm leading-relaxed opacity-80">{p.adultsOnlyText}</p>}
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className={cn(p.adultsOnly && "mt-10")}>
+          {!p.adultsOnly && <SectionTitle n={ctx.numbers[block.id]} title={p.title} />}
+          <ul className="mt-6 space-y-3">
+            {items.map((r, i) => (
+              <li key={i} data-reveal style={d(i)} className="flex gap-3 text-base leading-relaxed">
+                <span style={{ color: C.accent }}>✦</span>
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Gallery({ block, ctx }: BlockProps<"gallery">) {
+  const photos = block.props.photos;
+  return (
+    <section className="py-20">
+      <div className="mx-auto max-w-6xl px-5 @xl:px-10">
+        <SectionTitle n={ctx.numbers[block.id]} title={block.props.title} />
+      </div>
+      {photos.length === 0 ? (
+        <PhotoSlot ctx={ctx} label="Fotos de la galería" className="mx-5 mt-8 h-60" />
+      ) : (
+        <>
+          <div className="pp-noscroll mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 @xl:px-10">
+            {photos.map((src, i) => (
+              <button
+                type="button"
+                key={src + i}
+                onClick={() => ctx.openLightbox(photos, i)}
+                className="group relative shrink-0 snap-start overflow-hidden"
+                data-reveal="scale"
+                style={d(i % 4)}
+              >
+                <Photo src={src} className="h-[58svh] max-h-[520px] w-auto max-w-[82cqw] object-cover transition duration-700 group-hover:scale-105" />
+                <span className="absolute top-3 left-3 px-2 py-0.5 text-[10px] tracking-[0.2em]" style={{ background: C.bg }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 px-5 text-[10px] tracking-[0.3em] uppercase @xl:px-10" style={{ color: C.muted }}>
+            Desliza · toca una foto para verla completa
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-dashed border-black/15 pb-2">
+      <dt style={{ color: C.muted }}>{k}</dt>
+      <dd className="text-right font-medium">{v}</dd>
+    </div>
+  );
+}
+
+function Gifts({ block, ctx }: BlockProps<"gifts">) {
+  const p = block.props;
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-20 @xl:px-10">
+      <SectionTitle n={ctx.numbers[block.id]} title={p.title} />
+      <div className="mt-8 grid gap-10 @3xl:grid-cols-[1.2fr_1fr]">
+        {p.note && (
+          <p data-reveal style={{ fontFamily: SERIF }} className="text-2xl leading-snug whitespace-pre-line @xl:text-3xl">
+            {p.note}
+          </p>
+        )}
+        {(p.account || p.registryUrl) && (
+          <div data-reveal className="space-y-6">
+            {p.account && (
+              <div className="border p-6" style={{ borderColor: C.ink }}>
+                <p className="text-[10px] tracking-[0.35em] uppercase" style={{ color: C.muted }}>
+                  Transferencia
+                </p>
+                <dl className="mt-4 space-y-3 text-sm">
+                  {p.bankName && <Row k="Banco" v={p.bankName} />}
+                  <Row k="Cuenta" v={p.account} />
+                  {p.holder && <Row k="Titular" v={p.holder} />}
+                </dl>
+                <CopyButton
+                  value={p.account}
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-[#343a26] py-3 text-xs tracking-[0.3em] text-[#f2eee3] uppercase transition hover:bg-[#a8996a]"
+                >
+                  Copiar cuenta
+                </CopyButton>
+              </div>
+            )}
+            {p.registryUrl && (
+              <a
+                href={p.registryUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border-b border-current pb-1 text-xs tracking-[0.3em] uppercase"
+              >
+                <Gift className="size-4" /> Mesa de regalos <ArrowUpRight className="size-4" />
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+const SAMPLE_GUEST: InvitationGuestData = {
+  fullName: "Invitado",
+  seats: 2,
+  plusOneNames: [],
+  rsvpStatus: "pending",
+  attendingCount: null,
+  rsvpMessage: "",
+  dietaryRestrictions: "",
+  responded: false,
+};
+
+function Rsvp({ block, ctx }: BlockProps<"rsvp">) {
+  const deadline = block.props.deadline ? `${block.props.deadline}T00:00:00.000Z` : null;
+  return (
+    <section className="border-t px-5 py-20 @xl:px-10" style={{ borderColor: C.line }}>
+      <div className="mx-auto max-w-xl">
+        <SectionTitle n={ctx.numbers[block.id]} title={block.props.title} />
+        <div className="mt-8" data-reveal style={{ fontFamily: SANS }}>
+          <RsvpSection guest={ctx.guest ?? SAMPLE_GUEST} token={ctx.token} rsvpDeadline={deadline} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Closing({ block, ctx }: BlockProps<"closing">) {
+  const p = block.props;
+  const hasPhoto = Boolean(p.photoUrl);
+  return (
+    <footer
+      className={cn("relative overflow-hidden", hasPhoto ? "text-white" : "ed-linen")}
+      style={{ height: hasPhoto ? "calc(var(--inv-screen) * 0.85)" : undefined, minHeight: hasPhoto ? 520 : undefined }}
+    >
+      {hasPhoto && (
+        <>
+          <Photo src={p.photoUrl} className="absolute inset-0 h-full w-full object-cover object-[50%_58%]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1f2316]/85 via-[#1f2316]/25 via-45% to-transparent" />
+        </>
+      )}
+      <div className={cn("relative flex flex-col items-center justify-end px-5 text-center", hasPhoto ? "h-full pb-20" : "py-24")}>
+        {p.kicker && (
+          <p data-reveal className="text-[11px] tracking-[0.4em] uppercase">
+            {p.kicker}
+          </p>
+        )}
+        <p data-reveal="blur" style={{ fontFamily: SERIF }} className="mt-6 text-5xl italic @xl:text-7xl">
+          {p.message}
+        </p>
+        <p data-reveal className="mt-8 text-xs tracking-[0.5em] uppercase">
+          {[ctx.couple, ctx.day?.short].filter(Boolean).join(" · ")}
+        </p>
+        {p.hashtag && (
+          <p data-reveal className="mt-2 text-[11px] tracking-[0.3em] opacity-80">
+            {p.hashtag}
+          </p>
+        )}
+      </div>
+    </footer>
+  );
+}
+
+const RENDERERS: { [K in BlockType]: (p: BlockProps<K>) => ReactNode } = {
+  cover: Cover,
+  guestMessage: GuestMessage,
+  verse: Verse,
+  countdown: Countdown,
+  featuredPhoto: FeaturedPhoto,
+  program: Program,
+  ceremony: Venue,
+  reception: Venue,
+  dressCode: DressCode,
+  gallery: Gallery,
+  gifts: Gifts,
+  recommendations: Recommendations,
+  rsvp: Rsvp,
+  closing: Closing,
+};
+
+/** Bloques con título numerado ("02 — El programa"). */
+const NUMBERED = new Set<BlockType>(["program", "ceremony", "reception", "dressCode", "recommendations", "gallery", "gifts", "rsvp"]);
+
+function renderBlock(block: InvitationBlock, ctx: Ctx) {
+  const Render = RENDERERS[block.type] as (p: { block: InvitationBlock; ctx: Ctx }) => ReactNode;
+  return <Render block={block} ctx={ctx} />;
+}
+
+/** Datos efectivos: los de la boda + lo que dicen los bloques (horas, lugar, fecha límite…). */
+export function effectiveData(data: InvitationData, design: InvitationDesign): InvitationData {
+  return { ...data, ...projectDesign(design) };
+}
+
+export function InvitationView({ data, design: designProp, guest, token, embedded = false, started = true, selectedId, onSelectBlock }: InvitationViewProps) {
+  const design = useMemo(() => designProp ?? designFromData(data), [designProp, data]);
+  const visible = design.blocks.filter((b) => !b.hidden);
+  const ref = useReveal(!embedded && started, visible.map((b) => b.id).join());
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+
+  const fx = effectiveData(data, design);
+  const timed = Boolean(fx.ceremonyTime || fx.receptionTime);
+  const start = fx.ceremonyTime ?? fx.receptionTime ?? data.weddingDate;
+  const numbers: Record<string, string> = {};
+  let n = 0;
+  for (const b of visible) if (NUMBERED.has(b.type)) numbers[b.id] = String(++n).padStart(2, "0");
+  const p1 = data.partner1.trim();
+  const p2 = data.partner2.trim();
+
+  const ctx: Ctx = {
+    data: fx,
+    design,
+    guest,
+    token,
+    embedded,
+    started,
+    p1,
+    p2,
+    initials: [p1[0], p2[0]].filter(Boolean).join(" & ").toUpperCase(),
+    couple: [p1, p2].filter(Boolean).join(" & "),
+    start,
+    day: eventDay(start, timed),
+    city: fx.ceremonyAddress || fx.receptionAddress || data.venueAddress,
+    calendar: calendarLinks(fx, token),
+    numbers,
+    openLightbox: (images, index) => !onSelectBlock && setLightbox({ images, index }),
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={{ ...editorialStyle, background: C.bg, color: C.ink, fontFamily: SANS, "--inv-screen": embedded ? "720px" : "100svh" } as CSSProperties}
+      className={cn("@container min-h-full overflow-x-clip", embedded && "pp-static")}
+    >
+      <EditorialFonts />
+      {visible.map((block) =>
+        onSelectBlock ? (
+          <div
+            key={block.id}
+            data-block-id={block.id}
+            title={BLOCK_INFO[block.type].label}
+            className={cn("ed-block", selectedId === block.id && "is-selected")}
+            onClickCapture={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelectBlock(block.id);
+            }}
+          >
+            {renderBlock(block, ctx)}
+          </div>
+        ) : (
+          <div key={block.id} data-block-id={block.id}>
+            {renderBlock(block, ctx)}
+          </div>
+        )
+      )}
+      <p className="py-5 text-center text-[0.6rem] tracking-[0.2em] uppercase" style={{ color: C.muted }}>
+        Invitación hecha con Wedplan
+      </p>
+      {!embedded && design.song.url && <SongButton url={design.song.url} title={design.song.title} />}
+      <Lightbox
+        images={lightbox?.images ?? []}
+        index={lightbox?.index ?? null}
+        onClose={() => setLightbox(null)}
+        onIndex={(index) => setLightbox((l) => (l ? { ...l, index } : l))}
+      />
     </div>
   );
 }

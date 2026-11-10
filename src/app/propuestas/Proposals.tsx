@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import "./propuestas.css";
+import "@/components/invitation/editorial.css";
 import type { Guest } from "./shared";
 import { Editorial } from "./styles/Editorial";
 import { Hacienda } from "./styles/Hacienda";

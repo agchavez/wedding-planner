@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { weddingDisplayName } from "@/lib/wedding";
 import { formatEventDay } from "@/lib/eventTime";
 import { firstName } from "@/lib/invitationMessage";
-import { findInvitationByToken, toInvitationData, toInvitationGuestData } from "@/lib/guestInvitations";
+import { findInvitationByToken, invitationDesigns, toInvitationData, toInvitationGuestData } from "@/lib/guestInvitations";
 import { InvitationExperience } from "@/components/invitation/InvitationExperience";
 import { invitationFontClasses } from "@/components/invitation/fonts";
 import { invitationTheme } from "@/lib/invitationThemes";
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `/i/${token}`,
     },
     twitter: { card: "summary_large_image", title, description },
-    other: { "theme-color": invitationTheme(settings.theme).background },
+    other: { "theme-color": invitationTheme("editorial").background },
   };
 }
 
@@ -67,10 +67,12 @@ export default async function InvitationPage({ params, searchParams }: Props) {
     });
   }
 
+  const data = toInvitationData(wedding, settings);
   return (
     <main className={invitationFontClasses}>
       <InvitationExperience
-        data={toInvitationData(wedding, settings)}
+        data={data}
+        design={invitationDesigns(settings, data).published}
         guest={toInvitationGuestData(guest)}
         token={token}
       />
