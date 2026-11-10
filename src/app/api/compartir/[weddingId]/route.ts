@@ -2,7 +2,8 @@ import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { uploadFileToDrive } from "@/lib/googleDrive";
-import { GUEST_LABEL_PREFIX, GUEST_MAX_BYTES } from "@/app/compartir/[weddingId]/constants";
+import { GUEST_LABEL_PREFIX, GUEST_MAX_BYTES, guestUploadState } from "@/app/compartir/[weddingId]/constants";
+import { isWeddingEditor } from "@/app/compartir/[weddingId]/access";
 
 /** Límite simple por IP (en memoria): frena abusos del enlace público sin estorbar a un invitado. */
 const WINDOW_MS = 60 * 60 * 1000;
@@ -26,7 +27,8 @@ const fail = (error: string, status: number) => NextResponse.json({ error }, { s
 /**
  * Subida pública de fotos y videos de los invitados (página /compartir/<id>, a la que lleva el QR
  * de las mesas). Cada archivo va a la carpeta de Google Drive de la boda y queda en Fotos con la
- * etiqueta "Invitado · <nombre>".
+ * etiqueta "Invitado · <nombre>", en la carpeta "Fotos de la boda". Solo dentro de la ventana de la boda
+ * (un día antes hasta 30 después); los editores de la boda pueden subir siempre.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/compartir/[weddingId]">) {
   const { weddingId } = await ctx.params;
@@ -47,8 +49,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/compartir/[
     .trim()
     .slice(0, 60);
 
-  const wedding = await prisma.wedding.findUnique({ where: { id: weddingId }, select: { id: true } });
+  const wedding = await prisma.wedding.findUnique({ where: { id: weddingId }, select: { id: true, weddingDate: true } });
   if (!wedding) return fail("Boda no encontrada", 404);
+  const state = guestUploadState(wedding.weddingDate);
+  if (state !== "open" && !(await isWeddingEditor(weddingId))) {
+    return fail(state === "soon" ? "El álbum todavía no está abierto." : "El álbum ya cerró. ¡Gracias!", 403);
+  }
 
   const safeName = (guestName || "Invitado").replace(/[\\/:*?"|]/g, "");
   const named = new File([file], `${safeName} - ${file.name || (isVideo ? "video" : "foto")}`.slice(0, 180), {
@@ -57,7 +63,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/compartir/[
 
   let uploaded: Awaited<ReturnType<typeof uploadFileToDrive>> = null;
   try {
-    uploaded = await uploadFileToDrive(named, weddingId);
+    uploaded = await uploadFileToDrive(named, weddingId, "boda");
   } catch (error) {
     console.error("[compartir] no se pudo subir a Drive", error);
   }
@@ -70,6 +76,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/compartir/[
       type: isVideo ? "video" : "image",
       url: uploaded.url,
       driveFileId: uploaded.driveFileId,
+      folder: "boda",
       label: `${GUEST_LABEL_PREFIX}${guestName || "Anónimo"}`,
       notes: "Subido desde la página para invitados",
       sortOrder: count,

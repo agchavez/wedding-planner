@@ -53,6 +53,9 @@ export function GuestUpload({
   partner2,
   dateIso,
   enabled,
+  state,
+  preview,
+  opensIso,
   initial,
 }: {
   weddingId: string;
@@ -60,6 +63,11 @@ export function GuestUpload({
   partner2: string;
   dateIso: string | null;
   enabled: boolean;
+  /** Ventana de la boda: open (se puede subir), soon (aún no abre), closed (ya cerró). */
+  state: "open" | "soon" | "closed";
+  /** Editor de la boda probando la página fuera de la ventana. */
+  preview: boolean;
+  opensIso: string | null;
   initial: Shot[];
 }) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -197,7 +205,12 @@ export function GuestUpload({
             Súbelas aquí, sin apps ni registros. Llegan directo a nuestro álbum.
           </p>
 
-          {enabled ? (
+          {preview && (
+            <p className="mt-5 rounded-lg bg-[#a8996a]/15 px-3 py-2 text-center text-xs text-[#5c5636]">
+              Vista de prueba: los invitados podrán subir fotos desde un día antes de la boda.
+            </p>
+          )}
+          {enabled && state === "open" ? (
             <>
               <label className="mt-7 block">
                 <span style={{ color: C.muted }} className="text-[11px] font-medium uppercase tracking-[0.25em]">
@@ -294,7 +307,13 @@ export function GuestUpload({
             </>
           ) : (
             <p style={{ borderColor: C.line, color: C.muted }} className="mt-7 rounded-xl border border-dashed px-4 py-5 text-center text-sm">
-              El álbum todavía no está abierto. Vuelve a intentarlo el día de la boda.
+              {state === "closed"
+                ? "El álbum ya cerró. ¡Gracias por compartir este día con nosotros!"
+                : `El álbum se abre el ${
+                    opensIso
+                      ? new Date(opensIso).toLocaleDateString("es-HN", { day: "numeric", month: "long", timeZone: "UTC" })
+                      : "día de la boda"
+                  }. ¡Te esperamos!`}
             </p>
           )}
         </section>

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { prisma } from "@/lib/prisma";
 import { getDriveConnection } from "@/lib/googleDrive";
-import { GUEST_LABEL_PREFIX } from "./constants";
+import { GUEST_LABEL_PREFIX, guestUploadState, guestUploadWindow } from "./constants";
+import { isWeddingEditor } from "./access";
 import { GuestUpload } from "./GuestUpload";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +35,9 @@ export default async function SharePhotosPage({ params }: PageProps<"/compartir/
   const wedding = await loadWedding(weddingId);
   if (!wedding) notFound();
 
-  const [connection, items] = await Promise.all([
+  const [connection, editor, items] = await Promise.all([
     getDriveConnection(weddingId),
+    isWeddingEditor(weddingId),
     prisma.mediaItem.findMany({
       where: { weddingId, label: { startsWith: GUEST_LABEL_PREFIX }, driveFileId: { not: null } },
       orderBy: { createdAt: "desc" },
@@ -51,6 +53,9 @@ export default async function SharePhotosPage({ params }: PageProps<"/compartir/
       partner2={firstName(wedding.partner2)}
       dateIso={wedding.weddingDate?.toISOString() ?? null}
       enabled={Boolean(connection?.refreshToken)}
+      state={editor ? "open" : guestUploadState(wedding.weddingDate)}
+      preview={editor && guestUploadState(wedding.weddingDate) !== "open"}
+      opensIso={guestUploadWindow(wedding.weddingDate)?.opens.toISOString() ?? null}
       initial={items.map((item) => ({
         id: item.id,
         driveFileId: item.driveFileId!,
