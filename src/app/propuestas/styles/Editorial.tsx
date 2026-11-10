@@ -7,7 +7,7 @@ import { CopyButton, DressIcons, Fonts, Lightbox, RsvpDemo, W, calendarUrl, phot
 const SERIF = "'Bodoni Moda', 'Didot', serif";
 const SANS = "'Inter', system-ui, sans-serif";
 const C = { bg: "#f2eee3", ink: "#343a26", muted: "#757359", line: "#d9d4c1", accent: "#a8996a" };
-const GALLERY = ["c-risa", "c-sombrilla", "c-abrazo", "c-picnic", "c-alzar", "c-mirada", "c-anillo2", "c-banca", "c-anillo3"].map(photo);
+const GALLERY = ["c-jardin", "c-sombrilla", "c-giro", "c-beso3", "c-alzar", "c-mirada", "c-anillo2", "c-banca", "c-anillo3"].map(photo);
 
 export function Editorial({ guest }: { guest: Guest }) {
   const [open, setOpen] = useState(false);
@@ -182,7 +182,7 @@ export function Editorial({ guest }: { guest: Guest }) {
         <div className="mx-auto grid max-w-6xl md:grid-cols-2">
           <div data-reveal="clip" className="relative min-h-[420px] overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo("c-arco")} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={photo("puerta-retrato")} alt="" className="absolute inset-0 h-full w-full object-cover" />
           </div>
           <div className="px-5 py-16 sm:px-12">
             <SectionTitle n="03" title="El lugar" dark />
