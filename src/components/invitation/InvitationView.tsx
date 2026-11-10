@@ -25,12 +25,15 @@ import {
   BLOCK_INFO,
   designFromData,
   eventTimeToIso,
+  framingStyle,
   projectDesign,
+  responsiveImage,
   type BlockOf,
   type BlockType,
   type EventProps,
   type InvitationBlock,
   type InvitationDesign,
+  type PhotoFraming,
 } from "@/lib/invitationBlocks";
 import type { InvitationData, InvitationGuestData } from "@/lib/guestInvitations";
 import { cn } from "@/lib/utils";
@@ -100,9 +103,41 @@ type Ctx = {
 
 type BlockProps<T extends BlockType> = { block: BlockOf<T>; ctx: Ctx };
 
-function Photo({ src, alt = "", className, style }: { src: string; alt?: string; className?: string; style?: CSSProperties }) {
-  // eslint-disable-next-line @next/next/no-img-element -- fotos elegidas por la pareja (Drive u otra URL)
-  return <img src={src} alt={alt} className={className} style={style} loading="lazy" />;
+function Photo({
+  src,
+  alt = "",
+  className,
+  style,
+  framing,
+  sizes = "100vw",
+  priority,
+}: {
+  src: string;
+  alt?: string;
+  className?: string;
+  style?: CSSProperties;
+  /** Encuadre elegido en el editor (posición y zoom). */
+  framing?: PhotoFraming;
+  /** Ancho con que se muestra (atributo sizes); por defecto, el ancho de la pantalla. */
+  sizes?: string;
+  /** La portada se pide primero; el resto se carga al acercarse. */
+  priority?: boolean;
+}) {
+  const { src: light, srcSet } = responsiveImage(src);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- fotos elegidas por la pareja (Drive u otra URL)
+    <img
+      src={light}
+      srcSet={srcSet}
+      sizes={srcSet ? sizes : undefined}
+      alt={alt}
+      className={className}
+      style={{ ...style, ...framingStyle(framing) }}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
+      decoding="async"
+    />
+  );
 }
 
 /** Hueco para una foto que falta (solo en el editor). */
@@ -157,6 +192,8 @@ function Cover({ block, ctx }: BlockProps<"cover">) {
           <>
             <Photo
               src={p.photoUrl}
+              framing={p.framing.photoUrl}
+              priority
               alt={ctx.couple}
               className={cn("absolute inset-0 h-full w-full object-cover", ctx.started ? "pp-ken" : "pp-ken-wait")}
             />
@@ -250,7 +287,7 @@ function GuestMessage({ block, ctx }: BlockProps<"guestMessage">) {
     <section className="mx-auto grid max-w-6xl gap-10 px-5 py-20 @xl:px-10 @3xl:grid-cols-[1fr_1.1fr] @3xl:items-center">
       {p.photoUrl ? (
         <figure data-reveal="clip" className="relative aspect-[3/4] overflow-hidden">
-          <Photo src={p.photoUrl} className="h-full w-full object-cover" />
+          <Photo src={p.photoUrl} framing={p.framing.photoUrl} sizes="(min-width: 768px) 45vw, 100vw" className="h-full w-full object-cover" />
           {p.caption && (
             <figcaption className="absolute bottom-3 left-3 px-2 py-1 text-[10px] tracking-[0.3em] uppercase" style={{ background: C.bg }}>
               {p.caption}
@@ -392,7 +429,7 @@ function FeaturedPhoto({ block, ctx }: BlockProps<"featuredPhoto">) {
   if (!p.photoUrl) return <PhotoSlot ctx={ctx} label="Foto destacada" className="mx-5 my-10 aspect-[4/5]" />;
   return (
     <figure data-reveal="clip" className="relative mx-auto aspect-[4/5] max-h-[90svh] w-full max-w-4xl overflow-hidden @3xl:aspect-[16/10]">
-      <Photo src={p.photoUrl} className="h-full w-full object-cover" />
+      <Photo src={p.photoUrl} framing={p.framing.photoUrl} className="h-full w-full object-cover" />
       {p.caption && (
         <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1f2316]/75 to-transparent px-5 pt-16 pb-6 text-white">
           <span style={{ fontFamily: SERIF }} className="text-2xl italic">
@@ -446,7 +483,7 @@ function Venue({ block, ctx }: { block: BlockOf<"ceremony"> | BlockOf<"reception
       <div className="mx-auto grid max-w-6xl @3xl:grid-cols-2">
         {p.photoUrl ? (
           <div data-reveal="clip" className="relative min-h-[340px] overflow-hidden">
-            <Photo src={p.photoUrl} className="absolute inset-0 h-full w-full object-cover" />
+            <Photo src={p.photoUrl} framing={p.framing.photoUrl} sizes="(min-width: 768px) 50vw, 100vw" className="absolute inset-0 h-full w-full object-cover" />
           </div>
         ) : null}
         <div className="px-5 py-16 @xl:px-12">
@@ -588,7 +625,7 @@ function Gallery({ block, ctx }: BlockProps<"gallery">) {
                 data-reveal="scale"
                 style={d(i % 4)}
               >
-                <Photo src={src} className="h-[58svh] max-h-[520px] w-auto max-w-[82cqw] object-cover transition duration-700 group-hover:scale-105" />
+                <Photo src={src} framing={block.props.framing[src]} sizes="(min-width: 768px) 40vw, 82vw" className="h-[58svh] max-h-[520px] w-auto max-w-[82cqw] object-cover transition duration-700 group-hover:scale-105" />
                 <span className="absolute top-3 left-3 px-2 py-0.5 text-[10px] tracking-[0.2em]" style={{ background: C.bg }}>
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -696,7 +733,7 @@ function Closing({ block, ctx }: BlockProps<"closing">) {
     >
       {hasPhoto && (
         <>
-          <Photo src={p.photoUrl} className="absolute inset-0 h-full w-full object-cover object-[50%_58%]" />
+          <Photo src={p.photoUrl} framing={p.framing.photoUrl} className="absolute inset-0 h-full w-full object-cover object-[50%_58%]" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#1f2316]/85 via-[#1f2316]/25 via-45% to-transparent" />
         </>
       )}

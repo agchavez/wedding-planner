@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, ItineraryEditor, PaletteEditor } from "@/app/(app)/invitaciones/editor/fields";
 import { PhotoField, PhotosField, type PickerPhoto } from "@/app/(app)/invitaciones/editor/PhotoPicker";
-import { BLOCK_INFO, type BlockType, type InvitationBlock, type InvitationDesign } from "@/lib/invitationBlocks";
+import { BLOCK_INFO, type BlockType, type Framing, type InvitationBlock, type InvitationDesign, type PhotoFraming } from "@/lib/invitationBlocks";
 import type { ItineraryEntry } from "@/lib/invitationThemes";
 
 type Kind = "text" | "area" | "photo" | "photos" | "bool" | "datetime" | "date" | "url" | "itinerary" | "colors";
@@ -121,6 +121,14 @@ export function BlockInspector({
 }) {
   const props = block.props as Record<string, unknown>;
   const set = (key: string, value: unknown) => onChange({ ...props, [key]: value }, `${block.id}:${key}`);
+  // Encuadre de las fotos (zoom y posición), por propiedad o, en la galería, por URL.
+  const framing = props.framing as Framing | undefined;
+  const setFraming = (key: string, f: PhotoFraming | undefined) => {
+    const next = { ...(framing ?? {}) };
+    if (f) next[key] = f;
+    else delete next[key];
+    set("framing", next);
+  };
 
   return (
     <div className="space-y-4">
@@ -153,14 +161,34 @@ export function BlockInspector({
           case "photo":
             return (
               <Field key={spec.key} label={spec.label} hint={spec.hint}>
-                <PhotoField value={String(value ?? "")} onChange={(u) => set(spec.key, u)} photos={photos} disabled={disabled} />
+                <PhotoField
+                  value={String(value ?? "")}
+                  onChange={(u) => {
+                    // Foto nueva: su encuadre empieza desde cero.
+                    const next = { ...(framing ?? {}) };
+                    delete next[spec.key];
+                    onChange({ ...props, [spec.key]: u, ...(framing ? { framing: next } : {}) }, `${block.id}:${spec.key}`);
+                  }}
+                  photos={photos}
+                  disabled={disabled}
+                  framing={framing?.[spec.key]}
+                  onFraming={framing ? (f) => setFraming(spec.key, f) : undefined}
+                  aspect={block.type === "cover" && spec.key === "photoUrl" ? "9 / 16" : spec.key === "openingPhotoUrl" ? "3 / 4" : "4 / 5"}
+                />
               </Field>
             );
           case "photos":
             return (
               <div key={spec.key}>
                 <p className="mb-1.5 text-sm font-medium">{spec.label}</p>
-                <PhotosField value={(value as string[]) ?? []} onChange={(v) => set(spec.key, v)} photos={photos} disabled={disabled} />
+                <PhotosField
+                  value={(value as string[]) ?? []}
+                  onChange={(v) => set(spec.key, v)}
+                  photos={photos}
+                  disabled={disabled}
+                  framing={framing}
+                  onFraming={framing ? setFraming : undefined}
+                />
               </div>
             );
           case "itinerary":

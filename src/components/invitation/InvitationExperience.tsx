@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { InvitationView, effectiveData, type InvitationViewProps } from "@/components/invitation/InvitationView";
+import {
+  InvitationView,
+  effectiveData,
+  type InvitationViewProps,
+} from "@/components/invitation/InvitationView";
 import { C, SCRIPT, SERIF, eventDay } from "@/components/invitation/kit";
-import { designFromData, findBlock } from "@/lib/invitationBlocks";
+import {
+  designFromData,
+  driveImageAt,
+  findBlock,
+  framingStyle,
+} from "@/lib/invitationBlocks";
 
 /**
  * Invitación pública: primero la pantalla de apertura (lino, foto de la pareja en un arco y el
@@ -13,7 +22,10 @@ import { designFromData, findBlock } from "@/lib/invitationBlocks";
  */
 export function InvitationExperience(props: InvitationViewProps) {
   const { data, guest } = props;
-  const design = useMemo(() => props.design ?? designFromData(data), [props.design, data]);
+  const design = useMemo(
+    () => props.design ?? designFromData(data),
+    [props.design, data],
+  );
   const [stage, setStage] = useState<"closed" | "opening" | "done">("closed");
   const [started, setStarted] = useState(false);
 
@@ -37,6 +49,9 @@ export function InvitationExperience(props: InvitationViewProps) {
 
   const cover = findBlock(design, "cover", true) ?? findBlock(design, "cover");
   const photo = cover?.props.openingPhotoUrl || cover?.props.photoUrl || "";
+  const photoFraming = cover?.props.openingPhotoUrl
+    ? cover.props.framing.openingPhotoUrl
+    : cover?.props.framing.photoUrl;
   const fx = effectiveData(data, design);
   const start = fx.ceremonyTime ?? fx.receptionTime ?? data.weddingDate;
   const day = eventDay(start, Boolean(fx.ceremonyTime || fx.receptionTime));
@@ -46,16 +61,25 @@ export function InvitationExperience(props: InvitationViewProps) {
   const first1 = p1.split(/\s+/)[0] ?? "";
   const first2 = p2.split(/\s+/)[0] ?? "";
   const mono = [p1[0], p2[0]].filter(Boolean).join("·").toUpperCase() || "♥";
-  const kicker = [cover?.props.openingKicker, day?.dots].filter(Boolean).join(" · ");
-  const headline = (cover?.props.headline || "Nos casamos").replace(/[¡!]/g, "");
+  const kicker = [cover?.props.openingKicker, day?.dots]
+    .filter(Boolean)
+    .join(" · ");
+  const headline = (cover?.props.headline || "Nos casamos").replace(
+    /[¡!]/g,
+    "",
+  );
   const dateLine = day ? `${day.day} de ${day.monthName} de ${day.year}` : "";
 
   const half = (side: "top" | "bottom") => (
-    <div className={`ed-half ed-half-${side} ed-linen absolute inset-x-0 h-1/2 overflow-hidden ${side === "top" ? "top-0" : "bottom-0"}`}>
+    <div
+      className={`ed-half ed-half-${side} ed-linen absolute inset-x-0 h-1/2 overflow-hidden ${side === "top" ? "top-0" : "bottom-0"}`}
+    >
       {photo && (
         <div
           className={`absolute inset-x-0 h-[100svh] bg-cover bg-center opacity-[0.16] grayscale-[35%] ${side === "top" ? "top-0" : "bottom-0"}`}
-          style={{ backgroundImage: `url("${photo.replace(/"/g, "%22")}")` }}
+          style={{
+            backgroundImage: `url("${driveImageAt(photo, 720).replace(/"/g, "%22")}")`,
+          }}
         />
       )}
     </div>
@@ -63,34 +87,76 @@ export function InvitationExperience(props: InvitationViewProps) {
 
   return (
     <>
-      <InvitationView {...props} design={design} started={started || !design.blocks.some((b) => b.type === "cover" && !b.hidden)} />
+      <InvitationView
+        {...props}
+        design={design}
+        started={
+          started || !design.blocks.some((b) => b.type === "cover" && !b.hidden)
+        }
+      />
       {stage !== "done" && (
-        <div className={`ed-opening fixed inset-0 z-50 ${stage !== "closed" ? "open pointer-events-none" : ""}`} style={{ color: C.ink }}>
+        <div
+          className={`ed-opening fixed inset-0 z-50 ${stage !== "closed" ? "open pointer-events-none" : ""}`}
+          style={{ color: C.ink }}
+        >
           {half("top")}
           {half("bottom")}
-          <span className="ed-seam absolute top-1/2 left-[calc(50%-4rem)] h-px w-32" style={{ background: C.accent }} aria-hidden />
+          <span
+            className="ed-seam absolute top-1/2 left-[calc(50%-4rem)] h-px w-32"
+            style={{ background: C.accent }}
+            aria-hidden
+          />
 
           <div className="ed-open-content absolute inset-0 flex flex-col items-center justify-evenly px-6 py-[4svh] text-center">
             {kicker && (
-              <p className="pp-fade flex items-center gap-2.5 whitespace-nowrap text-[clamp(8px,2.6vw,10px)] tracking-[0.3em] uppercase" style={{ color: C.muted }}>
-                <span className="h-px w-5 shrink-0" style={{ background: C.accent }} />
+              <p
+                className="pp-fade flex items-center gap-2.5 whitespace-nowrap text-[clamp(8px,2.6vw,10px)] tracking-[0.3em] uppercase"
+                style={{ color: C.muted }}
+              >
+                <span
+                  className="h-px w-5 shrink-0"
+                  style={{ background: C.accent }}
+                />
                 {kicker}
-                <span className="h-px w-5 shrink-0" style={{ background: C.accent }} />
+                <span
+                  className="h-px w-5 shrink-0"
+                  style={{ background: C.accent }}
+                />
               </p>
             )}
 
-            <div className="pp-rise relative mx-auto w-fit shrink-0" style={{ ["--d" as string]: 1 }}>
-              <div className="absolute -inset-2.5 rounded-t-full border" style={{ borderColor: `${C.accent}99` }} aria-hidden />
+            <div
+              className="pp-rise relative mx-auto w-fit shrink-0"
+              style={{ ["--d" as string]: 1 }}
+            >
+              <div
+                className="absolute -inset-2.5 rounded-t-full border"
+                style={{ borderColor: `${C.accent}99` }}
+                aria-hidden
+              />
               {/* Ancho y alto explícitos (3:4): iOS Safari no deriva bien el ancho de aspect-ratio en flex. */}
               <div
                 className="relative overflow-hidden rounded-t-full"
-                style={{ background: C.deep, height: "clamp(180px, 30svh, 340px)", width: "calc(clamp(180px, 30svh, 340px) * 0.75)" }}
+                style={{
+                  background: C.deep,
+                  height: "clamp(180px, 30svh, 340px)",
+                  width: "calc(clamp(180px, 30svh, 340px) * 0.75)",
+                }}
               >
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element -- foto elegida por la pareja
-                  <img src={photo} alt={[p1, p2].filter(Boolean).join(" y ")} className="ed-drift h-full w-full object-cover" />
+                  <img
+                    src={driveImageAt(photo, 720)}
+                    fetchPriority="high"
+                    alt={[p1, p2].filter(Boolean).join(" y ")}
+                    className="ed-drift h-full w-full object-cover"
+                    style={framingStyle(photoFraming)}
+                  />
                 ) : (
-                  <span className="flex h-full items-center justify-center text-6xl italic" style={{ fontFamily: SERIF, color: C.cream }}>
+                  <span
+                    className="flex h-full items-center justify-center text-6xl italic"
+                    style={{ fontFamily: SERIF, color: C.cream }}
+                  >
                     {p1[0]}
                     <span style={{ color: C.accent }}>&amp;</span>
                     {p2[0]}
@@ -100,36 +166,63 @@ export function InvitationExperience(props: InvitationViewProps) {
             </div>
 
             <div className="pp-rise" style={{ ["--d" as string]: 3 }}>
-              <p className="text-[10px] tracking-[0.45em] uppercase" style={{ color: C.muted }}>
+              <p
+                className="text-[10px] tracking-[0.45em] uppercase"
+                style={{ color: C.muted }}
+              >
                 Una invitación para
               </p>
-              <p className="mt-1 text-[clamp(2.4rem,11vw,3.6rem)] leading-[1.05]" style={{ fontFamily: SCRIPT }}>
+              <p
+                className="mt-1 text-[clamp(2.4rem,11vw,3.6rem)] leading-[1.05]"
+                style={{ fontFamily: SCRIPT }}
+              >
                 {guest?.fullName ?? "ti"}
               </p>
             </div>
 
             <div className="pp-rise" style={{ ["--d" as string]: 5 }}>
-              <p className="text-[clamp(1.7rem,8vw,2.4rem)] italic leading-tight" style={{ fontFamily: SERIF }}>
+              <p
+                className="text-[clamp(1.7rem,8vw,2.4rem)] italic leading-tight"
+                style={{ fontFamily: SERIF }}
+              >
                 {first1 || "Nuestra boda"}
-                {first1 && first2 && <span style={{ color: C.accent }}> &amp; </span>}
+                {first1 && first2 && (
+                  <span style={{ color: C.accent }}> &amp; </span>
+                )}
                 {first2}
               </p>
-              <p className="mt-2 text-[clamp(8px,2.5vw,10px)] tracking-[0.25em] uppercase" style={{ color: C.muted }}>
+              <p
+                className="mt-2 text-[clamp(8px,2.5vw,10px)] tracking-[0.25em] uppercase"
+                style={{ color: C.muted }}
+              >
                 {[headline, dateLine].filter(Boolean).join(" · ")}
               </p>
             </div>
 
-            <div className="pp-rise flex flex-col items-center gap-3" style={{ ["--d" as string]: 7 }}>
+            <div
+              className="pp-rise flex flex-col items-center gap-3"
+              style={{ ["--d" as string]: 7 }}
+            >
               <button
                 type="button"
                 onClick={open}
                 aria-label="Abrir la invitación"
                 className="ed-seal ed-breathe flex size-[5.25rem] items-center justify-center rounded-full text-xl italic outline-none ring-1 ring-[#a8996a]/70 ring-offset-4 ring-offset-[#f2eee3] focus-visible:ring-2"
-                style={{ fontFamily: SERIF, color: C.cream, background: "radial-gradient(circle at 35% 30%, #5d6444, #343a26 70%)" }}
+                style={{
+                  fontFamily: SERIF,
+                  color: C.cream,
+                  background:
+                    "radial-gradient(circle at 35% 30%, #5d6444, #343a26 70%)",
+                }}
               >
                 {mono}
               </button>
-              <button type="button" onClick={open} className="text-[10px] tracking-[0.4em] uppercase" style={{ color: C.ink }}>
+              <button
+                type="button"
+                onClick={open}
+                className="text-[10px] tracking-[0.4em] uppercase"
+                style={{ color: C.ink }}
+              >
                 Abrir invitación
               </button>
             </div>
