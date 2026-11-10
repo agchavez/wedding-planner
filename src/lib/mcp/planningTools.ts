@@ -6,7 +6,8 @@ import { mongoDb } from "@/lib/mongo";
 import { idMatch, idString } from "@/lib/ids";
 import { parseWeddingRole, roleLabel } from "@/lib/permissions";
 import { publicOrigin } from "@/lib/guestInvitations";
-import { deleteDriveFile, getDriveConnection, uploadFileToDrive } from "@/lib/googleDrive";
+import { deleteDriveFile, getDriveConnection, moveDriveFile, uploadFileToDrive } from "@/lib/googleDrive";
+import { MEDIA_FOLDERS, parseMediaFolder, type MediaFolder as MediaFolderKey } from "@/lib/mediaFolders";
 import { SONG_CATEGORY_OPTIONS } from "@/app/(app)/canciones/categories";
 import { TIMELINE_CATEGORY_OPTIONS } from "@/app/(app)/linea-tiempo/categories";
 import { MEDIA_TYPE_OPTIONS } from "@/app/(app)/fotos/constants";
@@ -21,6 +22,7 @@ import type { MediaItem, Song, TimelineEvent } from "@/generated/prisma";
 const songCategory = z.enum(SONG_CATEGORY_OPTIONS.map((o) => o.value) as [string, ...string[]]);
 const timelineCategory = z.enum(["none", ...TIMELINE_CATEGORY_OPTIONS.map((o) => o.value)]);
 const mediaType = z.enum(MEDIA_TYPE_OPTIONS.map((o) => o.value) as [string, ...string[]]);
+const mediaFolder = z.enum(MEDIA_FOLDERS.map((f) => f.key) as [MediaFolderKey, ...MediaFolderKey[]]);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Formato HH:mm").or(z.literal(""));
 
 /**
@@ -65,7 +67,15 @@ function describeSong(s: Song) {
 }
 
 function describeMedia(m: MediaItem) {
-  return { id: m.id, type: m.type, url: m.url, label: m.label || null, notes: m.notes || null, inGoogleDrive: Boolean(m.driveFileId) };
+  return {
+    id: m.id,
+    type: m.type,
+    url: m.url,
+    label: m.label || null,
+    notes: m.notes || null,
+    folder: parseMediaFolder(m.folder),
+    inGoogleDrive: Boolean(m.driveFileId),
+  };
 }
 
 async function ownedEvent(weddingId: string, eventId: string) {
@@ -399,8 +409,9 @@ export function registerPlanningTools(server: McpServer) {
     {
       title: "Agregar foto, video o enlace",
       description:
-        "Agrega un enlace (url + type: image, video, map o link) o sube un archivo (file, en base64) a la carpeta de Google Drive conectada. Para subir archivos, Google Drive debe estar conectado desde la app (Fotos).",
+        "Agrega un enlace (url + type: image, video, map o link) o sube un archivo (file, en base64) a la carpeta de Google Drive conectada. Para subir archivos, Google Drive debe estar conectado desde la app (Fotos). folder: invitacion (fotos de la invitación), boda (fotos del día) u otros (por defecto).",
       inputSchema: z.object({
+        folder: mediaFolder.optional(),
         type: mediaType.optional(),
         url: httpUrl.optional(),
         file: fileInput.optional(),
@@ -408,13 +419,14 @@ export function registerPlanningTools(server: McpServer) {
         notes: z.string().max(1000).optional(),
       }),
     },
-    async ({ type, url, file, label, notes }, ctx) => {
+    async ({ folder: folderInput, type, url, file, label, notes }, ctx) => {
       const a = editor(ctx);
+      const folder = parseMediaFolder(folderInput);
       let finalUrl = url ?? "";
       let finalType = type ?? "link";
       let driveFileId: string | null = null;
       if (file) {
-        const uploaded = await uploadFileToDrive(toFile(file), a.weddingId);
+        const uploaded = await uploadFileToDrive(toFile(file), a.weddingId, folder);
         if (!uploaded) return json({ error: "Google Drive no está conectado. Conéctalo en Fotos desde la app para subir archivos." });
         finalUrl = uploaded.url;
         driveFileId = uploaded.driveFileId;
@@ -423,7 +435,7 @@ export function registerPlanningTools(server: McpServer) {
       if (!finalUrl) return json({ error: "Pasa url o file." });
       const count = await prisma.mediaItem.count({ where: { weddingId: a.weddingId } });
       const item = await prisma.mediaItem.create({
-        data: { weddingId: a.weddingId, type: finalType, url: finalUrl, driveFileId, label: label?.trim() ?? "", notes: notes?.trim() ?? "", sortOrder: count },
+        data: { weddingId: a.weddingId, type: finalType, url: finalUrl, driveFileId, folder, label: label?.trim() ?? "", notes: notes?.trim() ?? "", sortOrder: count },
       });
       await log(a, "media.create", `Agregó "${item.label || item.url}" a Fotos`, item.id);
       return json({ created: describeMedia(item) });
@@ -434,16 +446,29 @@ export function registerPlanningTools(server: McpServer) {
     "update_media",
     {
       title: "Editar foto o enlace",
-      description: "Cambia el título o las notas de un elemento de Fotos.",
-      inputSchema: z.object({ mediaId: objectId, label: z.string().max(120).optional(), notes: z.string().max(1000).optional() }),
+      description:
+        "Cambia el título, las notas o la carpeta (invitacion, boda, otros) de un elemento de Fotos. Al cambiar la carpeta también se mueve el archivo en Google Drive.",
+      inputSchema: z.object({
+        mediaId: objectId,
+        label: z.string().max(120).optional(),
+        notes: z.string().max(1000).optional(),
+        folder: mediaFolder.optional(),
+      }),
     },
-    async ({ mediaId, label, notes }, ctx) => {
+    async ({ mediaId, label, notes, folder }, ctx) => {
       const a = editor(ctx);
       const item = await prisma.mediaItem.findFirst({ where: { id: mediaId, weddingId: a.weddingId } });
       if (!item) return json({ error: "Elemento no encontrado." });
+      if (folder && item.driveFileId && parseMediaFolder(item.folder) !== folder) {
+        await moveDriveFile(item.driveFileId, folder, a.weddingId);
+      }
       const updated = await prisma.mediaItem.update({
         where: { id: item.id },
-        data: { ...(label !== undefined ? { label: label.trim() } : {}), ...(notes !== undefined ? { notes: notes.trim() } : {}) },
+        data: {
+          ...(label !== undefined ? { label: label.trim() } : {}),
+          ...(notes !== undefined ? { notes: notes.trim() } : {}),
+          ...(folder ? { folder } : {}),
+        },
       });
       await log(a, "media.update", `Editó "${updated.label || updated.url}" en Fotos`, updated.id);
       return json({ updated: describeMedia(updated) });

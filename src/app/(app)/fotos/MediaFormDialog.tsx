@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useWeddingAccess } from "@/components/WeddingAccess";
 import { createMediaItem } from "@/app/(app)/fotos/actions";
 import { MEDIA_TYPE_OPTIONS } from "@/app/(app)/fotos/constants";
+import { MEDIA_FOLDERS, type MediaFolder } from "@/lib/mediaFolders";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileDropzone } from "@/components/ui/dropzone";
@@ -15,10 +16,13 @@ import { Textarea } from "@/components/ui/textarea";
 
 export function MediaFormDialog({
   driveConnected,
+  defaultFolder = "otros",
   triggerRender,
   triggerChildren,
 }: {
   driveConnected: boolean;
+  /** Carpeta abierta en la página: es la que viene elegida. */
+  defaultFolder?: MediaFolder;
   triggerRender: ReactElement;
   triggerChildren: ReactNode;
 }) {
@@ -27,6 +31,7 @@ export function MediaFormDialog({
   const { canEdit } = useWeddingAccess();
   const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState<string>("image");
+  const [folder, setFolder] = useState<MediaFolder>(defaultFolder);
 
   const canUpload = driveConnected && (type === "image" || type === "video");
 
@@ -52,6 +57,7 @@ export function MediaFormDialog({
                   ? files.map((file) => {
                       const single = new FormData();
                       single.set("type", String(formData.get("type") ?? "image"));
+                      single.set("folder", String(formData.get("folder") ?? folder));
                       single.set("notes", String(formData.get("notes") ?? ""));
                       single.set("file", file);
                       return single;
@@ -84,6 +90,22 @@ export function MediaFormDialog({
           }}
           className="space-y-3"
         >
+          <div>
+            <Label htmlFor="folder">Carpeta</Label>
+            <Select name="folder" value={folder} onValueChange={(v) => v && setFolder(v as MediaFolder)}>
+              <SelectTrigger className="mt-1 w-full">
+                <SelectValue>{(v: string) => MEDIA_FOLDERS.find((f) => f.key === v)?.label}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {MEDIA_FOLDERS.map((f) => (
+                  <SelectItem key={f.key} value={f.key}>
+                    {f.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label htmlFor="type">Tipo</Label>
             <Select name="type" value={type} onValueChange={(v) => v && setType(v)}>

@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 import { getActiveWeddingId } from "@/lib/wedding";
+import { MEDIA_FOLDERS, type MediaFolder } from "@/lib/mediaFolders";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
@@ -112,12 +113,56 @@ async function ensureAppFolder(drive: ReturnType<typeof google.drive>, connectio
   return newFolderId;
 }
 
-/** Sube un archivo a la carpeta "WeddingPlanner" del Drive conectado y lo hace visible por link. */
-export async function uploadFileToDrive(file: File, weddingId?: string): Promise<{ url: string; driveFileId: string } | null> {
+type Drive = ReturnType<typeof google.drive>;
+type Connection = NonNullable<Awaited<ReturnType<typeof getDriveConnection>>>;
+
+/** Subcarpeta (Invitación, Fotos de la boda, Otros) dentro de "WeddingPlanner"; se crea la primera vez. */
+async function ensureSubfolder(drive: Drive, connection: Connection, folder: MediaFolder) {
+  const parentId = await ensureAppFolder(drive, connection.id, connection.folderId);
+  const known = (connection.subfolderIds ?? {}) as Record<string, string>;
+  if (known[folder]) {
+    try {
+      const existing = await drive.files.get({ fileId: known[folder], fields: "id, trashed" });
+      if (existing.data.id && !existing.data.trashed) return known[folder];
+    } catch {
+      // Se borró desde Drive: se vuelve a crear.
+    }
+  }
+  const name = MEDIA_FOLDERS.find((f) => f.key === folder)!.driveName;
+  const res = await drive.files.create({
+    requestBody: { name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] },
+    fields: "id",
+  });
+  const id = res.data.id;
+  if (!id) throw new Error("No se pudo crear la carpeta en Google Drive.");
+  const fresh = await prisma.googleDriveConnection.findUnique({ where: { id: connection.id }, select: { subfolderIds: true } });
+  const merged = { ...((fresh?.subfolderIds ?? {}) as Record<string, string>), [folder]: id };
+  await prisma.googleDriveConnection.update({ where: { id: connection.id }, data: { subfolderIds: merged } });
+  connection.subfolderIds = merged;
+  return id;
+}
+
+/** Enlace para abrir en Drive la carpeta de cada sección (solo las que ya existen). */
+export function driveFolderLinks(connection: { subfolderIds?: unknown } | null): Partial<Record<MediaFolder, string>> {
+  const known = (connection?.subfolderIds ?? {}) as Record<string, string>;
+  return Object.fromEntries(
+    Object.entries(known).map(([key, id]) => [key, `https://drive.google.com/drive/folders/${id}`])
+  ) as Partial<Record<MediaFolder, string>>;
+}
+
+/**
+ * Sube un archivo a la subcarpeta indicada de "WeddingPlanner" en el Drive conectado y lo hace
+ * visible por link.
+ */
+export async function uploadFileToDrive(
+  file: File,
+  weddingId?: string,
+  folder: MediaFolder = "otros"
+): Promise<{ url: string; driveFileId: string } | null> {
   const result = await getDriveClient(weddingId);
   if (!result) return null;
   const { drive, connection } = result;
-  const folderId = await ensureAppFolder(drive, connection.id, connection.folderId);
+  const folderId = await ensureSubfolder(drive, connection, folder);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const created = await drive.files.create({
@@ -133,6 +178,17 @@ export async function uploadFileToDrive(file: File, weddingId?: string): Promise
   const fresh = await drive.files.get({ fileId, fields: "webViewLink" });
 
   return { url: fresh.data.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`, driveFileId: fileId };
+}
+
+/** Mueve un archivo de Drive a la subcarpeta indicada (quitándolo de las demás). */
+export async function moveDriveFile(driveFileId: string, folder: MediaFolder, weddingId?: string) {
+  const result = await getDriveClient(weddingId);
+  if (!result) return;
+  const { drive, connection } = result;
+  const target = await ensureSubfolder(drive, connection, folder);
+  const current = await drive.files.get({ fileId: driveFileId, fields: "parents" });
+  const remove = (current.data.parents ?? []).filter((p) => p !== target).join(",");
+  await drive.files.update({ fileId: driveFileId, addParents: target, ...(remove ? { removeParents: remove } : {}), fields: "id" });
 }
 
 export async function deleteDriveFile(driveFileId: string, weddingId?: string) {

@@ -31,6 +31,8 @@ model GoogleDriveConnection {
   refreshToken String
   expiryDate   DateTime?
   folderId     String?
+  // Ids de las subcarpetas dentro de folderId, por clave de carpeta (invitacion, boda, otros).
+  subfolderIds Json?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -45,6 +47,8 @@ model MediaItem {
   type        String   @default("link")
   url         String
   driveFileId String?
+  // Carpeta: invitacion | boda | otros (null = otros, los que existían antes de las carpetas).
+  folder      String?
   label       String   @default("")
   notes       String   @default("")
   sortOrder   Int      @default(0)

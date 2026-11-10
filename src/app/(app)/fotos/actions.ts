@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getEditableWeddingId } from "@/lib/wedding";
 import { audit } from "@/lib/audit";
-import { deleteDriveFile, disconnectGoogleDrive, uploadFileToDrive } from "@/lib/googleDrive";
+import { deleteDriveFile, disconnectGoogleDrive, moveDriveFile, uploadFileToDrive } from "@/lib/googleDrive";
+import { MEDIA_FOLDERS, parseMediaFolder } from "@/lib/mediaFolders";
 
 export async function createMediaItem(formData: FormData) {
   const weddingId = await getEditableWeddingId();
@@ -13,13 +14,14 @@ export async function createMediaItem(formData: FormData) {
   const urlInput = String(formData.get("url") ?? "").trim();
   const typeInput = String(formData.get("type") ?? "link");
   const file = formData.get("file");
+  const folder = parseMediaFolder(formData.get("folder"));
 
   let url = urlInput;
   let driveFileId: string | null = null;
   let type = typeInput;
 
   if (file instanceof File && file.size > 0) {
-    const uploaded = await uploadFileToDrive(file);
+    const uploaded = await uploadFileToDrive(file, undefined, folder);
     if (!uploaded) throw new Error("Conecta Google Drive antes de subir un archivo.");
     url = uploaded.url;
     driveFileId = uploaded.driveFileId;
@@ -32,7 +34,7 @@ export async function createMediaItem(formData: FormData) {
 
   const count = await prisma.mediaItem.count({ where: { weddingId } });
   const item = await prisma.mediaItem.create({
-    data: { weddingId, type, url, driveFileId, label, notes, sortOrder: count },
+    data: { weddingId, type, url, driveFileId, folder, label, notes, sortOrder: count },
   });
   await audit("media.create", `Agregó "${item.label || item.url}" a Fotos`, { weddingId, targetId: item.id });
 
@@ -49,6 +51,18 @@ export async function updateMediaItem(id: string, formData: FormData) {
     },
   });
   await audit("media.update", `Editó "${item.label || item.url}" en Fotos`, { weddingId, targetId: id });
+  revalidatePath("/fotos");
+}
+
+/** Pasa un elemento a otra carpeta (y mueve el archivo en Drive si se subió ahí). */
+export async function moveMediaItem(id: string, folderInput: string) {
+  const weddingId = await getEditableWeddingId();
+  const folder = parseMediaFolder(folderInput);
+  const item = await prisma.mediaItem.findFirstOrThrow({ where: { id, weddingId } });
+  if (item.driveFileId) await moveDriveFile(item.driveFileId, folder);
+  await prisma.mediaItem.update({ where: { id }, data: { folder } });
+  const label = MEDIA_FOLDERS.find((f) => f.key === folder)!.label;
+  await audit("media.update", `Movió "${item.label || item.url}" a ${label}`, { weddingId, targetId: id });
   revalidatePath("/fotos");
 }
 
