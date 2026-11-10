@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     openGraph: { type: "website", siteName: couple, locale: "es_HN", title, description, url: `/ejemplos/${example.slug}` },
     twitter: { card: "summary_large_image", title, description },
-    other: { "theme-color": invitationTheme(data.theme).background },
+    other: { "theme-color": invitationTheme("editorial").background },
   };
 }
 

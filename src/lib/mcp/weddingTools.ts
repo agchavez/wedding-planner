@@ -8,9 +8,17 @@ import { weddingDisplayName } from "@/lib/wedding";
 import { cleanName, CATALOG_NAME_MAX, nameKey } from "@/lib/catalog";
 import { checkCatalogName } from "@/lib/catalog-server";
 import { isLabelColor, LABEL_COLORS, parseSide, SIDE_LABEL } from "@/lib/guestLabels";
-import { buildInvitationLinks, getInvitationSettings, NOT_SENT_FILTER } from "@/lib/guestInvitations";
+import {
+  buildInvitationLinks,
+  getInvitationSettings,
+  invitationDesigns,
+  NOT_SENT_FILTER,
+  syncDesignsWithFields,
+  toInvitationData,
+} from "@/lib/guestInvitations";
+import { BLOCK_INFO } from "@/lib/invitationBlocks";
 import { INVITATION_STATUS, invitationStatus, type InvitationStatus } from "@/lib/invitationMessage";
-import { isInvitationTheme, INVITATION_THEMES, ITINERARY_ICONS } from "@/lib/invitationThemes";
+import { DESIGN_THEMES, isInvitationTheme, INVITATION_THEMES, ITINERARY_ICONS } from "@/lib/invitationThemes";
 import { parseEventDateTime, toEventDateTimeValue } from "@/lib/eventTime";
 import { auth, editor, httpUrl, json, log, objectId, dateOnly, parseDateOnly, toDateOnlyValue } from "@/lib/mcp/shared";
 import type { Guest, GuestLabel } from "@/generated/prisma";
@@ -385,10 +393,18 @@ export function registerWeddingTools(server: McpServer) {
     },
     async (ctx) => {
       const a = auth(ctx);
-      const s = await getInvitationSettings(a.weddingId);
+      const [s, wedding] = await Promise.all([
+        getInvitationSettings(a.weddingId),
+        prisma.wedding.findUniqueOrThrow({ where: { id: a.weddingId } }),
+      ]);
+      const designs = invitationDesigns(s, toInvitationData(wedding, s));
       return json({
         theme: s.theme,
-        availableThemes: Object.fromEntries(Object.entries(INVITATION_THEMES).map(([k, t]) => [k, t.description])),
+        availableThemes: Object.fromEntries(DESIGN_THEMES.map((k) => [k, INVITATION_THEMES[k].description])),
+        // Orden de los bloques que ven los invitados (se cambia en el editor de la app).
+        blocks: designs.published.blocks.map((b) => ({ type: b.type, label: BLOCK_INFO[b.type].label, hidden: b.hidden })),
+        hasUnpublishedDraft: designs.hasChanges,
+        publishedAt: designs.publishedAt,
         headline: s.headline,
         message: s.message,
         quote: s.quote,
@@ -421,7 +437,7 @@ export function registerWeddingTools(server: McpServer) {
     {
       title: "Editar la invitación",
       description:
-        "Cambia el contenido o el estilo de la invitación digital. Las horas van en formato YYYY-MM-DDTHH:mm (hora de Honduras). La plantilla de WhatsApp admite {nombre}, {nombre_completo}, {pareja}, {fecha}, {enlace} y {lugares}.",
+        "Cambia el contenido de la invitación digital; se aplica de inmediato a lo que ven los invitados y al borrador del editor (cada campo va a su bloque: coverImageUrl → portada, galleryUrls → galería…). Las horas van en formato YYYY-MM-DDTHH:mm (hora de Honduras). La plantilla de WhatsApp admite {nombre}, {nombre_completo}, {pareja}, {fecha}, {enlace} y {lugares}.",
       inputSchema: z.object({
         theme: z.enum(Object.keys(INVITATION_THEMES) as [string, ...string[]]).optional(),
         headline: z.string().max(80).optional(),
@@ -462,7 +478,7 @@ export function registerWeddingTools(server: McpServer) {
         giftAccount: z.string().max(60).optional(),
         giftAccountHolder: z.string().max(100).optional(),
         giftRegistryUrl: httpUrl.optional(),
-        galleryUrls: z.array(httpUrl).max(8).optional(),
+        galleryUrls: z.array(httpUrl).max(12).optional(),
         songUrl: httpUrl.optional().describe("Archivo de audio público (mp3)"),
         songTitle: z.string().max(100).optional(),
         adultsOnly: z.boolean().optional(),
@@ -485,6 +501,10 @@ export function registerWeddingTools(server: McpServer) {
           ...(receptionTime !== undefined ? { receptionTime: parseEventDateTime(receptionTime) } : {}),
           ...(rsvpDeadline !== undefined ? { rsvpDeadline: rsvpDeadline ? new Date(`${rsvpDeadline}T00:00:00Z`) : null } : {}),
         },
+      });
+      await syncDesignsWithFields(a.weddingId, {
+        ...args,
+        ...(galleryUrls ? { galleryUrls: galleryUrls.filter(Boolean) } : {}),
       });
       await log(a, "invitation.design_update", "Actualizó el diseño de la invitación");
       return json({ ok: true, updatedFields: Object.keys(args) });

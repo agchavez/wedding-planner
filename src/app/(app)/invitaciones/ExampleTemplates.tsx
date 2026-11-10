@@ -8,10 +8,11 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { applyInvitationExample } from "@/app/(app)/invitaciones/actions";
 import { INVITATION_EXAMPLES } from "@/lib/invitationExamples";
 import { invitationTheme } from "@/lib/invitationThemes";
+import type { InvitationDesign } from "@/lib/invitationBlocks";
 import { cn } from "@/lib/utils";
 
-/** Ejemplos listos: se ven en /ejemplos y se copian a la invitación para modificarlos. */
-export function ExampleTemplates({ highlight }: { highlight?: string }) {
+/** Ejemplos listos: se ven en /ejemplos y se copian al borrador de la invitación para modificarlos. */
+export function ExampleTemplates({ highlight, onApplied }: { highlight?: string; onApplied?: (design: InvitationDesign) => void }) {
   const router = useRouter();
   const highlightRef = useRef<HTMLDivElement>(null);
 
@@ -20,15 +21,12 @@ export function ExampleTemplates({ highlight }: { highlight?: string }) {
   }, []);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="flex items-center gap-2 font-heading text-lg font-semibold">
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Wand2 className="size-4 text-decorative" />
-            Empieza con un ejemplo
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Copia el estilo, la foto y los textos; tus fechas y lugares no cambian. Después modifícalo como quieras.
+            Copia la foto y los textos; tus fechas y lugares no cambian. Después modifícalo y publícalo.
           </p>
         </div>
         <a href="/ejemplos" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
@@ -36,7 +34,7 @@ export function ExampleTemplates({ highlight }: { highlight?: string }) {
           <ExternalLink className="size-3" />
         </a>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {INVITATION_EXAMPLES.map((example) => {
           const t = invitationTheme(example.data.theme);
           const couple = `${example.data.partner1} & ${example.data.partner2}`;
@@ -71,13 +69,14 @@ export function ExampleTemplates({ highlight }: { highlight?: string }) {
                     triggerRender={<Button size="xs" className="flex-1" />}
                     triggerChildren="Usar"
                     title={`¿Usar el ejemplo "${example.title}"?`}
-                    description="Se reemplazarán el estilo, la foto de portada y los textos de tu invitación. Tus fechas, horas y lugares se mantienen."
+                    description="Se reemplazarán la foto de portada y los textos del borrador. Tus fechas, horas y lugares se mantienen. Los invitados lo verán cuando publiques."
                     confirmLabel="Usar ejemplo"
                     destructive={false}
                     successMessage="Ejemplo aplicado: ya puedes modificarlo"
                     onConfirm={async () => {
                       const result = await applyInvitationExample(example.slug);
-                      router.refresh();
+                      if ("design" in result && result.design) onApplied?.(result.design);
+                      else router.refresh();
                       return result;
                     }}
                   />

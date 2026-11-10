@@ -1,4 +1,4 @@
-/* Animaciones de las propuestas de invitación (solo esta ruta). */
+/* Invitación Editorial (/i/<token>, editor y /propuestas): animaciones y apertura. */
 
 [data-reveal] {
   opacity: 0;
@@ -109,4 +109,43 @@
   [data-reveal] { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
   .pp-ken-wait { transform: none; }
   .pp-ken, .pp-marquee, .pp-spin, .pp-bob, .pp-twinkle, .pp-shimmer, .pp-pulse { animation: none; }
+}
+
+/* Vista previa del editor: todo visible desde el inicio (sin esperar al scroll). */
+.pp-static [data-reveal] { opacity: 1; transform: none; clip-path: inset(0 0 0 0); filter: none; transition: none; }
+.pp-static .pp-draw path, .pp-static .pp-draw circle { stroke-dashoffset: 0; }
+
+/* Apertura: el contenido se desvanece y luego el telón de lino se abre en dos. */
+.ed-open-content { transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.6, 0, 0.3, 1); }
+.ed-opening.open .ed-open-content { opacity: 0; transform: scale(0.97); }
+.ed-half { transition: transform 1.25s cubic-bezier(0.8, 0, 0.2, 1) 0.45s; }
+.ed-opening.open .ed-half-top { transform: translateY(-100%); }
+.ed-opening.open .ed-half-bottom { transform: translateY(100%); }
+.ed-seam { transition: transform 0.6s cubic-bezier(0.7, 0, 0.2, 1), opacity 0.4s ease 0.4s; transform-origin: center; }
+.ed-opening.open .ed-seam { transform: scaleX(1.6); opacity: 0; }
+.ed-seal { transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.3s ease; }
+.ed-seal:hover { transform: scale(1.05); }
+.ed-seal:active { transform: scale(0.96); }
+
+@keyframes ed-breathe-k { 0%, 100% { box-shadow: 0 0 0 0 rgb(168 153 106 / 0.45), 0 12px 24px -10px rgb(52 58 38 / 0.55); } 50% { box-shadow: 0 0 0 12px rgb(168 153 106 / 0), 0 12px 24px -10px rgb(52 58 38 / 0.55); } }
+.ed-breathe { animation: ed-breathe-k 2.6s ease-in-out infinite; }
+@keyframes ed-drift-k { from { transform: scale(1.12) translateY(1%); } to { transform: scale(1.02) translateY(-1%); } }
+.ed-drift { animation: ed-drift-k 14s ease-in-out infinite alternate; }
+
+.ed-linen {
+  background-color: #f2eee3;
+  background-image:
+    repeating-linear-gradient(0deg, rgb(52 58 38 / 0.025) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(52 58 38 / 0.02) 0 1px, transparent 1px 4px);
+}
+
+/* Bloque seleccionado en el editor. */
+.ed-block { position: relative; cursor: pointer; }
+.ed-block::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 30; box-shadow: inset 0 0 0 0 transparent; transition: box-shadow 0.15s; }
+.ed-block:hover::after { box-shadow: inset 0 0 0 2px rgb(168 153 106 / 0.7); }
+.ed-block.is-selected::after { box-shadow: inset 0 0 0 3px #a8996a; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ed-drift, .ed-breathe { animation: none; }
+  .ed-half, .ed-open-content, .ed-seam { transition-duration: 0.01s; transition-delay: 0s; }
 }

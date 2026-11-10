@@ -6,7 +6,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SendPanel } from "@/app/(app)/invitaciones/SendPanel";
 import type { Guest } from "@/generated/prisma";
-import { DesignEditor, type DesignEditorValues } from "@/app/(app)/invitaciones/DesignEditor";
+import { BlockEditor } from "@/app/(app)/invitaciones/editor/BlockEditor";
+import type { PickerPhoto } from "@/app/(app)/invitaciones/editor/PhotoPicker";
+import type { InvitationDesign } from "@/lib/invitationBlocks";
 import { MessageEditor } from "@/app/(app)/invitaciones/MessageEditor";
 import type { InvitationRow, MessageSettings } from "@/app/(app)/invitaciones/shared";
 import type { InvitationData } from "@/lib/guestInvitations";
@@ -18,7 +20,8 @@ export function InvitationsDashboard({
   groupSuggestions,
   labels,
   data,
-  editor,
+  designs,
+  photos,
   messageSettings,
   coupleNames,
   dateLabel,
@@ -31,7 +34,8 @@ export function InvitationsDashboard({
   groupSuggestions: string[];
   labels: LabelOption[];
   data: InvitationData;
-  editor: DesignEditorValues;
+  designs: { draft: InvitationDesign; published: InvitationDesign; publishedAt: string | null };
+  photos: PickerPhoto[];
   messageSettings: MessageSettings;
   coupleNames: string;
   dateLabel: string;
@@ -78,12 +82,22 @@ export function InvitationsDashboard({
           />
         </TabsContent>
         <TabsContent value="diseno" className="pt-4">
-          {/* `key`: al aplicar un ejemplo llegan valores nuevos y el editor se reinicia con ellos. */}
-          <DesignEditor
-            key={JSON.stringify(editor)}
-            initial={editor}
-            base={data}
-            sampleGuest={sample}
+          <BlockEditor
+            data={data}
+            initialDraft={designs.draft}
+            initialPublished={designs.published}
+            publishedAt={designs.publishedAt}
+            photos={photos}
+            sampleGuest={{
+              fullName: sample?.fullName ?? "Ana López",
+              seats: 1 + (sample?.plusOnes ?? 1),
+              plusOneNames: [],
+              rsvpStatus: "pending",
+              attendingCount: null,
+              rsvpMessage: "",
+              dietaryRestrictions: "",
+              responded: false,
+            }}
             highlightExample={highlightExample}
           />
         </TabsContent>

@@ -13,6 +13,7 @@ import {
 } from "@/lib/invitationMessage";
 import type { Guest, InvitationSettings, Wedding } from "@/generated/prisma";
 import type { ItineraryEntry } from "@/lib/invitationThemes";
+import { designFromData, designKey, patchDesign, sanitizeDesign, type InvitationDesign, type LegacyPatch } from "@/lib/invitationBlocks";
 
 /** Datos de la invitación ya serializables, tal como los recibe la vista (cliente). */
 export type InvitationData = {
@@ -154,6 +155,48 @@ export function toInvitationData(wedding: Wedding, s: InvitationSettings): Invit
     recommendations: s.recommendations,
     closingMessage: s.closingMessage,
   };
+}
+
+/**
+ * Borrador y versión publicada de la invitación por bloques. Sin diseño guardado se derivan de
+ * los campos de siempre (ver lib/invitationBlocks.ts), así las invitaciones anteriores siguen
+ * igual. Un diseño guardado dañado también cae a lo derivado en vez de romper la página.
+ */
+export function invitationDesigns(
+  settings: Pick<InvitationSettings, "draftDesign" | "publishedDesign" | "publishedAt">,
+  data: InvitationData
+): { draft: InvitationDesign; published: InvitationDesign; publishedAt: string | null; hasChanges: boolean } {
+  const published = sanitizeDesign(settings.publishedDesign) ?? designFromData(data);
+  const draft = sanitizeDesign(settings.draftDesign, { trim: false }) ?? published;
+  return {
+    draft,
+    published,
+    publishedAt: settings.publishedAt?.toISOString() ?? null,
+    hasChanges: designKey(draft) !== designKey(published),
+  };
+}
+
+/**
+ * Lleva a los bloques un cambio hecho directamente a los campos de siempre (MCP): se aplica al
+ * borrador y a lo publicado, para que los invitados lo vean ya y el editor no lo pise.
+ * Sin diseños guardados no hace nada: se derivan de los campos al leer.
+ */
+export async function syncDesignsWithFields(weddingId: string, patch: LegacyPatch) {
+  const s = await prisma.invitationSettings.findUnique({
+    where: { id: weddingId },
+    select: { draftDesign: true, publishedDesign: true },
+  });
+  if (!s) return;
+  const published = sanitizeDesign(s.publishedDesign);
+  const draft = sanitizeDesign(s.draftDesign, { trim: false });
+  if (!published && !draft) return;
+  await prisma.invitationSettings.update({
+    where: { id: weddingId },
+    data: {
+      ...(published ? { publishedDesign: patchDesign(published, patch) } : {}),
+      ...(draft ? { draftDesign: patchDesign(draft, patch) } : {}),
+    },
+  });
 }
 
 export function toInvitationGuestData(guest: Guest): InvitationGuestData {

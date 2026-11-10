@@ -27,6 +27,23 @@ export type InvitationTheme = {
 };
 
 export const INVITATION_THEMES = {
+  // Diseño del editor por bloques (ver DESIGN_THEMES): verde olivo y lino.
+  editorial: {
+    name: "Editorial",
+    description: "Revista: Bodoni, fotos grandes y telón de apertura",
+    background: "#f2eee3",
+    paper: "#f7f4ea",
+    ink: "#343a26",
+    muted: "#757359",
+    accent: "#343a26",
+    gold: "#a8996a",
+    envelope: "#343a26",
+    envelopeFlap: "#2b301f",
+    seal: "#a8996a",
+    sealInk: "#f2eee3",
+    band: "#343a26",
+    bandInk: "#f2eee3",
+  },
   olive: {
     name: "Olivo",
     description: "Verde olivo y lino, botánica y elegante",
@@ -117,6 +134,22 @@ export function isInvitationTheme(value: unknown): value is InvitationThemeName 
 
 export function invitationTheme(name: string): InvitationTheme {
   return INVITATION_THEMES[isInvitationTheme(name) ? name : "classic"];
+}
+
+/**
+ * Diseño del editor por bloques. Hay uno solo (Editorial); la lista queda por si se agregan
+ * más. Los temas anteriores (olive, classic…) siguen siendo válidos en la base (la tarjeta de
+ * WhatsApp usa su paleta) pero la invitación se ve con Editorial: ninguna se rompe.
+ */
+export const DESIGN_THEMES = ["editorial"] as const;
+export type DesignTheme = (typeof DESIGN_THEMES)[number];
+
+export function isDesignTheme(value: unknown): value is DesignTheme {
+  return typeof value === "string" && (DESIGN_THEMES as readonly string[]).includes(value);
+}
+
+export function designThemeFor(theme: string | null | undefined): DesignTheme {
+  return isDesignTheme(theme) ? theme : "editorial";
 }
 
 /** Iniciales para el monograma: "Ana" + "Luis" → "A & L". */
