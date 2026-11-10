@@ -175,10 +175,13 @@ function Cover({ block, ctx }: BlockProps<"cover">) {
               {p.headline}
             </p>
             <h1 style={{ fontFamily: SERIF }} className="mt-3 leading-[0.85]">
-              <span className="pp-rise block text-[21cqw] italic @3xl:text-[12rem]" style={d(2)}>
+              <span className="pp-rise block italic @3xl:!text-[12rem]" style={{ ...d(2), fontSize: heroSize(ctx.p1 || "Nuestra", 92) }}>
                 {ctx.p1 || "Nuestra"}
               </span>
-              <span className="pp-rise block pl-[10cqw] text-[21cqw] @3xl:pl-40 @3xl:text-[12rem]" style={d(3)}>
+              <span
+                className="pp-rise block pl-[10cqw] @3xl:pl-40 @3xl:!text-[12rem]"
+                style={{ ...d(3), fontSize: heroSize(`& ${ctx.p2 || "boda"}`, 82) }}
+              >
                 <span style={{ color: hasPhoto ? "#d8c99a" : C.accent }}>&amp;</span> {ctx.p2 || "boda"}
               </span>
             </h1>
@@ -207,6 +210,15 @@ function Cover({ block, ctx }: BlockProps<"cover">) {
       )}
     </>
   );
+}
+
+/**
+ * Tamaño del nombre en la portada: 21cqw como máximo y más chico si el nombre es largo, para que
+ * no se salga del ancho en el celular (≈0.55em por letra en Bodoni).
+ */
+function heroSize(text: string, availableCqw: number) {
+  const size = Math.min(21, availableCqw / (0.55 * Math.max(text.length, 1)));
+  return `${size.toFixed(2)}cqw`;
 }
 
 function FamilyList({ title, names }: { title: string; names: string[] }) {
