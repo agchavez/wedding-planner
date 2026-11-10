@@ -36,7 +36,6 @@ export const W = {
   closing: "No vemos la hora de celebrar contigo.",
   itinerary: [
     { time: "3:30 pm", title: "Ceremonia nupcial" },
-    { time: "6:00 pm", title: "Cóctel de bienvenida" },
     { time: "7:00 pm", title: "Entrada de los novios y vals con los padres" },
     { time: "8:00 pm", title: "Cena" },
     { time: "9:30 pm", title: "Fotografías con los invitados" },
