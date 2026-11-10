@@ -53,18 +53,80 @@ export type EventProps = {
   note: string;
   showMap: boolean;
   photoUrl: string;
+  framing: Framing;
 };
+
+/**
+ * Encuadre de una foto: punto de enfoque (x, y en %) y zoom (1 = sin zoom). Se guarda por foto en
+ * `framing` del bloque: la clave es el nombre de la propiedad ("photoUrl", "openingPhotoUrl") o,
+ * en la galería, la URL de la foto.
+ */
+export type PhotoFraming = { x: number; y: number; z: number };
+export type Framing = Record<string, PhotoFraming>;
+
+export const DEFAULT_FRAMING: PhotoFraming = { x: 50, y: 50, z: 1 };
+
+/** Estilo de <img> (object-fit: cover) para un encuadre; vacío si no hay ajuste. */
+export function framingStyle(f: PhotoFraming | undefined): { objectPosition?: string; scale?: string; transformOrigin?: string } {
+  if (!f) return {};
+  const pos = `${f.x}% ${f.y}%`;
+  return { objectPosition: pos, ...(f.z > 1 ? { scale: String(f.z), transformOrigin: pos } : {}) };
+}
+
+const DRIVE_RE = /^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+(?:-rw)?$/;
+const DRIVE_WIDTHS = [480, 720, 1080, 1440, 2000];
+
+/**
+ * Fotos de Drive en el tamaño justo: `src` liviano y `srcSet` con varios anchos en WebP ("-rw"),
+ * para que cada celular descargue solo lo que necesita. Otras URLs se dejan igual.
+ */
+export function responsiveImage(url: string, fallbackWidth = 1080): { src: string; srcSet?: string } {
+  const m = DRIVE_RE.exec(url);
+  if (!m) return { src: url };
+  return {
+    src: `${m[1]}=w${fallbackWidth}-rw`,
+    srcSet: DRIVE_WIDTHS.map((w) => `${m[1]}=w${w}-rw ${w}w`).join(", "),
+  };
+}
+
+/** Una foto de Drive a un ancho fijo (fondos y miniaturas). */
+export function driveImageAt(url: string, width: number) {
+  const m = DRIVE_RE.exec(url);
+  return m ? `${m[1]}=w${width}-rw` : url;
+}
+
+function cleanFraming(value: unknown): Framing {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Framing = {};
+  const clamp = (n: unknown, min: number, max: number, def: number) =>
+    typeof n === "number" && Number.isFinite(n) ? Math.round(Math.min(max, Math.max(min, n)) * 100) / 100 : def;
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>).slice(0, 24)) {
+    if (!key || key.length > 2000 || !raw || typeof raw !== "object") continue;
+    const r = raw as Record<string, unknown>;
+    out[key] = { x: clamp(r.x, 0, 100, 50), y: clamp(r.y, 0, 100, 50), z: clamp(r.z, 1, 3, 1) };
+  }
+  return out;
+}
 
 export type BlockPropsMap = {
   /**
    * Portada y pantalla de apertura. `openingPhotoUrl` vacío = la misma foto de portada;
    * `marquee`: frases de la cinta, una por línea (vacío = se arman con la fecha y el lugar).
    */
-  cover: { headline: string; kicker: string; photoUrl: string; openingPhotoUrl: string; openingKicker: string; marquee: string };
+  cover: {
+    headline: string;
+    kicker: string;
+    photoUrl: string;
+    openingPhotoUrl: string;
+    openingKicker: string;
+    marquee: string;
+    framing: Framing;
+  };
   guestMessage: {
     message: string;
     showSeats: boolean;
     photoUrl: string;
+    framing: Framing;
     caption: string;
     brideParents: string;
     groomParents: string;
@@ -72,7 +134,7 @@ export type BlockPropsMap = {
   };
   verse: { text: string; reference: string };
   countdown: { title: string; showCalendar: boolean };
-  featuredPhoto: { photoUrl: string; caption: string };
+  featuredPhoto: { photoUrl: string; caption: string; framing: Framing };
   program: { title: string; items: ItineraryEntry[] };
   ceremony: EventProps;
   reception: EventProps;
@@ -87,12 +149,12 @@ export type BlockPropsMap = {
     /** Etiqueta bajo ese ícono; vacía = "Sin verde". */
     avoidLabel: string;
   };
-  gallery: { title: string; photos: string[] };
+  gallery: { title: string; photos: string[]; framing: Framing };
   gifts: { title: string; note: string; bankName: string; account: string; holder: string; registryUrl: string };
   recommendations: { title: string; adultsOnly: boolean; adultsOnlyText: string; items: string };
   /** `deadline`: "YYYY-MM-DD" o vacío. */
   rsvp: { title: string; deadline: string };
-  closing: { kicker: string; message: string; hashtag: string; photoUrl: string };
+  closing: { kicker: string; message: string; hashtag: string; photoUrl: string; framing: Framing };
 };
 
 export type BlockOf<T extends BlockType> = { id: string; type: T; hidden: boolean; props: BlockPropsMap[T] };
@@ -123,12 +185,21 @@ export const BLOCK_INFO: Record<BlockType, { label: string; description: string;
 };
 
 export const DEFAULT_PROPS: { [K in BlockType]: BlockPropsMap[K] } = {
-  cover: { headline: "¡Nos casamos!", kicker: "Vol. 01", photoUrl: "", openingPhotoUrl: "", openingKicker: "Edición especial", marquee: "" },
+  cover: {
+    headline: "¡Nos casamos!",
+    kicker: "Vol. 01",
+    photoUrl: "",
+    openingPhotoUrl: "",
+    openingKicker: "Edición especial",
+    marquee: "",
+    framing: {},
+  },
   guestMessage: {
     message:
       "Con la bendición de Dios y de nuestras familias, tenemos el honor de invitarte a celebrar el día en que uniremos nuestras vidas.",
     showSeats: true,
     photoUrl: "",
+    framing: {},
     caption: "Fig. 01 — Nosotros",
     brideParents: "",
     groomParents: "",
@@ -136,12 +207,12 @@ export const DEFAULT_PROPS: { [K in BlockType]: BlockPropsMap[K] } = {
   },
   verse: { text: "", reference: "" },
   countdown: { title: "Faltan", showCalendar: true },
-  featuredPhoto: { photoUrl: "", caption: "" },
+  featuredPhoto: { photoUrl: "", caption: "", framing: {} },
   program: { title: "El programa", items: [] },
-  ceremony: { title: "El lugar", time: "", place: "", address: "", mapUrl: "", note: "", showMap: true, photoUrl: "" },
-  reception: { title: "La recepción", time: "", place: "", address: "", mapUrl: "", note: "", showMap: false, photoUrl: "" },
+  ceremony: { title: "El lugar", time: "", place: "", address: "", mapUrl: "", note: "", showMap: true, photoUrl: "", framing: {} },
+  reception: { title: "La recepción", time: "", place: "", address: "", mapUrl: "", note: "", showMap: false, photoUrl: "", framing: {} },
   dressCode: { title: "Vestimenta", code: "Formal", note: "", colors: [], showIcons: true, avoidColors: [], avoidLabel: "" },
-  gallery: { title: "Portafolio", photos: [] },
+  gallery: { title: "Portafolio", photos: [], framing: {} },
   gifts: {
     title: "Regalos",
     note: "Tu presencia es nuestro mejor regalo. Si deseas tener un detalle con nosotros, te dejamos esta opción.",
@@ -157,7 +228,7 @@ export const DEFAULT_PROPS: { [K in BlockType]: BlockPropsMap[K] } = {
     items: "",
   },
   rsvp: { title: "Confirma tu asistencia", deadline: "" },
-  closing: { kicker: "", message: "No vemos la hora de celebrar contigo.", hashtag: "", photoUrl: "" },
+  closing: { kicker: "", message: "No vemos la hora de celebrar contigo.", hashtag: "", photoUrl: "", framing: {} },
 };
 
 const MAX_BLOCKS = 40;
@@ -409,7 +480,8 @@ function cleanProps<T extends BlockType>(type: T, raw: unknown, trim: boolean): 
   const out: Record<string, unknown> = {};
   for (const [key, def] of Object.entries(defaults)) {
     const value = key in src ? src[key] : def;
-    if (URL_KEYS.has(key)) out[key] = cleanUrl(key, value);
+    if (key === "framing") out[key] = cleanFraming(value);
+    else if (URL_KEYS.has(key)) out[key] = cleanUrl(key, value);
     else if (key === "time") out[key] = typeof value === "string" && DATETIME_RE.test(value) ? value : "";
     else if (key === "deadline") out[key] = typeof value === "string" && DATE_RE.test(value) ? value : "";
     else if (key === "colors" || key === "avoidColors")
