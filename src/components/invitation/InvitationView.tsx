@@ -8,6 +8,7 @@ import { RsvpSection } from "@/components/invitation/RsvpSection";
 import {
   C,
   CopyButton,
+  AVOID_GREENS,
   DressIcons,
   EditorialFonts,
   Lightbox,
@@ -517,7 +518,14 @@ function DressCode({ block, ctx }: BlockProps<"dressCode">) {
       )}
       {p.showIcons && (
         <div data-reveal>
-          <DressIcons color={C.ink} muted={C.muted} noGreen={/verde/i.test(p.note)} className="mt-8" />
+          <DressIcons
+            color={C.ink}
+            muted={C.muted}
+            // Diseños anteriores sin colores elegidos: si la nota pide no usar verde, tonos de verde.
+            avoidColors={p.avoidColors.length ? p.avoidColors : /verde/i.test(p.note) ? AVOID_GREENS : []}
+            avoidLabel={p.avoidLabel || "Sin verde"}
+            className="mt-8"
+          />
         </div>
       )}
     </section>
