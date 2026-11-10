@@ -35,13 +35,17 @@ export const W = {
   recommendations: ["Llega 20 minutos antes de la ceremonia.", "Habrá estacionamiento en el lugar."],
   closing: "No vemos la hora de celebrar contigo.",
   itinerary: [
-    { time: "3:30 pm", title: "Ceremonia" },
-    { time: "5:30 pm", title: "Cóctel de bienvenida" },
-    { time: "6:30 pm", title: "Sesión de fotos" },
-    { time: "7:00 pm", title: "Entrada de los novios y primer baile" },
+    { time: "3:30 pm", title: "Ceremonia nupcial" },
+    { time: "6:00 pm", title: "Cóctel de bienvenida" },
+    { time: "7:00 pm", title: "Entrada de los novios y vals con los padres" },
     { time: "8:00 pm", title: "Cena" },
-    { time: "9:30 pm", title: "Corte del pastel y brindis" },
-    { time: "10:00 pm", title: "¡Fiesta!" },
+    { time: "9:30 pm", title: "Fotografías con los invitados" },
+    { time: "9:30 pm", title: "Brindis y palabras de amigos y familiares" },
+    { time: "10:00 pm", title: "Primera ronda de baile" },
+    { time: "10:15 pm", title: "Postre" },
+    { time: "10:45 pm", title: "Segunda tanda de baile" },
+    { time: "11:15 pm", title: "Juegos y lanzamiento de la liga" },
+    { time: "11:55 pm", title: "Baile hasta la 1:00 am" },
   ],
 };
 
