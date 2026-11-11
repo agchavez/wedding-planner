@@ -22,7 +22,7 @@
 
 import { designThemeFor, isDesignTheme, ITINERARY_ICONS, type DesignTheme, type ItineraryEntry } from "@/lib/invitationThemes";
 import type { InvitationData } from "@/lib/guestInvitations";
-import { uploadedSongOwner } from "@/lib/songFiles";
+import { cleanSongRange, uploadedSongOwner } from "@/lib/songFiles";
 
 export const BLOCK_TYPES = [
   "cover",
@@ -208,7 +208,8 @@ export type InvitationBlock = { [K in BlockType]: BlockOf<K> }[BlockType];
 export type InvitationDesign = {
   v: 1;
   theme: DesignTheme;
-  song: { url: string; title: string };
+  /** `start` y `end` en segundos: el tramo que suena (0 y 0 = la canción completa). */
+  song: { url: string; title: string; start: number; end: number };
   blocks: InvitationBlock[];
 };
 
@@ -473,7 +474,7 @@ export function designFromData(d: DesignSource): InvitationDesign {
   // Ids fijos (el tipo): el diseño derivado es el mismo en cada lectura, así el borrador
   // derivado y el publicado derivado no aparecen como "cambios sin publicar".
   for (const b of blocks) b.id = b.type;
-  return { v: 1, theme: designThemeFor(d.theme), song: { url: d.songUrl ?? "", title: d.songTitle ?? "" }, blocks };
+  return { v: 1, theme: designThemeFor(d.theme), song: { url: d.songUrl ?? "", title: d.songTitle ?? "", start: 0, end: 0 }, blocks };
 }
 
 /* ------------------------------------------------------------------------------------ */
@@ -595,7 +596,12 @@ export function sanitizeDesign(raw: unknown, { trim = true }: { trim?: boolean }
   return {
     v: 1,
     theme: isDesignTheme(src.theme) ? src.theme : designThemeFor(typeof src.theme === "string" ? src.theme : ""),
-    song: { url: isSafeSongUrl(songUrl) ? songUrl : "", title: text(song.title, 100) },
+    song: {
+      url: isSafeSongUrl(songUrl) ? songUrl : "",
+      title: text(song.title, 100),
+      // Sin canción no hay tramo que guardar.
+      ...(isSafeSongUrl(songUrl) ? cleanSongRange(song.start, song.end) : { start: 0, end: 0 }),
+    },
     blocks,
   };
 }
@@ -798,7 +804,11 @@ export function patchDesign(design: InvitationDesign, patch: LegacyPatch): Invit
   for (const [field, value] of Object.entries(patch)) {
     if (value === undefined) continue;
     if (field === "theme" && typeof value === "string") next.theme = designThemeFor(value);
-    else if (field === "songUrl") next.song.url = String(value);
+    else if (field === "songUrl") {
+      // Otra canción: el tramo elegido para la anterior ya no aplica.
+      if (String(value) !== next.song.url) Object.assign(next.song, { start: 0, end: 0 });
+      next.song.url = String(value);
+    }
     else if (field === "songTitle") next.song.title = String(value);
     else if (field === "showCountdown") {
       const block = ensureBlock(blocks, "countdown");

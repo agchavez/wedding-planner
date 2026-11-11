@@ -854,7 +854,7 @@ export function InvitationView({ data, design: designProp, guest, token, embedde
       <p className="py-5 text-center text-[0.6rem] tracking-[0.2em] uppercase" style={{ color: C.muted }}>
         Invitación hecha con Wedplan
       </p>
-      {!embedded && design.song.url && <SongButton url={design.song.url} title={design.song.title} />}
+      {!embedded && design.song.url && <SongButton url={design.song.url} title={design.song.title} start={design.song.start} end={design.song.end} />}
       <Lightbox
         images={lightbox?.images ?? []}
         index={lightbox?.index ?? null}

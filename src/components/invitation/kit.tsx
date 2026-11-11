@@ -280,13 +280,20 @@ export function DressIcons({
 }
 
 /** Botón flotante para la canción de la boda. */
-export function SongButton({ url, title }: { url: string; title: string }) {
+export function SongButton({ url, title, start = 0, end = 0 }: { url: string; title: string; start?: number; end?: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
+  // Fragmento: suena de `start` a `end` (0 = hasta el final) y vuelve a empezar en `start`.
+  const outside = (t: number) => t < start - 0.3 || (end > 0 && t >= end);
+  function restart(audio: HTMLAudioElement) {
+    audio.currentTime = start;
+    void audio.play().catch(() => setPlaying(false));
+  }
   function toggle() {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
+      if (outside(audio.currentTime)) audio.currentTime = start;
       void audio
         .play()
         .then(() => setPlaying(true))
@@ -306,7 +313,19 @@ export function SongButton({ url, title }: { url: string; title: string }) {
       >
         {playing ? <Pause className="size-4" fill="currentColor" /> : <Play className="ml-0.5 size-4" fill="currentColor" />}
       </button>
-      <audio ref={audioRef} src={url} preload="none" loop onEnded={() => setPlaying(false)} />
+      <audio
+        ref={audioRef}
+        src={url}
+        preload="none"
+        // Algunos navegadores ignoran el salto hecho antes de cargar: se repite al conocer la duración.
+        onLoadedMetadata={(e) => {
+          if (start > 0 && e.currentTarget.currentTime < start - 0.3) e.currentTarget.currentTime = start;
+        }}
+        onTimeUpdate={(e) => {
+          if (end > 0 && !e.currentTarget.paused && e.currentTarget.currentTime >= end) restart(e.currentTarget);
+        }}
+        onEnded={(e) => restart(e.currentTarget)}
+      />
     </>
   );
 }

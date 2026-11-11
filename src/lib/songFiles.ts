@@ -47,3 +47,39 @@ export function songTitleFromFileName(name: string): string {
     .trim()
     .slice(0, 100);
 }
+
+/* Fragmento: la invitación puede reproducir solo un tramo de la canción (en segundos). */
+
+export const SONG_MAX_SECONDS = 3600;
+
+/** "1:05" o "65" → 65; vacío → 0; algo que no es un tiempo → null. */
+export function parseSongTime(value: string): number | null {
+  const t = value.trim().replace(",", ".");
+  if (!t) return 0;
+  const m = /^(?:(\d{1,3}):)?(\d{1,4}(?:\.\d)?)$/.exec(t);
+  if (!m) return null;
+  const seconds = Number(m[2]);
+  if (m[1] !== undefined && seconds >= 60) return null;
+  const total = (m[1] ? Number(m[1]) * 60 : 0) + seconds;
+  return total <= SONG_MAX_SECONDS ? total : null;
+}
+
+/** 65 → "1:05"; 65.5 → "1:05.5". */
+export function formatSongTime(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds * 10) / 10);
+  const m = Math.floor(total / 60);
+  const rest = Math.round((total - m * 60) * 10) / 10;
+  const [whole, tenth] = String(rest).split(".");
+  return `${m}:${whole.padStart(2, "0")}${tenth ? `.${tenth}` : ""}`;
+}
+
+/**
+ * Tramo válido: `start` desde 0 y `end` en 0 (hasta el final) o después del inicio. Un final que
+ * no deja al menos un segundo de música se descarta.
+ */
+export function cleanSongRange(start: unknown, end: unknown): { start: number; end: number } {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(Math.min(SONG_MAX_SECONDS, Math.max(0, v)) * 10) / 10 : 0);
+  const s = num(start);
+  const e = num(end);
+  return { start: s, end: e >= s + 1 ? e : 0 };
+}

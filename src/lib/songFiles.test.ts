@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { detectSongKind, songFileKind, songTitleFromFileName, songUrl, uploadedSongOwner } from "@/lib/songFiles";
+import { cleanSongRange, detectSongKind, formatSongTime, parseSongTime, songFileKind, songTitleFromFileName, songUrl, uploadedSongOwner } from "@/lib/songFiles";
+import { patchDesign } from "@/lib/invitationBlocks";
 import { sanitizeDesign } from "@/lib/invitationBlocks";
 
 const bytes = (...head: number[]) => Uint8Array.from([...head, ...new Array(16).fill(0)]);
@@ -43,5 +44,43 @@ describe("songFiles", () => {
     expect(song("https://ejemplo.com/a.mp3")).toBe("https://ejemplo.com/a.mp3");
     expect(song("/api/uploads/receipts/x.pdf")).toBe("");
     expect(song("javascript:alert(1)")).toBe("");
+  });
+});
+
+describe("fragmento de la canción", () => {
+  it("lee tiempos escritos como minuto:segundo o en segundos", () => {
+    expect(parseSongTime("1:05")).toBe(65);
+    expect(parseSongTime("65")).toBe(65);
+    expect(parseSongTime("0:07.5")).toBe(7.5);
+    expect(parseSongTime("  ")).toBe(0);
+    expect(parseSongTime("1:75")).toBeNull();
+    expect(parseSongTime("un minuto")).toBeNull();
+    expect(parseSongTime("999:00")).toBeNull();
+  });
+
+  it("escribe los segundos como minuto:segundo", () => {
+    expect(formatSongTime(65)).toBe("1:05");
+    expect(formatSongTime(7.5)).toBe("0:07.5");
+    expect(formatSongTime(600)).toBe("10:00");
+    expect(parseSongTime(formatSongTime(83.4))).toBe(83.4);
+  });
+
+  it("descarta un final que no va después del inicio", () => {
+    expect(cleanSongRange(30, 75)).toEqual({ start: 30, end: 75 });
+    expect(cleanSongRange(30, 0)).toEqual({ start: 30, end: 0 });
+    expect(cleanSongRange(30, 20)).toEqual({ start: 30, end: 0 });
+    expect(cleanSongRange(30, 30.5)).toEqual({ start: 30, end: 0 });
+    expect(cleanSongRange(-5, "x")).toEqual({ start: 0, end: 0 });
+    expect(cleanSongRange(Number.NaN, Infinity)).toEqual({ start: 0, end: 0 });
+  });
+
+  it("el diseño guarda el tramo solo si hay canción, y lo borra al cambiarla", () => {
+    const url = songUrl(WEDDING, "x.mp3");
+    const withSong = sanitizeDesign({ blocks: [], song: { url, title: "x", start: 62, end: 95.26 } })!;
+    expect(withSong.song).toMatchObject({ start: 62, end: 95.3 });
+    expect(sanitizeDesign({ blocks: [], song: { url: "", start: 62, end: 95 } })!.song).toMatchObject({ start: 0, end: 0 });
+    expect(sanitizeDesign({ blocks: [], song: { url, title: "x" } })!.song).toMatchObject({ start: 0, end: 0 });
+    expect(patchDesign(withSong, { songUrl: "https://ejemplo.com/otra.mp3" }).song).toMatchObject({ start: 0, end: 0 });
+    expect(patchDesign(withSong, { songTitle: "Otro nombre" }).song).toMatchObject({ start: 62, end: 95.3 });
   });
 });
