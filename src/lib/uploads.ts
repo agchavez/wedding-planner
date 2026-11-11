@@ -30,10 +30,11 @@ function sanitizeFileName(name: string): string {
 /** Guarda un archivo subido en UPLOADS_ROOT/<subdir>/ y devuelve la URL con la que se sirve. */
 export async function saveUploadedFile(
   file: File,
-  subdir: string
+  subdir: string,
+  maxSize = MAX_FILE_SIZE
 ): Promise<{ url: string; name: string } | null> {
   if (!file || file.size === 0) return null;
-  if (file.size > MAX_FILE_SIZE) throw new Error("El archivo supera el límite de 10 MB.");
+  if (file.size > maxSize) throw new Error(`El archivo supera el límite de ${Math.round(maxSize / 1024 / 1024)} MB.`);
 
   const dir = path.join(UPLOADS_ROOT, subdir);
   await mkdir(dir, { recursive: true });
