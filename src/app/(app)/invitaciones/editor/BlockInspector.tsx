@@ -7,11 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, ItineraryEditor, PaletteEditor } from "@/app/(app)/invitaciones/editor/fields";
 import { PhotoField, PhotosField, type PickerPhoto } from "@/app/(app)/invitaciones/editor/PhotoPicker";
-import { BLOCK_INFO, type BlockType, type Framing, type InvitationBlock, type InvitationDesign, type PhotoFraming } from "@/lib/invitationBlocks";
+import {
+  BLOCK_INFO,
+  OPENING_BUTTON_LABELS,
+  OPENING_BUTTON_STYLES,
+  OPENING_STYLE_LABELS,
+  OPENING_STYLES,
+  openingDefaultColors,
+  type BlockType,
+  type Framing,
+  type InvitationBlock,
+  type InvitationDesign,
+  type OpeningColors,
+  type OpeningStyle,
+  type PhotoFraming,
+} from "@/lib/invitationBlocks";
 import type { ItineraryEntry } from "@/lib/invitationThemes";
 
-type Kind = "text" | "area" | "photo" | "photos" | "bool" | "datetime" | "date" | "url" | "itinerary" | "colors";
-type Spec = { key: string; label: string; kind: Kind; placeholder?: string; hint?: string; rows?: number };
+type Kind = "text" | "area" | "photo" | "photos" | "bool" | "datetime" | "date" | "url" | "itinerary" | "colors" | "choice" | "color";
+type Spec = {
+  key: string;
+  label: string;
+  kind: Kind;
+  placeholder?: string;
+  hint?: string;
+  rows?: number;
+  /** "choice": opciones a elegir. */
+  options?: { value: string; label: string }[];
+  /** "color": qué color de fábrica de la apertura se muestra cuando está vacío. */
+  role?: keyof OpeningColors;
+};
 
 const EVENT_FIELDS: Spec[] = [
   { key: "title", label: "Título de la sección", kind: "text" },
@@ -30,8 +55,26 @@ const SPECS: Record<BlockType, Spec[]> = {
     { key: "photoUrl", label: "Foto de portada", kind: "photo", hint: "También sale en la tarjeta de WhatsApp." },
     { key: "headline", label: "Frase", kind: "text", placeholder: "¡Nos casamos!" },
     { key: "kicker", label: "Texto de la esquina", kind: "text", placeholder: "Vol. 01" },
+    {
+      key: "openingStyle",
+      label: "Apertura: estilo",
+      kind: "choice",
+      options: OPENING_STYLES.map((value) => ({ value, label: OPENING_STYLE_LABELS[value] })),
+      hint: "Lo primero que ve el invitado. Se abre tocando el botón o deslizando. Pruébala en «Ver como invitado».",
+    },
     { key: "openingKicker", label: "Apertura: texto de arriba", kind: "text", placeholder: "Edición especial", hint: "Se le agrega la fecha." },
-    { key: "openingPhotoUrl", label: "Apertura: foto", kind: "photo", hint: "Vacío: la misma de la portada." },
+    { key: "openingButtonText", label: "Apertura: texto del botón", kind: "text", placeholder: "Abrir invitación" },
+    {
+      key: "openingButtonStyle",
+      label: "Apertura: forma del botón",
+      kind: "choice",
+      options: OPENING_BUTTON_STYLES.map((value) => ({ value, label: OPENING_BUTTON_LABELS[value] })),
+      hint: "En el arco con foto el botón es siempre el sello.",
+    },
+    { key: "openingBg", label: "Apertura: color de fondo", kind: "color", role: "bg" },
+    { key: "openingText", label: "Apertura: color del texto", kind: "color", role: "text" },
+    { key: "openingAccent", label: "Apertura: color de acento", kind: "color", role: "accent", hint: "El «&» y las líneas finas." },
+    { key: "openingPhotoUrl", label: "Apertura: foto", kind: "photo", hint: "Solo en el arco con foto. Vacío: la misma de la portada." },
     { key: "marquee", label: "Cinta de frases", kind: "area", rows: 3, hint: "Una frase por línea. Vacío: fecha, ciudad y nombres." },
   ],
   guestMessage: [
@@ -205,6 +248,55 @@ export function BlockInspector({
                 <PaletteEditor value={(value as string[]) ?? []} onChange={(v) => set(spec.key, v)} disabled={disabled} />
               </div>
             );
+          case "choice":
+            return (
+              <div key={spec.key}>
+                <p className="mb-1.5 text-sm font-medium">{spec.label}</p>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label={spec.label}>
+                  {spec.options?.map((o) => (
+                    <Button
+                      key={o.value}
+                      type="button"
+                      size="sm"
+                      variant={value === o.value ? "default" : "outline"}
+                      aria-pressed={value === o.value}
+                      disabled={disabled}
+                      onClick={() => set(spec.key, o.value)}
+                    >
+                      {o.label}
+                    </Button>
+                  ))}
+                </div>
+                {spec.hint && <p className="mt-1 text-xs text-muted-foreground">{spec.hint}</p>}
+              </div>
+            );
+          case "color": {
+            const chosen = String(value ?? "");
+            const fallback = openingDefaultColors(props.openingStyle as OpeningStyle)[spec.role ?? "bg"];
+            return (
+              <div key={spec.key}>
+                <p className="mb-1.5 text-sm font-medium">{spec.label}</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={chosen || fallback}
+                    disabled={disabled}
+                    onChange={(e) => set(spec.key, e.target.value)}
+                    className="size-10 cursor-pointer rounded-full border border-border bg-transparent p-0.5 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch-wrapper]:p-0"
+                    aria-label={spec.label}
+                  />
+                  {chosen ? (
+                    <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => set(spec.key, "")}>
+                      Restablecer
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Color del estilo</span>
+                  )}
+                </div>
+                {spec.hint && <p className="mt-1 text-xs text-muted-foreground">{spec.hint}</p>}
+              </div>
+            );
+          }
           case "area":
             return (
               <Field key={spec.key} label={spec.label} hint={spec.hint}>

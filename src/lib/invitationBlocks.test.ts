@@ -4,6 +4,7 @@ import {
   eventTimeToIso,
   findBlock,
   isoToEventTime,
+  openingColors,
   patchDesign,
   projectDesign,
   sanitizeDesign,
@@ -110,5 +111,34 @@ describe("invitationBlocks", () => {
     expect(findBlock(next, "cover")?.props.photoUrl).toBe("https://example.com/c.jpg");
     expect(findBlock(next, "ceremony")?.props.time).toBe("2026-12-12T16:00");
     expect(findBlock(next, "countdown")?.hidden).toBe(true);
+  });
+});
+
+describe("apertura de la portada", () => {
+  const coverOf = (props: Record<string, unknown>) => findBlock(sanitizeDesign({ blocks: [{ id: "c", type: "cover", props }] })!, "cover")!.props;
+
+  it("las invitaciones guardadas sin estilo conservan el arco y el botón de siempre", () => {
+    const c = coverOf({ headline: "Hola" });
+    expect(c.openingStyle).toBe("arch");
+    expect(c.openingButtonText).toBe("Abrir invitación");
+    expect(c.openingButtonStyle).toBe("outline");
+    expect([c.openingBg, c.openingText, c.openingAccent]).toEqual(["", "", ""]);
+  });
+
+  it("acepta los estilos conocidos y descarta lo demás", () => {
+    expect(coverOf({ openingStyle: "side", openingButtonStyle: "solid" })).toMatchObject({ openingStyle: "side", openingButtonStyle: "solid" });
+    expect(coverOf({ openingStyle: "explosion", openingButtonStyle: 7 })).toMatchObject({ openingStyle: "arch", openingButtonStyle: "outline" });
+  });
+
+  it("solo guarda colores #rrggbb", () => {
+    const c = coverOf({ openingBg: "#1A2B3C", openingText: "red; background:url(x)", openingAccent: "#fff" });
+    expect(c.openingBg).toBe("#1a2b3c");
+    expect(c.openingText).toBe("");
+    expect(c.openingAccent).toBe("");
+  });
+
+  it("usa los colores de fábrica del estilo cuando no se eligió ninguno", () => {
+    expect(openingColors(coverOf({ openingStyle: "curtain" }))).toEqual({ bg: "#343a26", text: "#f2eee3", accent: "#a8996a" });
+    expect(openingColors(coverOf({ openingStyle: "arch", openingBg: "#000000" }))).toEqual({ bg: "#000000", text: "#343a26", accent: "#a8996a" });
   });
 });

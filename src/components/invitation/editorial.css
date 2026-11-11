@@ -139,6 +139,23 @@
     repeating-linear-gradient(90deg, rgb(52 58 38 / 0.02) 0 1px, transparent 1px 4px);
 }
 
+/* Telones tipográficos: el texto va en las hojas y se va con ellas (arriba/abajo o a los lados). */
+.ed-leaf { background: var(--o-bg); transition: transform 1.3s cubic-bezier(0.8, 0, 0.2, 1); }
+.ed-opening.open .ed-leaf-top { transform: translateY(-100%); }
+.ed-opening.open .ed-leaf-bottom { transform: translateY(100%); }
+.ed-opening.open .ed-leaf-left { transform: translateX(-100%); }
+.ed-opening.open .ed-leaf-right { transform: translateX(100%); }
+
+/* Botón de la apertura: toma los colores elegidos (--o-fg sobre --o-bg). */
+@keyframes ed-obtn-k { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--o-fg) 35%, transparent); } 50% { box-shadow: 0 0 0 14px transparent; } }
+.ed-obtn { border-radius: 9999px; padding: 0.75rem 1.75rem; color: var(--o-fg); transition: background-color 0.2s ease, color 0.2s ease; }
+.ed-obtn-outline { border: 1px solid color-mix(in srgb, var(--o-fg) 40%, transparent); animation: ed-obtn-k 2.4s ease-in-out infinite; }
+.ed-obtn-outline:hover { background: var(--o-fg); color: var(--o-bg); }
+.ed-obtn-solid { background: var(--o-fg); color: var(--o-bg); animation: ed-obtn-k 2.4s ease-in-out infinite; }
+.ed-obtn-solid:hover { background: color-mix(in srgb, var(--o-fg) 85%, var(--o-bg)); }
+.ed-obtn-text { padding: 0.5rem 0.25rem; border-radius: 0; border-bottom: 1px solid var(--o-accent); }
+.ed-obtn:focus-visible { outline: 2px solid var(--o-accent); outline-offset: 4px; }
+
 /* Bloque seleccionado en el editor. */
 .ed-block { position: relative; cursor: pointer; }
 .ed-block::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 30; box-shadow: inset 0 0 0 0 transparent; transition: box-shadow 0.15s; }
@@ -146,6 +163,6 @@
 .ed-block.is-selected::after { box-shadow: inset 0 0 0 3px #a8996a; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ed-drift, .ed-breathe { animation: none; }
-  .ed-half, .ed-open-content, .ed-seam { transition-duration: 0.01s; transition-delay: 0s; }
+  .ed-drift, .ed-breathe, .ed-obtn { animation: none; }
+  .ed-half, .ed-leaf, .ed-open-content, .ed-seam { transition-duration: 0.01s; transition-delay: 0s; }
 }
