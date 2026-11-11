@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Eye, EyeOff, Loader2, Upload } from "lucide-react";
+import { Eye, EyeOff, Loader2, Play, Upload } from "lucide-react";
 import { uploadInvitationSong } from "@/app/(app)/invitaciones/actions";
-import { SONG_MAX_BYTES, uploadedSongOwner } from "@/lib/songFiles";
+import { cleanSongRange, formatSongTime, parseSongTime, SONG_MAX_BYTES, uploadedSongOwner } from "@/lib/songFiles";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -344,6 +344,35 @@ export function GlobalInspector({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const uploaded = uploadedSongOwner(design.song.url) !== null;
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const testing = useRef(false);
+  const [rangeError, setRangeError] = useState("");
+
+  function setRange(start: number, end: number) {
+    const clean = cleanSongRange(start, end);
+    // Un final que no deja al menos un segundo después del inicio no sirve.
+    setRangeError(end > 0 && clean.end === 0 ? "El final debe ir después del inicio." : "");
+    onChange({ ...design.song, ...clean }, "song:range");
+  }
+  function setTime(which: "start" | "end", value: string) {
+    const seconds = parseSongTime(value);
+    if (seconds === null) return setRangeError("Escribe el tiempo como minuto:segundo, por ejemplo 1:05.");
+    if (which === "start") setRange(seconds, design.song.end);
+    else setRange(design.song.start, seconds);
+  }
+  /** Usa el momento en que va el reproductor de arriba. */
+  function mark(which: "start" | "end") {
+    const now = Math.round((audioRef.current?.currentTime ?? 0) * 10) / 10;
+    if (which === "start") setRange(now, design.song.end);
+    else setRange(design.song.start, now);
+  }
+  function testFragment() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = design.song.start;
+    testing.current = true;
+    void audio.play().catch(() => (testing.current = false));
+  }
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -357,7 +386,7 @@ export function GlobalInspector({
       const data = new FormData();
       data.set("song", file);
       const res = await uploadInvitationSong(data);
-      if (res.ok) onChange({ url: res.url, title: design.song.title.trim() || res.title }, "song:upload");
+      if (res.ok) onChange({ url: res.url, title: design.song.title.trim() || res.title, start: 0, end: 0 }, "song:upload");
       else setError(res.error);
     } catch {
       setError("No se pudo subir la canción. Inténtalo de nuevo.");
@@ -388,7 +417,7 @@ export function GlobalInspector({
             {uploading ? "Subiendo…" : uploaded ? "Cambiar archivo" : "Elegir archivo"}
           </Button>
           {design.song.url && !uploading && (
-            <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => onChange({ url: "", title: "" }, "song:remove")}>
+            <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => onChange({ url: "", title: "", start: 0, end: 0 }, "song:remove")}>
               Quitar canción
             </Button>
           )}
@@ -399,12 +428,79 @@ export function GlobalInspector({
             {error}
           </p>
         )}
-        {design.song.url && <audio key={design.song.url} src={design.song.url} controls preload="none" className="mt-2 h-9 w-full" />}
+        {design.song.url && (
+          <audio
+            key={design.song.url}
+            ref={audioRef}
+            src={design.song.url}
+            controls
+            preload="none"
+            className="mt-2 h-9 w-full"
+            // "Probar fragmento": se detiene al llegar al final elegido.
+            onTimeUpdate={(e) => {
+              if (testing.current && design.song.end > 0 && e.currentTarget.currentTime >= design.song.end) {
+                e.currentTarget.pause();
+                testing.current = false;
+              }
+            }}
+            onPause={() => (testing.current = false)}
+          />
+        )}
       </div>
+      {design.song.url && (
+        <div>
+          <p className="text-sm font-medium">Fragmento</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Para que suene solo una parte. Escribe los tiempos (minuto:segundo) o reproduce la canción arriba y marca el momento. Vacío: la canción completa.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                { key: "start", label: "Empieza en", placeholder: "0:00" },
+                { key: "end", label: "Termina en", placeholder: "Final" },
+              ] as const
+            ).map((f) => (
+              <div key={f.key}>
+                <Field label={f.label}>
+                  <Input
+                    key={`${design.song.url}:${f.key}:${design.song[f.key]}`}
+                    defaultValue={design.song[f.key] > 0 ? formatSongTime(design.song[f.key]) : ""}
+                    placeholder={f.placeholder}
+                    inputMode="numeric"
+                    disabled={disabled}
+                    onBlur={(e) => setTime(f.key, e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                  />
+                </Field>
+                <Button type="button" variant="ghost" size="sm" className="mt-1 h-7 px-2 text-xs" disabled={disabled} onClick={() => mark(f.key)}>
+                  Marcar aquí
+                </Button>
+              </div>
+            ))}
+          </div>
+          {rangeError && (
+            <p role="alert" className="mt-1 text-xs text-destructive">
+              {rangeError}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={testFragment}>
+              <Play className="size-3.5" />
+              Probar fragmento
+            </Button>
+            {(design.song.start > 0 || design.song.end > 0) && (
+              <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => setRange(0, 0)}>
+                Canción completa
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
       <Field label="O pega un enlace al audio" hint="Un archivo de audio público. Los enlaces de Spotify o YouTube no se pueden reproducir.">
         <Input
           value={uploaded ? "" : design.song.url}
-          onChange={(e) => onChange({ ...design.song, url: e.target.value }, "song:url")}
+          // Otro enlace es otra canción: el fragmento elegido ya no aplica.
+          onChange={(e) => onChange({ ...design.song, url: e.target.value, start: 0, end: 0 }, "song:url")}
           placeholder={uploaded ? "Canción subida. Pega un enlace para reemplazarla." : "https://…/cancion.mp3"}
           disabled={disabled}
         />
