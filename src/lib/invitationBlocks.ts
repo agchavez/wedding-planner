@@ -22,6 +22,7 @@
 
 import { designThemeFor, isDesignTheme, ITINERARY_ICONS, type DesignTheme, type ItineraryEntry } from "@/lib/invitationThemes";
 import type { InvitationData } from "@/lib/guestInvitations";
+import { uploadedSongOwner } from "@/lib/songFiles";
 
 export const BLOCK_TYPES = [
   "cover",
@@ -257,6 +258,9 @@ export function isSafeImageUrl(url: string) {
 }
 
 export const isSafeLinkUrl = (url: string) => /^https?:\/\/[^\s]+$/i.test(url);
+
+/** Canción: un enlace http(s) a un audio o una canción subida a este servidor (/api/cancion/…). */
+export const isSafeSongUrl = (url: string) => isSafeLinkUrl(url) || uploadedSongOwner(url) !== null;
 
 /** URL directa de Google Drive para una foto (sin redirecciones: la tarjeta de WhatsApp no las sigue). */
 export const driveImageUrl = (driveFileId: string) => `https://lh3.googleusercontent.com/d/${driveFileId}=w2000`;
@@ -533,7 +537,7 @@ export function sanitizeDesign(raw: unknown, { trim = true }: { trim?: boolean }
   return {
     v: 1,
     theme: isDesignTheme(src.theme) ? src.theme : designThemeFor(typeof src.theme === "string" ? src.theme : ""),
-    song: { url: isSafeLinkUrl(songUrl) ? songUrl : "", title: text(song.title, 100) },
+    song: { url: isSafeSongUrl(songUrl) ? songUrl : "", title: text(song.title, 100) },
     blocks,
   };
 }

@@ -1,6 +1,9 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
+import { useRef, useState } from "react";
+import { Eye, EyeOff, Loader2, Upload } from "lucide-react";
+import { uploadInvitationSong } from "@/app/(app)/invitaciones/actions";
+import { SONG_MAX_BYTES, uploadedSongOwner } from "@/lib/songFiles";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -245,17 +248,72 @@ export function GlobalInspector({
   onChange: (song: InvitationDesign["song"], key: string) => void;
   disabled?: boolean;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const uploaded = uploadedSongOwner(design.song.url) !== null;
+
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    setError("");
+    if (file.size > SONG_MAX_BYTES) {
+      setError(`La canción supera el límite de ${SONG_MAX_BYTES / 1024 / 1024} MB.`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const data = new FormData();
+      data.set("song", file);
+      const res = await uploadInvitationSong(data);
+      if (res.ok) onChange({ url: res.url, title: design.song.title.trim() || res.title }, "song:upload");
+      else setError(res.error);
+    } catch {
+      setError("No se pudo subir la canción. Inténtalo de nuevo.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>
         <p className="font-heading text-base font-semibold">Canción</p>
         <p className="text-xs text-muted-foreground">Un botón para escucharla queda flotando en la invitación.</p>
       </div>
-      <Field label="Enlace al audio (mp3)" hint="Un archivo de audio público. Los enlaces de Spotify o YouTube no se pueden reproducir.">
+      <div>
+        <p className="mb-1.5 text-sm font-medium">Subir la canción</p>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a"
+          className="hidden"
+          onChange={(e) => void upload(e.target.files?.[0])}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={disabled || uploading} onClick={() => fileRef.current?.click()}>
+            {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+            {uploading ? "Subiendo…" : uploaded ? "Cambiar archivo" : "Elegir archivo"}
+          </Button>
+          {design.song.url && !uploading && (
+            <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => onChange({ url: "", title: "" }, "song:remove")}>
+              Quitar canción
+            </Button>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Un archivo mp3 o m4a de hasta {SONG_MAX_BYTES / 1024 / 1024} MB.</p>
+        {error && (
+          <p role="alert" className="mt-1 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+        {design.song.url && <audio key={design.song.url} src={design.song.url} controls preload="none" className="mt-2 h-9 w-full" />}
+      </div>
+      <Field label="O pega un enlace al audio" hint="Un archivo de audio público. Los enlaces de Spotify o YouTube no se pueden reproducir.">
         <Input
-          value={design.song.url}
+          value={uploaded ? "" : design.song.url}
           onChange={(e) => onChange({ ...design.song, url: e.target.value }, "song:url")}
-          placeholder="https://…/cancion.mp3"
+          placeholder={uploaded ? "Canción subida. Pega un enlace para reemplazarla." : "https://…/cancion.mp3"}
           disabled={disabled}
         />
       </Field>

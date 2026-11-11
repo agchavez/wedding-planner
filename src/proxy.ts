@@ -25,6 +25,8 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/galeria/") ||
     pathname.startsWith("/compartir/") ||
     pathname.startsWith("/api/compartir/") ||
+    // Canción de la invitación: la escuchan los invitados, que no tienen sesión.
+    pathname.startsWith("/api/cancion/") ||
     pathname.startsWith("/i/") ||
     pathname === "/propuestas" ||
     pathname.startsWith("/propuestas/foto/") ||

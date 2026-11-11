@@ -8,6 +8,8 @@ import { audit } from "@/lib/audit";
 import { getInvitationSettings, invitationDesigns, NOT_SENT_FILTER, toInvitationData } from "@/lib/guestInvitations";
 import { findInvitationExample } from "@/lib/invitationExamples";
 import { patchDesign, projectDesign, sanitizeDesign } from "@/lib/invitationBlocks";
+import { detectSongKind, SONG_MAX_BYTES, songTitleFromFileName, songUrl } from "@/lib/songFiles";
+import { saveUploadedFile } from "@/lib/uploads";
 
 const text = (value: unknown, max = 500) => String(value ?? "").trim().slice(0, max);
 
@@ -22,6 +24,29 @@ async function loadDesigns(weddingId: string) {
     getInvitationSettings(weddingId),
   ]);
   return invitationDesigns(settings, toInvitationData(wedding, settings));
+}
+
+/**
+ * Sube la canción de la invitación (mp3 o m4a) y devuelve su enlace público. No cambia el
+ * diseño: el editor pone el enlace en el borrador y se publica como cualquier otro cambio.
+ */
+export async function uploadInvitationSong(formData: FormData): Promise<{ ok: true; url: string; title: string } | { ok: false; error: string }> {
+  const weddingId = await getEditableWeddingId();
+  const file = formData.get("song");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Elige un archivo de audio." };
+  if (file.size > SONG_MAX_BYTES) return { ok: false, error: `La canción supera el límite de ${SONG_MAX_BYTES / 1024 / 1024} MB.` };
+
+  // El tipo sale del contenido, no del nombre: el archivo se sirve públicamente como audio.
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const kind = detectSongKind(bytes);
+  if (!kind) return { ok: false, error: "El archivo no es un mp3 o m4a válido." };
+
+  const base = (file.name || "cancion").replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "cancion";
+  const saved = await saveUploadedFile(new File([bytes], `${base}.${kind}`), `songs/${weddingId}`, SONG_MAX_BYTES);
+  if (!saved) return { ok: false, error: "No se pudo guardar la canción." };
+
+  await audit("invitation.song_upload", "Subió la canción de la invitación", { weddingId });
+  return { ok: true, url: songUrl(weddingId, saved.url.split("/").pop() ?? ""), title: songTitleFromFileName(file.name || "") };
 }
 
 /** Autoguardado del editor: solo el borrador, los invitados siguen viendo lo publicado. */
