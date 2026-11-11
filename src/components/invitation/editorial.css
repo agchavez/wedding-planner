@@ -13,8 +13,19 @@
 [data-reveal="left"] { transform: translateX(-36px); }
 [data-reveal="right"] { transform: translateX(36px); }
 [data-reveal="scale"] { transform: scale(0.94); }
-[data-reveal="clip"] { opacity: 1; transform: none; clip-path: inset(100% 0 0 0); }
-[data-reveal="wipe"] { opacity: 1; transform: none; clip-path: inset(0 100% 0 0); }
+/*
+ * "clip" y "wipe": el recorte va en los hijos, no en el elemento observado. Un elemento recortado
+ * por completo con su propio clip-path nunca "entra en pantalla" para IntersectionObserver (el
+ * navegador descuenta el recorte), así que no recibía `.in` y la foto se quedaba invisible.
+ */
+[data-reveal="clip"], [data-reveal="wipe"] { opacity: 1; transform: none; }
+[data-reveal="clip"] > *, [data-reveal="wipe"] > * {
+  transition: clip-path 1.2s cubic-bezier(0.7, 0, 0.2, 1);
+  transition-delay: calc(var(--d, 0) * 110ms);
+}
+[data-reveal="clip"] > * { clip-path: inset(100% 0 0 0); }
+[data-reveal="wipe"] > * { clip-path: inset(0 100% 0 0); }
+[data-reveal="clip"].in > *, [data-reveal="wipe"].in > * { clip-path: inset(0 0 0 0); }
 [data-reveal="blur"] { transform: none; filter: blur(14px); }
 [data-reveal].in {
   opacity: 1;
@@ -107,12 +118,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
+  [data-reveal="clip"] > *, [data-reveal="wipe"] > * { clip-path: none; transition: none; }
   .pp-ken-wait { transform: none; }
   .pp-ken, .pp-marquee, .pp-spin, .pp-bob, .pp-twinkle, .pp-shimmer, .pp-pulse { animation: none; }
 }
 
 /* Vista previa del editor: todo visible desde el inicio (sin esperar al scroll). */
 .pp-static [data-reveal] { opacity: 1; transform: none; clip-path: inset(0 0 0 0); filter: none; transition: none; }
+.pp-static [data-reveal="clip"] > *, .pp-static [data-reveal="wipe"] > * { clip-path: none; transition: none; }
 .pp-static .pp-draw path, .pp-static .pp-draw circle { stroke-dashoffset: 0; }
 
 /* Apertura: el contenido se desvanece y luego el telón de lino se abre en dos. */
