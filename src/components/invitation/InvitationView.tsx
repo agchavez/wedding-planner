@@ -316,13 +316,16 @@ function GuestMessage({ block, ctx }: BlockProps<"guestMessage">) {
         )}
         {ctx.guest && p.showSeats && (
           <div data-reveal className="mt-8 flex items-center gap-4 border-y py-4" style={{ ...d(2), borderColor: C.line }}>
+            <p className="text-[11px] tracking-[0.25em] uppercase" style={{ color: C.muted }}>
+              Tenemos
+            </p>
             <span className="text-5xl leading-none italic" style={{ fontFamily: SERIF }}>
               {ctx.guest.seats}
             </span>
             <p className="text-[11px] leading-relaxed tracking-[0.25em] uppercase" style={{ color: C.muted }}>
               {ctx.guest.seats === 1 ? "Lugar reservado" : "Lugares reservados"}
               <br />
-              {ctx.guest.seats === 1 ? "para ti" : "para ti y tu compañía"}
+              para ti
             </p>
           </div>
         )}
