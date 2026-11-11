@@ -621,7 +621,7 @@ function Gallery({ block, ctx }: BlockProps<"gallery">) {
                 type="button"
                 key={src + i}
                 onClick={() => ctx.openLightbox(photos, i)}
-                className="group relative shrink-0 snap-start overflow-hidden"
+                className="group relative shrink-0 snap-center overflow-hidden"
                 data-reveal="scale"
                 style={d(i % 4)}
               >
