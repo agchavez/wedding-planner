@@ -108,10 +108,48 @@ function cleanFraming(value: unknown): Framing {
   return out;
 }
 
+/**
+ * Estilos de la pantalla de apertura. "arch": lino con la foto en un arco y sello. Los demás son
+ * el telón tipográfico: "curtain" (iniciales, se parte arriba y abajo), "side" (una inicial por
+ * hoja, se abre a los lados) y "names" (nombres de pila, se parte entre los dos).
+ */
+export const OPENING_STYLES = ["arch", "curtain", "side", "names"] as const;
+export type OpeningStyle = (typeof OPENING_STYLES)[number];
+export const OPENING_STYLE_LABELS: Record<OpeningStyle, string> = {
+  arch: "Arco con foto",
+  curtain: "Telón con iniciales",
+  side: "Telón lateral",
+  names: "Telón con nombres",
+};
+
+export const OPENING_BUTTON_STYLES = ["outline", "solid", "text"] as const;
+export type OpeningButtonStyle = (typeof OPENING_BUTTON_STYLES)[number];
+export const OPENING_BUTTON_LABELS: Record<OpeningButtonStyle, string> = {
+  outline: "Contorno",
+  solid: "Relleno",
+  text: "Solo texto",
+};
+
+export type OpeningColors = { bg: string; text: string; accent: string };
+
+/** Colores de fábrica de cada apertura: el arco es claro (lino) y los telones, verde olivo. */
+export function openingDefaultColors(style: OpeningStyle): OpeningColors {
+  return style === "arch"
+    ? { bg: "#f2eee3", text: "#343a26", accent: "#a8996a" }
+    : { bg: "#343a26", text: "#f2eee3", accent: "#a8996a" };
+}
+
+/** Colores de la apertura: los elegidos en el bloque o, si están vacíos, los de fábrica del estilo. */
+export function openingColors(props: Pick<BlockPropsMap["cover"], "openingStyle" | "openingBg" | "openingText" | "openingAccent">): OpeningColors {
+  const def = openingDefaultColors(props.openingStyle);
+  return { bg: props.openingBg || def.bg, text: props.openingText || def.text, accent: props.openingAccent || def.accent };
+}
+
 export type BlockPropsMap = {
   /**
    * Portada y pantalla de apertura. `openingPhotoUrl` vacío = la misma foto de portada;
    * `marquee`: frases de la cinta, una por línea (vacío = se arman con la fecha y el lugar).
+   * `openingBg`, `openingText` y `openingAccent`: "#rrggbb" o vacío (colores de fábrica del estilo).
    */
   cover: {
     headline: string;
@@ -119,6 +157,12 @@ export type BlockPropsMap = {
     photoUrl: string;
     openingPhotoUrl: string;
     openingKicker: string;
+    openingStyle: OpeningStyle;
+    openingButtonText: string;
+    openingButtonStyle: OpeningButtonStyle;
+    openingBg: string;
+    openingText: string;
+    openingAccent: string;
     marquee: string;
     framing: Framing;
   };
@@ -191,6 +235,12 @@ export const DEFAULT_PROPS: { [K in BlockType]: BlockPropsMap[K] } = {
     photoUrl: "",
     openingPhotoUrl: "",
     openingKicker: "Edición especial",
+    openingStyle: "arch",
+    openingButtonText: "Abrir invitación",
+    openingButtonStyle: "outline",
+    openingBg: "",
+    openingText: "",
+    openingAccent: "",
     marquee: "",
     framing: {},
   },
@@ -434,6 +484,7 @@ const LIMITS: Record<string, number> = {
   headline: 80,
   kicker: 80,
   openingKicker: 80,
+  openingButtonText: 40,
   marquee: 400,
   message: 1500,
   brideParents: 300,
@@ -456,6 +507,11 @@ const LIMITS: Record<string, number> = {
 };
 
 const URL_KEYS = new Set(["photoUrl", "openingPhotoUrl", "mapUrl", "registryUrl"]);
+/** Propiedades con una lista cerrada de valores. */
+const ENUM_KEYS: Record<string, readonly string[]> = { openingStyle: OPENING_STYLES, openingButtonStyle: OPENING_BUTTON_STYLES };
+/** Propiedades que son un solo color ("#rrggbb") o vacío. */
+const COLOR_KEYS = new Set(["openingBg", "openingText", "openingAccent"]);
+const HEX_RE = /^#[0-9a-f]{6}$/i;
 
 function cleanUrl(key: string, value: unknown) {
   const url = text(value, 2000);
@@ -484,8 +540,10 @@ function cleanProps<T extends BlockType>(type: T, raw: unknown, trim: boolean): 
     else if (URL_KEYS.has(key)) out[key] = cleanUrl(key, value);
     else if (key === "time") out[key] = typeof value === "string" && DATETIME_RE.test(value) ? value : "";
     else if (key === "deadline") out[key] = typeof value === "string" && DATE_RE.test(value) ? value : "";
+    else if (ENUM_KEYS[key]) out[key] = typeof value === "string" && ENUM_KEYS[key].includes(value) ? value : def;
+    else if (COLOR_KEYS.has(key)) out[key] = typeof value === "string" && HEX_RE.test(value) ? value.toLowerCase() : "";
     else if (key === "colors" || key === "avoidColors")
-      out[key] = Array.isArray(value) ? value.filter((c): c is string => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 6) : [];
+      out[key] = Array.isArray(value) ? value.filter((c): c is string => typeof c === "string" && HEX_RE.test(c)).slice(0, 6) : [];
     else if (key === "photos")
       out[key] = Array.isArray(value)
         ? [...new Set(value.map((u) => text(u, 2000)).filter(isSafeImageUrl))].slice(0, 12)
